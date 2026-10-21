@@ -167,7 +167,10 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
   role as the app checks an edit; the `.mthd` is
   written only on the computer that started sharing. A change the role doesn't allow is
   `refused` with nothing written, and so is any change from a computer with no actor id
-  yet once the owner has set roles.
+  yet once the owner has set roles. Once changes are signed (decisions.md, entry 89), the
+  server signs with the person's key, as the command line does (docs/CLI.md); a change is
+  `refused` while that key isn't in the budget yet (open it in Method Budget once) and
+  after the person was removed.
 - At most 32 files are kept open; past that the one used longest ago is forgotten, with its
   undo steps.
 

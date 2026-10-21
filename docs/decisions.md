@@ -4374,6 +4374,156 @@ docs/CLI.md, `method-budget incentives`; MCP: `set_credit`, `list_charges`, `inc
   unapplied credit's row figures in its rows table, and a per-location view in the printed
   reports. The terms band needs a live check in the app.
 
+## 89. Signed changes and removal by cutoff in a shared budget (2026-10-20, built on the recommendation)
+
+Roadmap 3.18's next step after roles (entry 78): each person's key pair, every change
+signed, removal by cutoff (docs/research/collaboration.md, section 7). The owner's go-ahead
+(relayed 2026-10-20) was to build it on the recommendation, `ed25519-dalek` included,
+provided it passes the 14-day crate-age check and `cargo deny`; it does, so it is marked
+"built on the recommendation" in the roadmap and can be reversed from the digest.
+Docs/APP.md, "Sharing a budget", says what a person sees; docs/FORMAT.md, "The change
+log", has the file rules; this records the choices.
+
+- **The dependency.** `ed25519-dalek` 3.0.0 (published 2026-07-06, BSD-3-Clause), pinned
+  exactly in method-format with `default-features = false` and only `fast` (precomputed
+  tables) and `zeroize`: no rand, serde or pkcs8. It brings `curve25519-dalek` 5.0.0
+  (BSD-3-Clause), `ed25519` 3.0.0 and `signature` 3.0.0 (Apache-2.0 OR MIT), `sha2`,
+  `digest` 0.11.3, `block-buffer` 0.12.1, `crypto-common` 0.2.2, `hybrid-array` 0.4.15,
+  `cpufeatures` 0.3.1 (MIT OR Apache-2.0), `curve25519-dalek-derive` 0.1.1 and, on a backend
+  we don't build, `fiat-crypto` 0.3.0. `sha2` 0.11.1 was 8 days old, so the lock holds
+  0.11.0 (209 days). A new key's 32 random bytes come from `getrandom` 0.3.4, already in the
+  lock through Tauri, on a desktop only. The engine (`method-core`) stays dependency-free
+  and builds for a browser: it is handed a `Signer` and a `Verifier`
+  (`method_core::log::sign`); method-format implements them over the change's line in the
+  file, which is what is signed, and keeps the key file. That is where the actor id file
+  already lives, so the app, the command line and the MCP server read one key.
+- **Keys.** One key pair per computer, made when it first starts sharing or joins a shared
+  budget: `signing-key` beside the actor id (`~/.method/signing-key`, or beside
+  `$METHOD_ACTOR_FILE`), the 32-byte seed as hex, written private (0600) through a
+  temporary file linked into place so two programs making one at once keep the first, never
+  in the shared folder. Actor ids stay 32 random bytes; the public key is a new op, `key
+  {key}`, in a change of the actor's own, signed by that key. Making the actor id the key
+  (the design's first idea) would have given every existing member a new actor and lost
+  their roles. A command line or agent (a tool actor, entry 78) publishes the same key as
+  its person and signs with it; its `acts_for` (or its `key`) must be signed with the key
+  its person published, which must be within the change's `deps`. That closes entry 78's
+  remaining hole (a new actor saying it writes for anyone).
+- **What is signed.** Ed25519, checked strictly, over `method-budget-log change v1`, a
+  newline and the change's canonical line without its `sig`; `sig` (128 hex characters) is
+  the line's last field. Lines are canonical, so a reader rebuilds the line from what it
+  read and checks that; a line written another way doesn't match, like an altered one.
+- **When signing starts, and the format.** With the owner's key: the owner's app puts it
+  into the change that sets the first role, or, for a budget whose roles were set by an
+  earlier version, into a change of its own the first time the owner opens it. Everyone
+  else's app puts its key in as soon as it has seen the owner's ("Added this computer's
+  key"), and from its key on signs everything. A change must be signed when its author has
+  a key, when it has seen the owner's key, or when its author is a stranger to the owner's
+  key change (no change of theirs within its `deps`, no role, not the owner), whatever the
+  change claims to have seen; otherwise, or when the signature doesn't verify, it is left
+  out and listed (`LogError::Unsigned`), exactly as a change beyond its author's role is
+  (`Log::rejected`, the status panel's list). **The log format is raised again, to 3**,
+  from the owner's key on (`budget.json` and every segment holding a `key`, a `revoke` or a
+  `sig`): the first role already raises it to 2 (entry 78), but 0.4.0 to 0.7.0 read 2 and
+  check no signatures, so without a second bump they would keep taking in unsigned changes
+  in anyone's name after signing started. At 3 they refuse the folder as newer than they
+  read and open the file on their own, as 0.3.0 does with roles. Budgets without roles
+  never sign and stay at 1; budgets with roles stay at 2 until their owner opens them in
+  this version.
+- **Removal by cutoff.** A new op, `revoke {actor}`, given by the same rules as a `grant`
+  (the owner removes anyone, a co-owner anyone but co-owners, an admin anyone but admins
+  and co-owners, nobody the owner), is a grant of read only plus a cutoff: the change's own
+  `deps`. A change by that person, or by a program that writes for them, outside those
+  `deps` and not having seen the removal is left out on every computer (`LogError::Removed`,
+  "It was made after its author was removed."), whatever it claims to have seen; their
+  changes within the remover's `deps` stay. A role given again later (made having seen the
+  removal) lets them back in for changes that have seen it, without reviving the ones left
+  out. The design's "last seq accepted" is the `deps` entry; using the whole `deps` also
+  covers the person's programs, which the remover may know of.
+- **The first role closes the backdating hole** entry 78 left open ("anyone can still write
+  a change whose `deps` hold only the genesis"): the owner's first change holding a role
+  judges a change by an actor it didn't know of (no change within its `deps`, not named by
+  it, not the owner) that doesn't include it as made after it, where that actor reads only.
+  People it knew keep entry 78's rule (judged as of their own `deps`), so a member's real
+  work made apart from the first role still counts.
+- **Order independence.** These three (the owner's first role, the owner's first key, every
+  removal) judge changes outside their own future, so a change applied before one of them
+  arrived may have to be left out after. The log then folds every change it has taken in
+  again, in the order taken, with all three known, until the set of them stops changing
+  (a removal can only be undone by its author's own removal, which runs down the ranks, so
+  it settles). It is rare (only when one of them arrives after changes it judges) and the
+  app reprojects when it happens (`Log::folds`). A computer's own changes left out that way
+  are still written to the folder, so nobody waits for a missing number.
+- **Not built, said in APP.md**: a new key for a person (a key is published once; a lost or
+  stolen computer is removed), grants that expire, "same person" links between computers,
+  and a way for a person who only uses the command line to put their key in (their app does
+  it). Until a person's computer has put its key in after the owner's, a change written in
+  their name at their next number by someone with the folder can't be told from theirs:
+  that window is the time their app takes to open the budget.
+- **Interface.** The Share dialog says in a sentence whether changes are signed, and under
+  each person "Signs changes" or that their changes are left out until their computer adds a
+  key; Remove… under each person the viewer may set the role of, with a question in place
+  ("Remove Jordan Lee? From now on Jordan Lee reads only, and any change of theirs that
+  hasn't reached you yet is left out on every computer. You can give them a role again
+  later."), then `share_remove_person`; a removed person shows "Removed: reads only, and
+  later changes are left out", and their own app refuses edits with "You were removed from
+  this shared budget...". The status panel's list of changes left out gives the new reasons
+  in sentences; the Activity tab marks signed changes ("2:14 PM · signed"). `method-budget
+  log` says whether changes are signed (`--json`: `signed`, and each actor's `key`).
+- Tests: core (crates/method-core/tests/log.rs, with a stand-in signature scheme, since the
+  engine holds no cryptography): signing starts at the first role and every later change is
+  signed; a budget without roles never signs; a tampered change is left out with why; a
+  change without a signature, signed with another key, or by a stranger claiming to be from
+  before roles is left out; a removed person's later change is left out in twelve orders and
+  their earlier one kept, and a role given again lets them back; only those who set a
+  person's role remove them; a program signs with its person's key; and the property test
+  `signed_changes_and_removals_converge_in_any_order` (an owner, three members and a silent
+  one whose name is forged, random edits, removals and roles given again, forgeries unsigned,
+  signed with another key and copied from real changes, exchanged in random orders, plus a
+  newcomer: same frontier, budget, members and left-out set, 24 seeds, more than five
+  changes cut by removals in all). Format (real Ed25519): a signature verifies, a changed
+  byte or another key doesn't, it is the line's last field, the key file is private and kept
+  and no temporary file is left; through the folder, the first role raises the format to 3
+  and a reader checks every signature, no key file is written into the shared folder, a line
+  altered in the folder and an unsigned change are left out, a removal cuts what the remover
+  hadn't seen, and a program signs with its person's key or is refused in words
+  (`NO_KEY_YET`, `REMOVED`). App (two sessions on one folder): changes are signed from the
+  first role and the lists say so, a change altered in the folder is left out with why,
+  removing a person leaves out their later changes and a role given again brings them back;
+  the reasons are plain. Command line: `set` is refused until the person's key is in, then
+  signs with it, and `log` reports it.
+
+- **After review (MReview, pull request #73):**
+  - *A key in someone else's name.* Anyone who can write in the folder can publish a `key` for
+    a person who has none yet. `Log::key_conflict` compares the key published for this
+    actor with this computer's; when they differ the log signs nothing and records nothing
+    as that actor (`LogError::Unsigned` with `why::KEY_TAKEN`). The app says so in the
+    toolbar, the status panel and the Share dialog (`key_warning`) and refuses edits with
+    that sentence; `SharedEdit` (command line, MCP) checks the person's key and its own and
+    refuses with `KEY_NOT_YOURS`, writing nothing. For the owner, on a budget whose roles
+    predate signing (or a new one before its first role), a planted key in the owner's name
+    would start signing; the owner's app finds it and refuses, but who counts as the owner
+    then changes who can do what, so the options are with the owner (roadmap, open
+    decisions). Tests: `a_key_published_in_my_name_stops_me_signing` (core),
+    `a_key_in_a_persons_name_that_isnt_theirs_stops_their_programs` (format),
+    `a_key_in_my_name_that_isnt_mine_is_said_and_stops_my_edits` and
+    `a_key_in_the_owners_name_on_a_roles_budget_is_found_and_refused` (app).
+  - *A refused change no longer takes the real change's number.* Before, a forgery that
+    arrived first was refused but held the number, so the real change with it was dropped as
+    a duplicate on that computer only, and computers disagreed. Now a different change at a
+    number already taken is kept with the others claiming it (`Log::forks`) and the log folds
+    again; in the fold a claimed number is settled only when nothing else can go on, among
+    every claim ready by then: the one that passes is applied, the rest listed; none passing
+    refuses the number; more than one passing (a fork) applies none and lists all, loudly,
+    in the status panel (decided as impossible with signing, so refused rather than picked).
+    A claim still waiting for its dependencies is weighed again when they arrive. Entry 62's
+    "the first stays" rule for forks is replaced by this. Tests:
+    `a_real_change_takes_the_place_of_a_forgery_at_its_number_in_either_order`,
+    `two_valid_changes_with_one_number_are_refused_loudly`, the updated
+    `a_malformed_change_is_refused_and_listed`, and the property test, which now plants
+    forgeries at members' next numbers, keeps them from the member until the end, and adds
+    two newcomers taking every forgery first and every one last (24 seeds; 200 run once).
+  - Test names: invented names only.
+
 ## 90. Rate tables the user keeps, and filling a line's rate from one (2026-10-20, the owner's direction)
 
 Roadmap 3.9. The owner (relayed 2026-10-20): 3.9 is on the legal line, so build only the
@@ -4753,3 +4903,59 @@ the framework is built and adding a language is a table.
   page, engine messages with stable codes, the native dialogs, room for longer words and
   a right-to-left check, a language override in the preferences, and the languages
   themselves, which wait on the owner's choice.
+
+## 95. The owner's key: start again, and the first key seen remembered (2026-10-20, the owner's decision)
+
+Roadmap 3.18, the open question entry 89 left: anyone who can write in a shared folder can
+publish a key in the owner's name before the owner's app does, and whoever holds it then
+signs as the owner. The owner (relayed 2026-10-20): "build 3.18 options 1 and 3". Design:
+docs/research/owner-key.md. Behavior: docs/APP.md, "Start Again" and "The owner's key,
+remembered"; format: docs/FORMAT.md, "A budget started again" and "The owner's key,
+remembered".
+
+- **Start Again (option 1), on the owner's computer only.** Offered when the key in the
+  owner's name isn't this computer's. `method_format::log::start_again` makes a new log in
+  memory from the budget as the old log folds it (refused changes left out): `Log::adopt` by
+  the owner, then `Log::publish_key_now` (the owner's key in a change of its own, which
+  starts signing before any role), then a `grant` per person with a role, a department's
+  scope matched to the new ids by category and account code. It is written beside the old
+  folder, the old one is marked `REPLACED` and moved aside, and the new one moved in; a stop
+  between the two moves is finished by the next open. The keeper's file is written from the
+  new log. Nothing is deleted. Members' unshared changes are listed, not replayed: they were
+  made against a history that no longer exists, and replaying them silently is how a planted
+  change could slip through.
+- **The first owner key seen (option 3).** Each computer keeps the owner's key the first
+  time it sees it, outside the shared folder (which anyone in the budget can write):
+  `owner-keys/<budget id>.json` beside the actor id. `Log::pin_owner_key` is set before the
+  log is read; a change by the owner that publishes or is signed with another key is refused
+  with "it is signed with an owner key this computer hasn't seen before", and
+  `Log::owner_key_changed` stops this computer recording anything. On the owner's own
+  computer only its own key is remembered. A budget started again has a new id, so its key is
+  remembered afresh. **Trust the New Key** rewrites the file, for an owner who moved to a new
+  computer without handing over.
+- **A replacement carries what a computer knew** (MReview on pull request #73). Everything
+  that marks a replacement lives in the shared folder, so a member could swap in a log of
+  their own and be remembered as the owner of the "new" budget. Each computer also keeps,
+  per budget file (`owner-keys/paths/<hash of the path>.json`), which budget it knew there,
+  its owner and the owner's key. Opening a log with another budget id there: another owner
+  is refused ("The change log beside this budget was started by someone other than its
+  owner..."); the owner's key it had seen is remembered for the new budget too, so the same
+  key joins without a word and a different one is held until Trust the New Key, whether or
+  not the old folder is still there. After a genuine Start Again over a planted key, the
+  computers that had seen the planted key trust the real one once, after asking the owner.
+- **Not built: option 2** (confirming the owner's key by phone or chat): a step per member
+  that people skip. It can sit on top of the remembered key later without a format change.
+- **What it leaves.** A member who joins only after a key was planted, and whose owner never
+  opens the budget again, takes the planted key as the owner's. The owner's app finds the
+  mismatch the moment it opens the budget, and offers Start Again.
+  Likewise, a computer that knew the budget only before the owner's key existed, or whose
+  budget file was moved or renamed, has nothing to carry and takes the new key as the first
+  it sees.
+- **Tests.** Engine: a remembered key keeps a rebuilt folder's owner key out and stops
+  recording; the real folder raises nothing; a computer that remembers nothing takes it in;
+  the owner's key before any role starts signing. Format: a planted key, Start Again with
+  roles and a department scope carried, the budget unchanged, the old folder kept aside and
+  ignored, a member's open log noticing, a fresh reader taking everything in, a stop between
+  the moves finished; the first key remembered outside the folder, never a planted one on the
+  owner's computer. App: Start Again offered only to the owner, a member refused until they
+  reopen, then sharing as before.

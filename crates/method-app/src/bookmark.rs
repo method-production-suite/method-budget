@@ -314,9 +314,9 @@ mod tests {
 
     #[test]
     fn the_trash_is_not_a_place_to_follow_a_file_to() {
-        assert!(in_trash(Path::new("/Users/sam/.Trash/Big Show.mthd")));
+        assert!(in_trash(Path::new("/Users/riley/.Trash/Big Show.mthd")));
         assert!(in_trash(Path::new("/Volumes/Work/.Trashes/501/a.mthd")));
-        assert!(!in_trash(Path::new("/Users/sam/Films/Trash talk.mthd")));
+        assert!(!in_trash(Path::new("/Users/riley/Films/Trash talk.mthd")));
     }
 
     #[test]

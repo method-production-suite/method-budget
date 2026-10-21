@@ -15,14 +15,19 @@
 //! moved out of someone's categories while they edited it keeps their
 //! edit.
 //!
-//! Without signatures this is enforced by honest apps only: anyone who
-//! can write to the shared folder can write a change in someone else's
-//! name. Signatures come with the key pairs of phase 3 (design 7).
+//! Signatures (decisions.md, entry 89; [`super::sign`]) make it hold
+//! against anyone who can write to the shared folder: once signing has
+//! started, a change in someone's name needs their key. What a change
+//! claims to have seen can still be a lie, so three kinds of change also
+//! judge changes that never saw them ([`Bounds`]): the owner's first role
+//! (a computer it never saw and didn't name is judged as after it), the
+//! owner's key (the same computers must sign), and every removal (the
+//! person's changes the remover hadn't seen are kept aside).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use super::clock::Frontier;
+use super::clock::{ChangeId, Frontier};
 use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, Op};
 use super::state::{GrantWrite, Register, State};
@@ -155,6 +160,14 @@ pub fn started_at(grants: &BTreeMap<ActorId, Register<GrantWrite>>, deps: &Front
 /// of which saw the others, the higher-ranked granter wins, then the later
 /// stamp, so every computer settles them alike.
 pub fn grant_at<'a>(reg: &'a Register<GrantWrite>, deps: &Frontier) -> Option<&'a Role> {
+    grant_write_at(reg, deps).map(|w| &w.role)
+}
+
+/// The grant write [`grant_at`] settles on.
+pub fn grant_write_at<'a>(
+    reg: &'a Register<GrantWrite>,
+    deps: &Frontier,
+) -> Option<&'a GrantWrite> {
     let seen: Vec<&(super::clock::Stamp, GrantWrite)> = reg
         .history()
         .iter()
@@ -167,7 +180,7 @@ pub fn grant_at<'a>(reg: &'a Register<GrantWrite>, deps: &Frontier) -> Option<&'
                 .any(|(o, w)| o.change() != s.change() && w.deps.includes(s.change()))
         })
         .max_by_key(|(s, w)| (w.rank, *s))
-        .map(|(_, w)| &w.role)
+        .map(|(_, w)| w)
 }
 
 /// The person `actor` writes for at `deps` (`Op::ActsFor`), or itself.
@@ -243,11 +256,188 @@ fn kind_of(state: &State, made: &Made, uid: Uid) -> Option<Kind> {
         .or_else(|| state.entity(uid).map(|e| e.kind))
 }
 
+/// The person a change writes for: the one its own `acts_for` names, or
+/// the one its actor writes for at its `deps`, or the actor itself.
+pub fn person_of_change(state: &State, change: &Change) -> ActorId {
+    change
+        .ops
+        .iter()
+        .find_map(|op| match op {
+            Op::ActsFor { person } => Some(*person),
+            _ => None,
+        })
+        .unwrap_or_else(|| person_at(state, change.actor, &change.deps))
+}
+
+/// A change that also judges changes that never saw it: what it is, and
+/// who it had heard of.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Bound {
+    pub id: ChangeId,
+    pub deps: Frontier,
+    /// Actors with a change it had seen, the owner, and anyone a role it
+    /// had seen (or gives) names: everyone it knew of.
+    pub known: BTreeSet<ActorId>,
+}
+
+impl Bound {
+    /// Whether `change` is judged as after this one although it never saw
+    /// it: made by someone this one didn't know of, without having seen it.
+    pub fn catches_stranger(&self, change: &Change) -> bool {
+        change.id() != self.id
+            && !self.known.contains(&change.actor)
+            && !change.deps.includes(self.id)
+    }
+}
+
+/// A removal: who, and everything the remover had seen.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Removal {
+    pub id: ChangeId,
+    pub person: ActorId,
+    pub deps: Frontier,
+}
+
+impl Removal {
+    /// Whether `change`, made for `person`, falls after the cutoff: the
+    /// remover hadn't seen it and it hadn't seen the removal.
+    pub fn cuts(&self, person: ActorId, change: &Change) -> bool {
+        person == self.person
+            && change.seq > self.deps.get(&change.actor)
+            && !change.deps.includes(self.id)
+    }
+}
+
+/// The changes that judge changes outside their own future (decisions.md,
+/// entry 89). Taken from the changes applied; when one arrives after
+/// changes it judges differently, the log folds everything again.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Bounds {
+    /// The owner's first change giving a role.
+    pub roles: Option<Bound>,
+    /// The owner's first change publishing a key: signing starts.
+    pub signing: Option<Bound>,
+    /// Every removal applied.
+    pub removals: Vec<Removal>,
+}
+
+impl Bounds {
+    /// What `change` adds, now that it is applied to `state`.
+    pub fn note(&mut self, state: &State, change: &Change) {
+        let owner = state.owner();
+        let known = || {
+            let mut k: BTreeSet<ActorId> = change
+                .deps
+                .0
+                .iter()
+                .filter(|(_, s)| **s > 0)
+                .map(|(a, _)| *a)
+                .collect();
+            k.extend(owner);
+            k.insert(change.actor);
+            for (a, reg) in state.grants() {
+                if grant_at(reg, &change.deps).is_some() {
+                    k.insert(*a);
+                }
+            }
+            for op in &change.ops {
+                if let Op::Grant { actor, .. } | Op::Revoke { actor } = op {
+                    k.insert(*actor);
+                }
+            }
+            k
+        };
+        if Some(change.actor) == owner {
+            if self.roles.is_none() && change.grants() {
+                self.roles = Some(Bound {
+                    id: change.id(),
+                    deps: change.deps.clone(),
+                    known: known(),
+                });
+            }
+            if self.signing.is_none() && change.key().is_some() {
+                self.signing = Some(Bound {
+                    id: change.id(),
+                    deps: change.deps.clone(),
+                    known: known(),
+                });
+            }
+        }
+        for op in &change.ops {
+            if let Op::Revoke { actor } = op {
+                self.removals.push(Removal {
+                    id: change.id(),
+                    person: *actor,
+                    deps: change.deps.clone(),
+                });
+            }
+        }
+    }
+
+    /// Whether `change` (already applied) would be judged differently by
+    /// the bounds `new` adds.
+    pub fn changes_verdict(state: &State, new: &Bounds, old: &Bounds, change: &Change) -> bool {
+        if state.owner() == Some(change.actor) {
+            return false;
+        }
+        let fresh = |b: &Option<Bound>, o: &Option<Bound>| {
+            b.as_ref()
+                .filter(|b| o.as_ref().map(|o| o.id) != Some(b.id))
+                .is_some_and(|b| b.catches_stranger(change))
+        };
+        if fresh(&new.roles, &old.roles) || fresh(&new.signing, &old.signing) {
+            return true;
+        }
+        let person = person_of_change(state, change);
+        new.removals
+            .iter()
+            .filter(|r| !old.removals.contains(r))
+            .any(|r| r.cuts(person, change))
+    }
+
+    /// Whether `change` falls after a removal of its person.
+    pub fn removed(&self, state: &State, change: &Change) -> Option<&Removal> {
+        if self.removals.is_empty() {
+            return None;
+        }
+        let person = person_of_change(state, change);
+        self.removals.iter().find(|r| r.cuts(person, change))
+    }
+
+    /// Whether `change` must be signed: its author has a key (or publishes
+    /// one in it), it was made after the owner's key, or its author is a
+    /// stranger to the owner's key change.
+    pub fn must_sign(&self, state: &State, change: &Change) -> bool {
+        if state.key_of(change.actor).is_some() || change.key().is_some() {
+            return true;
+        }
+        self.signing
+            .as_ref()
+            .is_some_and(|s| change.deps.includes(s.id) || s.catches_stranger(change))
+    }
+}
+
 /// Checks every op of `change` against its author's role at the change's
 /// causal point. `change` must already pass [`State::check`].
 pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
+    check_within(state, &Bounds::default(), change)
+}
+
+/// [`check`], with the changes that judge changes which never saw them.
+pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(), Refusal> {
     let deps = &change.deps;
-    let role = role_at(state, change.actor, deps);
+    // A computer the owner's first role never knew of, writing as if it
+    // hadn't seen it: judged as after it, where it has no role.
+    let stranger = state.owner() != Some(change.actor)
+        && bounds
+            .roles
+            .as_ref()
+            .is_some_and(|r| r.catches_stranger(change));
+    let role = if stranger {
+        Role::ReadOnly
+    } else {
+        role_at(state, change.actor, deps)
+    };
     let mut made = Made::new();
     let mut made_links = false;
     for (index, op) in change.ops.iter().enumerate() {
@@ -316,7 +506,18 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
             made_links = true;
             continue;
         }
-        if let Op::Grant { actor, role: given } = op {
+        if let Op::Key { .. } = op {
+            // A key is about the computer, not the budget: anyone may
+            // publish theirs (the signature checks say whether it is theirs).
+            continue;
+        }
+        let granted = match op {
+            Op::Grant { actor, role } => Some((actor, role.clone())),
+            Op::Revoke { actor } => Some((actor, Role::ReadOnly)),
+            _ => None,
+        };
+        if let Some((actor, given)) = granted {
+            let given = &given;
             if !role.sets_roles() {
                 return Err(refuse("only the owner and admins set roles".into()));
             }

@@ -1503,6 +1503,9 @@ pub fn run() {
             crate::shared_app::share_blame,
             crate::shared_app::share_use_value,
             crate::shared_app::share_set_role,
+            crate::shared_app::share_remove_person,
+            crate::shared_app::share_start_again,
+            crate::shared_app::share_reopen,
             // The personal setup library (src/library.rs)
             crate::library::library_view,
             crate::library::library_create,

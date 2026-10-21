@@ -2329,7 +2329,7 @@ mod tests {
     #[test]
     fn folders_under_home_are_written_from_tilde() {
         let sep = std::path::MAIN_SEPARATOR;
-        let home = PathBuf::from(format!("{sep}Users{sep}sam"));
+        let home = PathBuf::from(format!("{sep}Users{sep}riley"));
         let under = home.join("Films").join("Big Show");
         assert_eq!(
             folder_text(Some(&under), Some(&home)),

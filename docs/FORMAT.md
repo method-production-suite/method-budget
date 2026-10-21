@@ -1688,6 +1688,13 @@ and every segment holding a `grant` has `format` 2. A program that reads only ve
 refuses the folder as newer than it reads (Method Budget 0.3.0 then opens the `.mthd` on
 its own, unshared, and says why) rather than skipping the roles and editing a stale budget.
 
+It is 3 from the owner's key on (decisions.md, entry 89): the computer writing the first
+`key`, `revoke` or signed change raises it before writing the segment, and every segment
+holding one has `format` 3. A program that reads only version 2 (Method Budget 0.4.0 to
+0.7.0) can't check signatures, so it must not take in changes once they are signed: it
+refuses the folder as newer than it reads, as above, rather than accepting a change written
+in someone else's name. A log without roles never reaches 3.
+
 ### Segment files
 
 A segment is UTF-8 text: a header line, then one change per line, each a single-line
@@ -1711,17 +1718,84 @@ sequence, all by `actor`.
 
 | Field | Meaning |
 |---|---|
-| `actor` | The computer that made it: 32 bytes as 64 hex characters (its public key, once changes are signed). |
+| `actor` | The computer (or a program on it) that made it: 32 random bytes as 64 hex characters. Its public key is a separate `key` op. |
 | `seq` | This actor's count, from 1 with no gaps. `(actor, seq)` names the change. |
 | `deps` | The last `seq` the author had seen from each actor (a version vector; actors at 0 are left out). A reader holds a change until everything in `deps` has been applied. |
 | `lamport` | 1 + the highest `lamport` the author had seen. Two writes to one field are settled by `(lamport, actor, seq, index)`: the higher wins everywhere. Wall clocks decide nothing. |
 | `time` | The author's wall clock, ISO 8601, shown but never used to order anything. |
 | `label` | What the person did, in the words the application's undo uses. |
 | `ops` | The operations, in order. |
+| `sig` | The author's Ed25519 signature, 128 hex characters; left out of an unsigned change. Always the last field. |
 
 Each line is written in canonical form (keys in this order, no spaces, UTF-8), so the
-same change always gives the same bytes; the budget id and, later, signatures cover those
-bytes. A `sig` field is reserved for signed changes (phase 3 of the design).
+same change always gives the same bytes; the budget id and signatures cover those bytes.
+
+### Signatures
+
+A signature (decisions.md, entry 89) is Ed25519 (RFC 8032, checked strictly: no weak keys,
+no malleable signatures) over the bytes `method-budget-log change v1` and a newline,
+followed by the change's canonical line without its `sig` field. A reader rebuilds that
+line from what it read and checks it; a line written any other way than canonically
+doesn't match and is treated like an altered one.
+
+**Keys.** An actor publishes its public key with a `key` op in a change of its own, signed
+by that key; from that change on, every change of that actor must be signed with it. A key
+is published once per actor and doesn't change (a second `key` is refused). A program that
+writes for a person (`acts_for`) signs with the person's key: the change holding its
+`acts_for`, or its own `key`, must be signed with the key the person published, and the
+person's `key` must be within the change's `deps`. Private keys never go into the folder;
+the reference implementation keeps one per computer, 64 hex characters of the 32-byte
+seed, in `~/.method/signing-key` beside the actor id (`$METHOD_ACTOR_FILE`'s folder),
+readable by its owner only.
+
+**When a change must be signed.** Signing starts with the owner's key: the owner's first
+change holding a `key` (the reference implementation puts it in the owner's first `grant`,
+or in a change of its own when the owner opens a budget that already has roles). A change
+must be signed when its actor has published a key (in it or before it), when its `deps`
+include the owner's key change, or when its actor is a stranger to that change: an actor
+with no change within the owner's key change's `deps`, given no role in or before it, and
+not the owner, whatever the change's own `deps` claim. A change that must be signed and
+isn't, or whose signature doesn't verify against its author's key, is refused and listed
+(its `seq` still counts). A change that need not be signed but carries a `sig` without a
+published key is refused too.
+
+**Strangers to the first role.** The owner's first change holding a `grant` judges changes
+that never saw it in the same way: a change by an actor it didn't know of (no change within
+its `deps`, not named by it, not the owner) that doesn't include it in its `deps` is judged
+as made after it, where that actor has no role and reads only. A change by someone it knew
+keeps the rule above (judged as of its own `deps`).
+
+**Removal.** A `revoke` of a person is a `grant` of `read_only` (by the same rules: who may
+give it, ranks) plus a cutoff: every change by that person, or by an actor that writes for
+them, that is not within the `revoke` change's `deps` and doesn't have the `revoke` within
+its own `deps` is refused and listed, on every reader, whatever it claims to have seen. Their
+changes within the remover's `deps` stay. A later `grant` to them (made having seen the
+`revoke`) gives them a role again for changes that have seen it.
+
+**A budget started again** (decision 95). The owner can replace a shared budget's log with
+a new one: a new genesis (so a new budget id), the owner's `key` in the next change, then a
+`grant` for each person who had a role. The new folder is written beside the old one as
+`.~Feature.mthd-log-new/`, a `REPLACED` file holding the new budget id and a newline is
+written into the old folder, the old folder is renamed `Feature.mthd-log-replaced-<date>`
+(with `-2`, `-3`... when taken) and the new one renamed into its place. A reader ignores a
+log folder holding `REPLACED`. A reader that finds no log folder but a whole
+`.~Feature.mthd-log-new/` (a stop between the two renames) moves it into place first. No op
+is added; the version stays 3.
+
+**The owner's key, remembered.** A reader may remember the owner's key the first time it
+sees it, outside the folder (the reference implementation keeps
+`~/.method/owner-keys/<budget id>.json`, `{ "owner", "key", "seen" }`, or under
+`$METHOD_OWNER_KEYS`), and from then on refuse and list a change by the owner that publishes
+or is signed with any other key. Such a reader writes nothing until the person trusts the new
+key. Nothing about it is written into the folder. It also keeps, per budget file, which
+budget it knew there, its owner and the owner's key; a log with a new budget id beside that
+file whose genesis actor isn't that owner is refused, and the owner's key it knew is
+remembered for the new budget too (a different key is then held, as above).
+
+These three (the owner's first `grant`, the owner's first `key`, each `revoke`) judge changes
+outside their own future, so a reader that applied a change before one of them arrived
+folds every change it holds again, in the order it took them, with all three known, until
+nothing more changes. The result is the same whatever order changes arrive in.
 
 ### Operations
 
@@ -1740,6 +1814,8 @@ the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `n
 | `add` | `entity`, `field`, `member` | Adds to a tag set; an add wins over a concurrent remove. |
 | `remove` | `entity`, `field`, `member`, `seen` | Removes the adds the remover had seen (`seen` lists their stamps). |
 | `acts_for` | `person` | The change's actor writes for `person`: a command line or agent on that person's computer, which writes as an actor of its own so it never shares a sequence of changes with the app (decisions.md, entry 78). It has the person's role. Refused (judged at the change's `deps`) unless roles are already set; unless `person` is the owner or has a role; when the actor is the owner's, has a role of its own, writes for someone already, or has a change kept that was made once roles were set; and when `person` itself writes for someone. So it is a new program's first word, and never raises a person's own actor. A segment holding one has `format` 2 like a `grant`. |
+| `key` | `key` | The change's actor's Ed25519 public key, 64 hex characters (below). Once per actor; the change is signed with it. Any role may publish one. A segment holding one has `format` 3. |
+| `revoke` | `actor` | Removes a person: `read_only` and a cutoff at this change's `deps` (below). Who may give it follows `grant`. A segment holding one has `format` 3. |
 | `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. A grant made after seeing another for the same person replaces it; among grants made apart (none saw the others), the one whose granter ranked higher when giving it wins (owner, then co-owner, then admin), then the later stamp. |
 
 **Roles.** The actor of the first change (the genesis) owns the budget. Until a `grant`
@@ -1753,8 +1829,9 @@ everything, and sets the roles of everyone but the owner, co-owners and admins; 
 `baseline`; `department` creates, changes, moves and deletes rows and notes within its
 scope only (a move must start and end there); `actuals` transactions, batches, `etc`
 entries and notes; `comment` notes only; `read_only` nothing. Only the owner and
-co-owners give `admin` or change an admin's role; nobody changes the owner's. Until changes are signed
-this holds against honest applications only. A `grant` whose `scope` is not empty is
+co-owners give `admin` or change an admin's role; nobody changes the owner's. Before the
+owner's key (signatures, below) this holds against honest applications only; after it, a
+change in someone's name needs their key. A `grant` whose `scope` is not empty is
 malformed unless its role is `department`. A program writing a shared budget without a
 window (the command line, the MCP server) records its edit as a change by this computer's
 actor, checked like any other, and never rewrites the `.mthd` unless that actor started
@@ -1831,9 +1908,18 @@ only when there are any, the whole list as one value) and a row's `rate_source`
 2. A change that names an entity that doesn't exist, puts an entity in a list its kind
    can't be in, or hangs a position on a missing one is refused whole, listed for the
    owner, and the actor's count moves past it.
-3. A second change with the same `(actor, seq)` and different content is a fork: the
-   first stays, the second is refused.
-4. The budget is a pure function of the applied changes, with these repairs made on the
+3. Two different changes with the same `(actor, seq)` are settled the same way in any
+   order (decisions.md, entry 89): when that number comes up and nothing else can go on,
+   the one change among them that passes is applied and the others are listed; when none
+   passes, the number is refused; when more than one passes (a fork, which signing makes
+   impossible without the key), none is applied and all are listed. A claim whose
+   dependencies haven't arrived when its number is settled is weighed again when they do.
+   A refused change never keeps the real one out.
+4. A change that must be signed and isn't, or whose signature doesn't match its author's
+   key, is refused and listed; so is one made by a removed person after the cutoff, and one
+   by a stranger to the first role that goes beyond read only (see Signatures). The actor's
+   count moves past it.
+5. The budget is a pure function of the applied changes, with these repairs made on the
    way out and never written back: two live rows with one id (the later shows with an id
    derived from its creating op, in the shared range `[2^32, 2^53)`); two live items of
    one kind with one name (identical ones are one item; otherwise the later shows as
@@ -1849,6 +1935,9 @@ type) keep the version and are left out when unused; breaking changes raise it, 
 readers refuse a newer version with a message to update.
 
 - **Version 1** (2026-10): first form, unsigned.
+- **Version 2** (2026-10-18): `grant` and `acts_for` (roles; decisions.md, entry 78).
+- **Version 3** (2026-10-20): `key`, `revoke` and the `sig` field (signed changes and
+  removal by cutoff; decisions.md, entry 89).
 
 ## Review files
 

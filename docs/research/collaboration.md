@@ -6,9 +6,12 @@ undo; `method_format::log`: the folder, segments and heartbeats; `method log` an
 `method sync`; decisions.md, entry 62) and the app's folder mode (decisions.md, entry
 64; docs/APP.md, "Sharing a budget"): the Session records every edit and absorbs the
 folder, File > Share, the status item, presence from heartbeats, flashes, conflict
-badges, the Review and Activity tabs, Who Changed This, per-person undo. Not yet built:
-signatures, roles and invites (phase 3), iroh live sessions (phase 4), the extras (5),
-and the service-by-service checks of section 5 on real sync services.
+badges, the Review and Activity tabs, Who Changed This, per-person undo. Phase 3 so
+far: roles (decisions.md, entry 78) and key pairs, signed changes and removal by cutoff
+(entry 89; section 7 says where the build differs from this design). Not yet built:
+invites, muted cells, locks and access requests (the rest of phase 3), iroh live sessions
+(phase 4), the extras (5), and the service-by-service checks of section 5 on real sync
+services.
 Written for the owner's
 direction from a design discussion: a change log under the model, shared-folder sync
 first (Dropbox, iCloud Drive, Google Drive, LucidLink; each person writes their own
@@ -619,9 +622,23 @@ received. In folder mode, read access is the folder's own sharing permission (a 
 Dropbox share), and our role only stops their app from making changes. In live mode, peers
 only send the log to authenticated members.
 
+**As built (decisions.md, entry 89)**, with these differences from the above. The key
+is a 0600 file beside the computer's actor id in the app's data folder, not the system
+keychain, which the command line can read as well, so a program writing for its person
+signs with the person's key. Actor ids stay 32 random bytes and the public key is a
+separate `key` op in the actor's own change, so budgets shared before signing keep their
+actors and roles. The genesis is not signed (budgets shared before keys existed have an
+unsigned one); signing starts with the owner's first `key`, put in with the first role.
+Membership records are the existing `grant` op (entry 78). Grants don't expire yet, and
+"same person" links between two computers are not built. A key doesn't change yet: a
+lost computer is removed.
+
 **Revoking**: the owner writes a revocation naming the member and **the last seq of
 theirs that is accepted**. Everything after it is rejected everywhere, whatever causal
-history the change claims. This closes the classic hole where a removed member
+history the change claims. (As built, the cutoff is the revocation change's own `deps`,
+which covers the person's programs too, and a later role lets them back in for changes
+that have seen it; the owner's first role and first key judge changes that never saw them
+the same way, decisions.md entry 89.) This closes the classic hole where a removed member
 backdates changes to look concurrent with the removal (one of the open problems Ink &
 Switch lists for Keyhive). The removed member's genuine offline work after that seq is
 lost unless someone re-applies it from the rejected-changes list.
@@ -1069,7 +1086,8 @@ months in. Live mode about 1 to 1.5 months later.
 14. **New dependencies when their time comes**: Tauri's deep-link plugin (and
     single-instance on Windows and Linux) for `methodbudget://` links, `ed25519-dalek` or
     iroh's key crate in phase 3, iroh in phase 4. Each would pass the cooldown and a size
-    check first.
+    check first. (`ed25519-dalek` 3.0.0 added for phase 3, built on the recommendation,
+    2026-10-20; decisions.md, entry 89.)
 
 ---
 

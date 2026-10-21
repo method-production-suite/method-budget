@@ -132,6 +132,15 @@ export function renderBar(view) {
   if (s.error) {
     text = s.error;
     tone = 'bad';
+  } else if (s.replaced) {
+    text = 'The owner started this budget again: reopen it to join';
+    tone = 'bad';
+  } else if (s.key_warning) {
+    text = 'Your changes here aren’t shared: a key in your name isn’t this computer’s';
+    tone = 'bad';
+  } else if (s.owner_key_warning) {
+    text = 'The owner’s key changed: ask the owner before you go on';
+    tone = 'bad';
   } else if (s.unshared > 0) {
     text = s.unshared === 1 ? 'Sharing 1 change…' : `Sharing ${s.unshared} changes…`;
     tone = 'busy';
@@ -305,14 +314,17 @@ function drawPanel() {
   rows.push(line('Keeps the file', s.keeper ? 'This computer' : (s.people.find((p) => p.keeper) || {}).name || 'Another computer'));
   if (s.file_written) rows.push(line('File last written', localTime(s.file_written)));
   if (s.error) rows.push(el('p', { class: 'share-problem', text: s.error, attrs: { role: 'alert' } }));
+  if (s.key_warning) rows.push(el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }));
+  const keyRows = ownerKeyRows(s);
+  if (keyRows) rows.push(...keyRows);
   if (s.notice) rows.push(el('p', { class: 'share-notice', text: s.notice, attrs: { role: 'status' } }));
   rows.push(line('Your changes not yet shared', String(s.unshared), s.unshared ? 'is-busy' : ''));
   if (s.waiting) rows.push(line('Changes waiting for ones that haven’t arrived', String(s.waiting), 'is-warn'));
   if (typeof s.synced_secs === 'number') rows.push(line('Folder last read', ago(s.synced_secs + extra)));
   rows.push(line('Changes in all', String(s.changes)));
   const people = el('div', { class: 'share-people-list' });
-  people.append(personRow(s.me));
-  for (const p of s.people) people.append(personRow(p));
+  people.append(personRow(s.me, s));
+  for (const p of s.people) people.append(personRow(p, s));
   rows.push(el('h4', { class: 'share-panel-sub', text: 'People' }), people);
   const refused = refusedList(s);
   if (refused) rows.push(...refused);
@@ -325,6 +337,91 @@ function drawPanel() {
   rows.push(actions);
   panel.replaceChildren(...rows);
 }
+
+/**
+ * A key in the owner's name (docs/research/owner-key.md): Start Again on the
+ * owner's computer, Reopen once the owner started the budget again, and
+ * Trust the New Key when the owner's key isn't the one this computer saw.
+ * Each asks first.
+ */
+function ownerKeyRows(s) {
+  const out = [];
+  const confirm = el('div', { class: 'share-first-role', attrs: { role: 'group' } });
+  confirm.hidden = true;
+  const error = el('p', { class: 'share-problem', attrs: { role: 'alert' } });
+  error.hidden = true;
+  const ask = (button, label, message, goText, run) => {
+    button.addEventListener('click', () => {
+      error.hidden = true;
+      const go = el('button', { class: 'btn btn-primary', text: goText, attrs: { type: 'button' } });
+      const keep = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+      keep.addEventListener('click', () => { confirm.hidden = true; button.focus(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        try {
+          await run();
+          confirm.hidden = true;
+        } catch (e) {
+          error.textContent = String(e);
+          error.hidden = false;
+        }
+        go.disabled = false;
+      });
+      confirm.setAttribute('aria-label', label);
+      confirm.replaceChildren(el('p', { class: 'modal-message', text: message }), el('div', { class: 'modal-actions' }, keep, go));
+      confirm.hidden = false;
+      go.focus();
+    });
+  };
+  const reopen = async (trust) => {
+    const v = await ctx.invoke('share_reopen', { doc: ctx.doc(), trust });
+    if (v) ctx.apply(v, { cmd: 'share_reopen' });
+    fetchStatus();
+  };
+  if (s.replaced) {
+    out.push(el('p', { class: 'share-problem', text: s.replaced, attrs: { role: 'alert' } }));
+    const lost = s.not_in_new || [];
+    if (lost.length) {
+      out.push(el('h4', { class: 'share-panel-sub', text: lost.length === 1 ? '1 change of yours isn’t in the new budget' : `${lost.length} changes of yours aren’t in the new budget` }));
+      out.push(el('p', { class: 'share-muted', text: 'They weren’t shared before the owner started again. Make them again by hand after you reopen.' }));
+      out.push(el('ul', { class: 'share-refused' }, ...lost.map((label) => el('li', { text: label }))));
+    }
+    const b = el('button', { class: 'btn btn-primary', text: 'Reopen', attrs: { type: 'button' } });
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        await reopen(false);
+      } catch (e) {
+        error.textContent = String(e);
+        error.hidden = false;
+      }
+      b.disabled = false;
+    });
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (s.can_start_again) {
+    const b = el('button', { class: 'btn btn-primary', text: 'Start Again…', attrs: { type: 'button' } });
+    ask(b, 'Start this shared budget again', START_AGAIN_NOTE, 'Start Again', async () => {
+      const status = await ctx.invoke('share_start_again', { doc: ctx.doc() });
+      if (status) statusArrived({ doc: ctx.doc(), status });
+      ctx.toast('Started again. Everyone else reopens the budget to join.');
+    });
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (s.owner_key_warning) {
+    out.push(el('p', { class: 'share-problem', text: s.owner_key_warning, attrs: { role: 'alert' } }));
+    const b = el('button', { class: 'btn', text: 'Trust the New Key…', attrs: { type: 'button' } });
+    ask(b, 'Trust the owner’s new key', TRUST_NOTE, 'Trust the New Key', () => reopen(true));
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (!out.length) return null;
+  out.push(confirm, error);
+  return out;
+}
+
+const START_AGAIN_NOTE = 'Someone put a key in your name in this shared budget before your computer did. Changes signed with it count as yours, so you can’t tell your own changes from theirs. Start Again makes a new shared budget from this one as it stands now, signed with this computer’s key. Everyone’s roles come with it. The old history is kept aside in the folder, but who changed what and undo start fresh. Each person reopens the budget to join the new one. Anything they changed and hadn’t shared yet must be made again.';
+
+const TRUST_NOTE = 'Only do this if the owner told you they moved to a new computer. This computer will take the new key as the owner’s from now on, and the changes signed with it come in. If you aren’t sure, ask the owner first.';
 
 /** Changes left out on this computer: who, when, what and why (decisions.md, entry 78). */
 function refusedList(s) {
@@ -345,8 +442,15 @@ function refusedList(s) {
   return [el('h4', { class: 'share-panel-sub', text: title }), items];
 }
 
-function personRow(p) {
+/** Whether a person's changes are signed, in words (decisions.md, entry 89). */
+function signText(p, s) {
+  if (!s || !s.signed) return '';
+  return p.signs ? 'Signs changes' : 'No key yet: their changes are left out until their computer adds one';
+}
+
+function personRow(p, s) {
   const when = p.me ? 'you' : typeof p.seen_secs === 'number' ? (p.away ? `away · last seen ${ago(p.seen_secs)}` : ago(p.seen_secs)) : 'not seen yet';
+  const signed = signText(p, s);
   return el(
     'div',
     { class: `share-person ${p.away ? 'is-away' : ''}` },
@@ -355,6 +459,7 @@ function personRow(p) {
     el('span', { class: 'share-person-where', text: p.keeper ? `${whereText(p)} · keeps the file` : whereText(p) }),
     el('span', { class: 'share-person-when', text: when }),
     p.role_text ? el('span', { class: 'share-person-role', text: p.role_text, title: p.role_text }) : null,
+    signed ? el('span', { class: 'share-person-role share-person-signed', text: signed, title: signed }) : null,
   );
 }
 
@@ -790,9 +895,9 @@ function sharedDialog(title, setup) {
       name.value = me.name;
       const colors = colorPicker(me.color, (c) => { me.color = c; });
       const people = el('div', { class: 'share-people-list share-people-dialog' });
-      if (s.me) people.append(personRow({ ...s.me, name: `${s.me.name} (you)` }));
+      if (s.me) people.append(personRow({ ...s.me, name: `${s.me.name} (you)` }, s));
       for (const p of s.people) {
-        people.append(personRow(p));
+        people.append(personRow(p, s));
         const picker = s.can_set_roles ? rolePicker(p, s, setup, error) : null;
         if (picker) people.append(picker);
       }
@@ -821,7 +926,8 @@ function sharedDialog(title, setup) {
         el('h4', { class: 'share-panel-sub', text: 'People' }),
         people,
         el('p', { class: 'share-muted', text: rolesNote(s) }),
-        s.can_set_roles ? el('p', { class: 'share-muted', text: UNSIGNED_NOTE }) : null,
+        s.key_warning ? el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }) : null,
+        s.signed_text ? el('p', { class: 'share-muted', text: s.signed_text }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: 'Your name' }), name), el('div', { class: 'modal-field' }, el('span', { text: 'Your color' }), colors), save),
         error,
         el('div', { class: 'modal-actions' }, done),
@@ -831,11 +937,13 @@ function sharedDialog(title, setup) {
   );
 }
 
-/** Roles are checked by the app, not yet signed (decisions.md, entry 78). */
-const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accident. They don’t stop someone who edits the shared folder’s files directly; signed changes come later.';
+/** An app older than this one can't read a change file that holds a role or a signature. */
+const OLDER_APPS_NOTE = 'Once roles are set, changes are signed, and everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
 
-/** An app older than this one can't read a change file that holds a role. */
-const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
+/** What Remove does (decisions.md, entry 89). */
+function removeNote(name) {
+  return `Remove ${name}? From now on ${name} reads only, and any change of theirs that hasn’t reached you yet is left out on every computer. You can give them a role again later.`;
+}
 
 /** The owner is one computer: an admin (or co-owner) is the way back if it is lost. */
 const ADMIN_NOTE = 'Only you, co-owners and admins can set roles, so if this computer is lost, they are the only way to change them. Name someone you trust as an admin now; you can make them a co-owner later, who can also make admins.';
@@ -969,7 +1077,36 @@ function rolePicker(p, s, setup, error) {
     }
     apply(null);
   });
-  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, cats, first);
+  // Remove: read only, with a cutoff at what has reached this computer.
+  const remove = p.removed ? null : el('button', { class: 'btn btn-quiet', text: 'Remove…', attrs: { type: 'button', 'aria-label': `Remove ${p.name}` } });
+  const confirmRemove = el('div', { class: 'share-first-role', attrs: { role: 'group', 'aria-label': `Remove ${p.name}` } });
+  confirmRemove.hidden = true;
+  if (remove) {
+    remove.addEventListener('click', () => {
+      error.hidden = true;
+      const go = el('button', { class: 'btn btn-primary', text: 'Remove', attrs: { type: 'button' } });
+      const keep = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+      keep.addEventListener('click', () => { confirmRemove.hidden = true; remove.focus(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        try {
+          const status = await ctx.invoke('share_remove_person', { doc: ctx.doc(), actor: p.actor });
+          if (status) statusArrived({ doc: ctx.doc(), status });
+          ctx.toast(`Removed ${p.name}. Everyone else sees it once it reaches them through the folder.`);
+          Object.assign(s, status || {});
+          confirmRemove.hidden = true;
+        } catch (e) {
+          error.textContent = String(e);
+          error.hidden = false;
+        }
+        go.disabled = false;
+      });
+      confirmRemove.replaceChildren(el('p', { class: 'modal-message', text: removeNote(p.name) }), el('div', { class: 'modal-actions' }, keep, go));
+      confirmRemove.hidden = false;
+      go.focus();
+    });
+  }
+  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, remove, cats, first, confirmRemove);
 }
 
 /** Once per budget: what sharing means for saving (design 9.2). */

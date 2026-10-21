@@ -1879,15 +1879,15 @@ admins), Edits everything, Edits some categories
 deletes lines and notes there and applies existing fringes and groups, and changes nothing
 else), Actuals and notes, Notes only, or Read only. Set saves it as a change shared like
 any other. The first role set asks first, because from then on someone without a role
-reads only; the dialog names who that would be, says that everyone sharing the budget then
-needs this version or later (an older version won't join it: it says the shared changes are
-newer than it reads and opens the file on its own, and what is changed there isn't shared),
+reads only and changes are signed (below); the dialog names who that would be, says that
+everyone sharing the budget then needs this version or later (an older version won't join
+it: it says the shared changes are newer than it reads and opens the file on its own, and
+what is changed there isn't shared),
 and offers to make someone an admin at the same time (or Not now), since only the owner's
 computer, co-owners and admins can set roles. The question shows in place under the
 person, not as a second dialog. Categories ticked for any role other than Edits some categories are refused
 with a sentence, in the dialog and in Rust.
-Under the people the dialog also says plainly that roles stop changes by accident, not
-someone who edits the shared folder's files directly, and that signed changes come later. A person given a role before they ever
+Under the people the dialog also says in a sentence whether changes are signed. A person given a role before they ever
 opened the budget is listed too. The People list shows each person's role in words; a
 person who may change less than everything sees a chip in the toolbar ("Some categories",
 "Actuals", "Notes only", "Read only") with the details on hover. An edit beyond the role
@@ -1900,9 +1900,9 @@ each with who, when, what it was and why in a sentence. Each change is
 judged by the roles its author had seen when making it, so a change made before someone
 saw their new role is kept everywhere, and a line moved out of a person's categories
 while they edited it keeps their edit; every computer keeps and leaves out the same
-changes. Roles are checked by the app, not yet secured: changes aren't signed, so another
-program that can write in the shared folder can still write a change in someone's name,
-and the folder's own sharing settings are what keeps a reader from writing at all.
+changes. The folder's own sharing settings are still what keeps a reader from writing
+files at all; signed changes (below) are what keeps a file written in someone else's name
+from counting.
 The command line's `set` and `apply` and the MCP server change a shared budget the same
 way, as this computer's person and within their role (docs/CLI.md, docs/MCP.md). Once roles
 are set, an edit to the `.mthd` made by another program can't be said to be anyone's, so
@@ -1913,27 +1913,99 @@ changes, and the status panel says so. A file put back to an older version of th
 again and the panel says so. Changes made by a person's command line or agent show under
 their name, as "Jordan Lee (command line or agent)", and aren't listed as another person.
 
+**Signed changes** (decisions.md, entry 89). Each computer has a key pair, made the first
+time it starts sharing or joins a shared budget: the private half stays on that computer
+in the app's data folder, beside its sharing id (`~/.method/signing-key`, readable by its
+owner only, never in the shared folder), and the public half goes into the change log. From
+the owner's first role on, every change is signed: the owner's computer puts its key in
+with that first role, everyone else's puts its key in as soon as it sees the owner's (a
+change of its own labeled "Added this computer's key"), and from then on each computer signs
+everything it writes. For a budget whose owner set roles in an earlier version, signing
+starts the first time the owner opens it in this version. Every computer checks every
+signature against the key its author put in before taking a change in; a change whose
+signature is missing or doesn't match is left out and listed in the status panel with why
+("Its signature doesn't match the person's key, so it may have been changed in the folder
+or written in their name.", "It isn't signed, and changes in this budget must be."), the same
+way a change beyond its author's role is. The Share dialog's People list says "Signs changes"
+under each person whose key is in, or that their changes are left out until their computer
+adds one; the Activity tab marks each signed change ("2:14 PM · signed"). A command line or
+agent signs with its person's key (the same key file), so it can write only once that
+person's app has put the key in the budget; until then it is refused in words. Budgets
+without roles are not signed and work as before. Once signing has started the change log is
+format 3, and an older version refuses it as it refuses roles (above).
+
+**A key in your name that isn't yours.** Anyone who can write in the shared folder could
+put a key in someone's name before that person's computer does. Each app (and the command
+line and MCP server for their person) compares the key published in its person's name with
+the one on this computer; when they differ, the toolbar item and the status panel say "A key
+in your name is in this shared budget, and it isn't this computer's...", the Share dialog
+says it too, and nothing is signed or changed as that person (edits are refused with that
+sentence; the command line and MCP server refuse with it and write nothing).
+
+**Start Again.** When the key in your name is the owner's and it isn't this computer's
+(someone put one in before your app did), the status panel offers **Start Again…** on the
+owner's computer only (decision 95; docs/research/owner-key.md). It asks first, then makes a
+new shared budget from this one as it stands: its first change is this computer's, the next
+adds this computer's key, and everyone's roles come with it (a department's categories
+matched by code). The old log folder is kept beside the budget as
+"Feature.mthd-log-replaced-<date>", with a `REPLACED` file in it, and nothing reads it again.
+The budget doesn't change; who changed what and undo start fresh. On everyone else's
+computer the toolbar item and the status panel say "The owner started this shared budget
+again. Reopen it to join; until then you can read it but not change it.", edits are refused
+with that sentence, their changes that hadn't reached the folder are listed by name to make
+again by hand, and **Reopen** joins the new budget.
+
+**The owner's key, remembered.** Each computer remembers the owner's key the first time it
+sees it in a shared budget, outside the shared folder (`~/.method/owner-keys/`, one small
+file per budget; the owner's own computer remembers only its own key). If the owner's key in
+the folder is ever a different one, changes signed with it are left out on that computer and
+listed, the status panel says "The owner's key in this shared budget changed...", and nothing
+is changed or shared there; the command line and MCP server refuse with the same words.
+**Trust the New Key…** (it asks first) takes the new key as the owner's, for an owner who
+moved to a new computer, and reads the budget again. What a computer knew carries over when
+the budget is started again: a log in the folder started by anyone but the owner isn't
+opened as shared (someone with the folder may have replaced it), and a new owner key it
+hadn't seen asks for Trust the New Key… before anything is shared. After the owner starts
+again over a planted key, that is what the people who had seen the planted key see: they
+ask the owner, then trust the new key once.
+
+**Two changes with one number.** A change in someone's name at a number their real change
+also has (a forgery that arrived first, say) never keeps the real one out: every computer
+takes in the one that passes and lists the other in the status panel. Two different changes
+at one number that both pass are both left out and listed.
+
+**Removing a person.** Under each person the owner, a co-owner or an admin (by the same
+rules as setting roles) has Remove…, which asks first and then records the removal as a
+change: the person reads only from then on, and their changes that hadn't reached the
+remover's computer, and that hadn't seen the removal, are left out on every computer
+whatever they claim to have seen, listed with "It was made after its author was removed."
+Changes of theirs that had arrived stay. Their programs are removed with them. A removed
+person sees "You were removed from this shared budget, so you can read it but not change
+it." Giving them a role again lets them back in from then on (their left-out changes stay
+left out). The People list shows "Removed: reads only, and later changes are left out".
+
 **Not yet** (later phases of the design): handing ownership itself on (the owner is one
-computer's id; a co-owner can do everything else), invite links, signed changes and removing a
-person's later changes (a removed member's work is judged by what they had seen, as
-above), picking single accounts (not only whole categories) in the dialog, muted cells and
+computer's id; a co-owner can do everything else), invite links, a new key for a person
+(a lost or stolen computer is removed, and comes back with a new sharing id), picking
+single accounts (not only whole categories) in the dialog, muted cells and
 locks on what a person can't change, access requests, live sessions with cursors,
 proposals, checkpoints for very long logs, and the service-by-service checks (iCloud,
 Google Drive, LucidLink) the design calls for.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`; each person also has `role`, `role_text` and `scope`), or `null` when the budget isn't shared |
+| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`, `refused_changes`, `notice`, `signed`, `signed_text`; each person also has `role`, `role_text`, `scope`, `signs` and `removed`), or `null` when the budget isn't shared |
 | `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked`, `categories` (`[{code, name}]`, when this person sets roles) |
 | `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
 | `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
 | `share_set_me` | `name`, `color` | The person as kept, for every shared budget |
 | `share_place` | `category`, `account` (where this person is) | nothing |
 | `share_review` | none | The review list: `index`, `key`, `sentence`, `place` (`{kind, key, parent, field, text}`), `values` |
-| `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place` |
+| `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place`, `signed` |
 | `share_blame` | `kind`, `key`, `field` | Every value the field has had, oldest first: `value`, `actor`, `name`, `color`, `me`, `time`, `label`, `kept`, `index` |
 | `share_use_value` | `kind`, `key`, `field`, `index` | View, with the value put back as one change |
 | `share_set_role` | `actor` (64 hex characters), `role` (`co_owner`, `admin`, `editor`, `department`, `actuals`, `comment`, `read_only`), `scope` (category numbers, for `department`) | The status, with the role set as one change; refused unless this person is the owner, a co-owner or an admin who may give it |
+| `share_remove_person` | `actor` (64 hex characters) | The status, with the removal recorded as one change (read only, and a cutoff at what has reached this computer); refused by the same rules as `share_set_role`, and for the owner and oneself |
 
 Rust sends `share-status` (`{doc, status}`) whenever the status changes and
 `share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)
@@ -3532,6 +3604,12 @@ TLS, no system proxy lookup, no async runtime), minisign-verify, and the gzip an
 readers for the `.app.tar.gz`. The release tooling (crates/xtask) adds `minisign`, the crate
 the Tauri CLI signs with, for `sign-update`; it never ships in the app. `method-release` (the workspace's own release plumbing:
 versions, release notes, the updater key's shape) has no dependencies.
+`method-format` signs and checks shared-budget changes with `ed25519-dalek` (3.0.0, pinned
+exactly, BSD-3-Clause, with only its `fast` and `zeroize` features; its RustCrypto
+dependencies `curve25519-dalek`, `ed25519`, `signature`, `sha2` 0.11.0 and `digest` come with
+it) and makes a new key's random bytes with `getrandom` (already in the lock through Tauri),
+on a desktop only (decisions.md, entry 89). The engine itself stays free of both: it is
+handed a signer and a checker.
 `method-session` depends only on the engine, the format, `serde` and `serde_json`, and must
 keep building for `wasm32-unknown-unknown` (`cargo xtask wasm-check`, in CI); its
 `std-clock` feature, which the app turns on, is the only thing in it that reads the system

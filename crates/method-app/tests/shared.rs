@@ -610,6 +610,7 @@ fn refused_changes_are_shown_with_who_when_and_what() {
             field: method_core::log::Field::Title,
             value: method_core::log::Value::text("Forged"),
         }],
+        sig: None,
     };
     method_format::log::LogDir::at(sh.folder())
         .write_segment(&[forged])
@@ -635,7 +636,7 @@ fn refused_changes_are_shown_with_who_when_and_what() {
 #[test]
 fn a_co_owner_sets_roles_from_their_own_computer() {
     let (_path, mut alex, mut jordan) = two_sessions();
-    let sam = ActorId([3; 32]);
+    let riley = ActorId([3; 32]);
     alex.shared_mut()
         .unwrap()
         .set_role(&JORDAN.hex(), "co_owner", &[])
@@ -649,17 +650,17 @@ fn a_co_owner_sets_roles_from_their_own_computer() {
         "{}",
         st.me.role_text
     );
-    // Jordan makes Sam an admin, and the owner sees it.
+    // Jordan makes Riley an admin, and the owner sees it.
     jordan
         .shared_mut()
         .unwrap()
-        .set_role(&sam.hex(), "admin", &[])
+        .set_role(&riley.hex(), "admin", &[])
         .unwrap();
     // But makes no co-owners and leaves the owner alone.
     let err = jordan
         .shared_mut()
         .unwrap()
-        .set_role(&sam.hex(), "co_owner", &[])
+        .set_role(&riley.hex(), "co_owner", &[])
         .unwrap_err();
     assert!(err.contains("Only the owner makes co-owners"), "{err}");
     assert!(jordan
@@ -669,7 +670,7 @@ fn a_co_owner_sets_roles_from_their_own_computer() {
         .is_err());
     exchange(&mut alex, &mut jordan);
     let st = alex.shared().unwrap().status(Instant::now());
-    let s = st.people.iter().find(|p| p.actor == sam.hex()).unwrap();
+    let s = st.people.iter().find(|p| p.actor == riley.hex()).unwrap();
     assert_eq!(s.role, "admin");
     assert_eq!(st.refused, 0);
 }
@@ -840,4 +841,320 @@ fn live_second_actor() {
     for r in jordan.shared().unwrap().review() {
         println!("  {}", r.sentence);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Signed changes and removing a person (decisions.md, entry 89)
+
+fn key(seed: u8) -> std::sync::Arc<dyn method_core::log::Signer> {
+    std::sync::Arc::new(method_format::log::sign::KeyPair::from_seed([seed; 32]))
+}
+
+/// Two sessions with keys, Alex having made Jordan an editor (the first
+/// role, which starts signing), everything exchanged.
+fn signed_sessions() -> (PathBuf, Session, Session) {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    jordan.shared_mut().unwrap().use_key(key(2)).unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(!st.signed, "no signing before the first role");
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    (path, alex, jordan)
+}
+
+#[test]
+fn changes_are_signed_from_the_first_role_and_the_lists_say_so() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    jordan.set_detail_field(id, "rate", "4321").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "4321");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.signed);
+    assert!(
+        st.signed_text.starts_with("Changes are signed"),
+        "{}",
+        st.signed_text
+    );
+    assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
+    assert!(st.me.signs);
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert!(j.signs, "Jordan's key arrived");
+    // The Activity list marks signed changes: Jordan's edit is.
+    let activity = alex.shared().unwrap().activity(10);
+    let edit = activity
+        .iter()
+        .find(|a| a.label.starts_with("Edit rate on 50-01"))
+        .unwrap();
+    assert!(edit.signed);
+    assert_eq!(edit.name, "Jordan Lee");
+    // The first change, made before signing, isn't.
+    let all = alex.shared().unwrap().activity(500);
+    assert!(!all.last().unwrap().signed);
+    // The file says so: format 3.
+    let dir = alex.shared().unwrap().folder().to_path_buf();
+    let info = std::fs::read_to_string(dir.join("budget.json")).unwrap();
+    assert!(info.contains("\"version\": 3"), "{info}");
+}
+
+#[test]
+fn a_change_altered_in_the_folder_is_left_out_with_why() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    jordan.shared_mut().unwrap().flush_all();
+    // Jordan's next change, altered in the folder before Alex reads it.
+    let id = ids_in(&jordan, "50-01")[0];
+    jordan.set_detail_field(id, "rate", "555").unwrap();
+    jordan.share_tick(later());
+    let dir = method_format::log::LogDir::at(jordan.shared().unwrap().folder());
+    let seg = dir.segments(JORDAN).last().unwrap().path.clone();
+    let text = std::fs::read_to_string(&seg).unwrap();
+    let line = text.lines().nth(1).unwrap().replace("\"555\"", "\"5\"");
+    let mut changes: Vec<method_core::log::Change> =
+        vec![method_format::log::change_from_json(&line).unwrap()];
+    changes.truncate(1);
+    std::fs::write(&seg, method_format::log::segment_bytes(&changes).unwrap()).unwrap();
+    alex.share_tick(later());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 1, "{:?}", st.refused_changes);
+    let r = &st.refused_changes[0];
+    assert_eq!(r.name, "Jordan Lee");
+    assert!(
+        r.why.starts_with("Its signature doesn\u{2019}t match"),
+        "{}",
+        r.why
+    );
+    assert_ne!(rate_of(&alex, id), "5");
+}
+
+#[test]
+fn removing_a_person_leaves_out_their_later_changes() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    // Seen by Alex before the removal: kept.
+    jordan.set_detail_field(id, "rate", "100").unwrap();
+    exchange(&mut alex, &mut jordan);
+    // Made while Alex removes Jordan, unseen: left out everywhere.
+    jordan.set_detail_field(id, "rate", "200").unwrap();
+    jordan.shared_mut().unwrap().flush_all();
+    let err = jordan
+        .shared_mut()
+        .unwrap()
+        .remove_person(&ALEX.hex())
+        .unwrap_err();
+    assert!(err.contains("owner"), "{err}");
+    alex.shared_mut()
+        .unwrap()
+        .remove_person(&JORDAN.hex())
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    for s in [&alex, &jordan] {
+        assert_eq!(rate_of(s, id), "100");
+    }
+    let st = alex.shared().unwrap().status(Instant::now());
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert!(j.removed);
+    assert!(j.role_text.starts_with("Removed"), "{}", j.role_text);
+    let r = st
+        .refused_changes
+        .iter()
+        .find(|r| r.name == "Jordan Lee")
+        .unwrap();
+    assert_eq!(r.why, "It was made after its author was removed.");
+    // Jordan's computer says so, and refuses edits before they are made.
+    let err = jordan.set_detail_field(id, "rate", "300").unwrap_err();
+    assert!(err.starts_with("You were removed"), "{err}");
+    // Given a role again, Jordan is back from then on.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    jordan.set_detail_field(id, "rate", "400").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "400");
+}
+
+/// Writes a change into the folder, in `who`'s name, publishing a key that
+/// isn't theirs: what someone with access to the folder could do.
+fn plant_key(s: &Session, who: ActorId) {
+    use method_core::log::{Op, Signer};
+    let sh = s.shared().unwrap();
+    let theirs = method_format::log::sign::KeyPair::from_seed([77; 32]);
+    let mut c = method_core::log::Change {
+        actor: who,
+        seq: sh.log().frontier().get(&who) + 1,
+        deps: sh.log().frontier().clone(),
+        lamport: sh.log().lamport() + 1,
+        time: "2026-10-20T10:00:00Z".into(),
+        label: "Added this computer\u{2019}s key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    c.sig = Some(theirs.sign(&c));
+    method_format::log::LogDir::at(sh.folder())
+        .write_segment(&[c])
+        .unwrap();
+}
+
+/// A key put in a member's name by someone else (MReview, pull request #73):
+/// the member's app says so plainly and changes nothing.
+#[test]
+fn a_key_in_my_name_that_isnt_mine_is_said_and_stops_my_edits() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    alex.share_tick(later());
+    // Before Jordan's app puts its key in, someone else puts one in for Jordan.
+    jordan.share_tick(later());
+    plant_key(&jordan, JORDAN);
+    jordan.share_tick(later());
+    jordan.shared_mut().unwrap().use_key(key(2)).unwrap();
+    jordan.share_tick(later());
+    let st = jordan.shared().unwrap().status(Instant::now());
+    let w = st.key_warning.clone().expect("a warning");
+    assert!(
+        w.starts_with("A key in your name is in this shared budget"),
+        "{w}"
+    );
+    assert!(!w.contains('\u{2014}') && !w.contains('!'), "{w}");
+    let id = ids_in(&jordan, "50-01")[0];
+    let before = rate_of(&jordan, id);
+    let err = jordan.set_detail_field(id, "rate", "999").unwrap_err();
+    assert!(err.starts_with("A key in your name"), "{err}");
+    assert_eq!(rate_of(&jordan, id), before);
+    // The owner sees nothing wrong with their own key.
+    alex.share_tick(later());
+    assert!(alex
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .key_warning
+        .is_none());
+}
+
+/// The owner's case on a budget whose roles were set before signing (format
+/// 2): a key put in the owner's name before the owner's app opens it in this
+/// version is found, said, and the owner's app signs nothing as that actor.
+/// Who then counts as the owner is the owner's decision (roadmap, waiting on
+/// the owner); this only detects and refuses.
+#[test]
+fn a_key_in_the_owners_name_on_a_roles_budget_is_found_and_refused() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    // Roles set without signing (an older version's budget).
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert!(!alex.shared().unwrap().status(Instant::now()).signed);
+    // Someone puts a key in the owner's name into the folder.
+    plant_key(&jordan, ALEX);
+    alex.share_tick(later());
+    // The owner opens it in this version: its key isn't the one in the log.
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    let w = st.key_warning.expect("a warning");
+    assert!(w.contains("the people you share this budget with"), "{w}");
+    let err = alex
+        .shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap_err();
+    assert!(err.contains("key"), "{err}");
+}
+
+// ---------------------------------------------------------------------------
+// The owner's key (docs/research/owner-key.md)
+
+/// A key put in Alex's name before Alex's app did: Alex's status offers Start
+/// Again, which makes a new shared budget signed with Alex's own key; Jordan's
+/// app says the owner started again and refuses edits until Jordan reopens,
+/// and after that the two share as before.
+#[test]
+fn the_owner_starts_again_and_a_member_reopens_to_join() {
+    use method_core::log::Signer;
+
+    let (path, mut alex, mut jordan) = two_sessions();
+    let dir = path.parent().unwrap().to_path_buf();
+    alex.shared_mut()
+        .unwrap()
+        .set_owner_keys_dir(Some(dir.join("keys-alex")));
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_owner_keys_dir(Some(dir.join("keys-jordan")));
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    jordan.shared_mut().unwrap().use_key(key(2)).unwrap();
+
+    // Someone with the folder puts a key in Alex's name.
+    let theirs = method_format::log::sign::KeyPair::from_seed([77; 32]);
+    let log = alex.shared().unwrap().log();
+    let mut planted = method_core::log::Change {
+        actor: ALEX,
+        seq: log.own_seq() + 1,
+        deps: log.frontier().clone(),
+        lamport: log.lamport() + 1,
+        time: "2026-10-20T12:00:00Z".into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    planted.sig = Some(theirs.sign(&planted));
+    method_format::log::LogDir::for_budget(&path)
+        .write_segment(&[planted])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.key_warning.is_some());
+    assert!(st.can_start_again);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(!st.can_start_again, "only on the owner's computer");
+    assert!(jordan.shared_mut().unwrap().start_again().is_err());
+
+    alex.shared_mut().unwrap().start_again().unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.key_warning.is_none(), "{:?}", st.key_warning);
+    assert!(!st.can_start_again);
+    assert!(st.signed);
+    assert!(st.replaced.is_none());
+
+    // Jordan's app notices and refuses edits until Jordan reopens.
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.replaced.is_some(), "{st:?}");
+    let id = ids_in(&jordan, "50-01")[0];
+    assert!(jordan.set_detail_field(id, "rate", "1234").is_err());
+
+    // Jordan's computer had seen the planted key as Alex's, so the new
+    // budget's key (Alex's real one) is a changed key there: Jordan asks
+    // Alex, then trusts it (MReview on pull request #73).
+    jordan.shared_mut().unwrap().reopen().unwrap();
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.replaced.is_none());
+    assert!(st.owner_key_warning.is_some(), "{st:?}");
+    assert!(jordan.set_detail_field(id, "rate", "1234").is_err());
+    let merged = jordan.shared_mut().unwrap().trust_owner_key().unwrap();
+    assert_eq!(&merged, alex.budget());
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.owner_key_warning.is_none());
+    jordan.set_detail_field(id, "rate", "1234").unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "1234");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
 }

@@ -7,7 +7,7 @@
 //! Nothing here watches or polls on its own: [`LogDir::scan`] and
 //! [`absorb`] are the hooks an application or `method-budget sync` drives.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,9 +15,12 @@ use std::sync::Arc;
 
 use method_core::log::hash::sha256_hex;
 use method_core::log::{
-    ActorId, Change, ChangeId, Field, Frontier, Ids, Kind, ListKey, ListName, Log, LogError,
-    Member, Node, Op, Placement, Projection, Role, Side, Stamp, Uid, Value,
+    ActorId, Binding, Change, ChangeId, Field, Frontier, Ids, Kind, ListKey, ListName, Log,
+    LogError, Member, Node, Op, Placement, Projection, PublicKey, Role, Side, Signature, Signer,
+    Stamp, Uid, Value,
 };
+
+pub mod sign;
 use method_core::Budget;
 use serde::{Deserialize, Serialize};
 
@@ -32,16 +35,29 @@ use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
 /// The highest log format version this build reads.
-pub const LOG_FORMAT_VERSION: u64 = 2;
+pub const LOG_FORMAT_VERSION: u64 = 3;
 /// The version a log is written at until someone is given a role.
 pub const LOG_FORMAT_BASE: u64 = 1;
 /// The version from the first role on (decisions.md, entry 78): `budget.json`
 /// and every segment holding a `grant` say 2, so a program that reads only 1
 /// refuses the folder as newer than it reads rather than skipping the roles.
 pub const LOG_FORMAT_ROLES: u64 = 2;
+/// The version from the owner's key on (decisions.md, entry 89):
+/// `budget.json` and every segment holding a `key`, a `revoke` or a signed
+/// change say 3, so a program that can't check signatures refuses the
+/// folder as newer than it reads rather than taking in unsigned changes.
+pub const LOG_FORMAT_SIGNED: u64 = 3;
 
 /// The format a segment holding `changes` is written at.
 fn format_for(changes: &[Change]) -> u64 {
+    if changes.iter().any(|c| {
+        c.sig.is_some()
+            || c.ops
+                .iter()
+                .any(|op| matches!(op, Op::Key { .. } | Op::Revoke { .. }))
+    }) {
+        return LOG_FORMAT_SIGNED;
+    }
     if changes.iter().any(|c| {
         c.ops
             .iter()
@@ -257,6 +273,14 @@ enum FileOp {
     ActsFor {
         person: String,
     },
+    /// The change's actor's public key (decisions.md, entry 89).
+    Key {
+        key: String,
+    },
+    /// A person removed, with a cutoff at the change's own `deps`.
+    Revoke {
+        actor: String,
+    },
 }
 
 fn parse_field(s: &str) -> Result<Field, String> {
@@ -332,6 +356,8 @@ impl From<&Op> for FileOp {
             Op::ActsFor { person } => FileOp::ActsFor {
                 person: person.hex(),
             },
+            Op::Key { key } => FileOp::Key { key: key.hex() },
+            Op::Revoke { actor } => FileOp::Revoke { actor: actor.hex() },
             Op::Grant { actor, role } => FileOp::Grant {
                 actor: actor.hex(),
                 role: role.key().into(),
@@ -420,6 +446,12 @@ impl TryFrom<FileOp> for Op {
             FileOp::ActsFor { person } => Op::ActsFor {
                 person: ActorId::parse(&person).ok_or_else(|| format!("bad actor {person:?}"))?,
             },
+            FileOp::Key { key } => Op::Key {
+                key: PublicKey::parse(&key).ok_or_else(|| format!("bad key {key:?}"))?,
+            },
+            FileOp::Revoke { actor } => Op::Revoke {
+                actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
+            },
             FileOp::Grant { actor, role, scope } => {
                 let scope = scope
                     .iter()
@@ -451,6 +483,11 @@ struct FileChange {
     time: String,
     label: String,
     ops: Vec<FileOp>,
+    /// The author's Ed25519 signature over the line without this field
+    /// (decisions.md, entry 89), 128 hex characters; last, so the signed
+    /// bytes are the line up to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sig: Option<String>,
 }
 
 /// One compound value as the `.mthd` writes it, under a key naming its
@@ -631,7 +668,18 @@ pub fn value_from_json(v: serde_json::Value) -> Result<Value, String> {
 /// One change as one line of JSON (no newline), in canonical form: the
 /// same change always gives the same bytes.
 pub fn change_to_json(c: &Change) -> String {
-    let f = FileChange {
+    let f = file_change(c, c.sig.map(|s| s.hex()));
+    serde_json::to_string(&f).expect("a change always serializes")
+}
+
+/// The line a signature is made over: the change's line without its
+/// `sig` (decisions.md, entry 89).
+pub fn unsigned_line(c: &Change) -> String {
+    serde_json::to_string(&file_change(c, None)).expect("a change always serializes")
+}
+
+fn file_change(c: &Change, sig: Option<String>) -> FileChange {
+    FileChange {
         actor: c.actor.hex(),
         seq: c.seq,
         deps: c.deps.0.iter().map(|(a, s)| (a.hex(), *s)).collect(),
@@ -639,8 +687,8 @@ pub fn change_to_json(c: &Change) -> String {
         time: c.time.clone(),
         label: c.label.clone(),
         ops: c.ops.iter().map(FileOp::from).collect(),
-    };
-    serde_json::to_string(&f).expect("a change always serializes")
+        sig,
+    }
 }
 
 /// Reads one change from its line of JSON.
@@ -665,6 +713,10 @@ pub fn change_from_json(line: &str) -> Result<Change, String> {
             .into_iter()
             .map(Op::try_from)
             .collect::<Result<_, String>>()?,
+        sig: f
+            .sig
+            .map(|s| Signature::parse(&s).ok_or_else(|| format!("bad signature {s:?}")))
+            .transpose()?,
     })
 }
 
@@ -857,9 +909,11 @@ impl LogDir {
         &self.root
     }
 
-    /// Whether the folder exists with a `budget.json`.
+    /// Whether the folder exists with a `budget.json`, and wasn't replaced
+    /// by a budget started again (a folder holding [`REPLACED_FILE`] is
+    /// ignored; docs/research/owner-key.md, part 1).
     pub fn exists(&self) -> bool {
-        self.root.join("budget.json").is_file()
+        self.root.join("budget.json").is_file() && !self.root.join(REPLACED_FILE).is_file()
     }
 
     fn actors_dir(&self) -> PathBuf {
@@ -1165,7 +1219,8 @@ pub fn init(path: &Path, actor: ActorId, ids: Ids, time: &str) -> Result<Shared,
         .and_then(|n| n.to_str())
         .unwrap_or("budget.mthd")
         .to_string();
-    let log = Log::adopt(actor, ids, &budget, &format!("Adopted {file}"), time);
+    let mut log = Log::adopt(actor, ids, &budget, &format!("Adopted {file}"), time);
+    log.set_verifier(Arc::new(sign::Ed25519));
     let genesis = log
         .changes()
         .next()
@@ -1181,11 +1236,40 @@ pub fn init(path: &Path, actor: ActorId, ids: Ids, time: &str) -> Result<Shared,
     })
 }
 
-/// Opens the shared budget at `path`: reads every actor's segments.
+/// Opens the shared budget at `path`: reads every actor's segments, with
+/// the owner key remembered in the usual place ([`owner_keys_dir`]).
 pub fn open(path: &Path, actor: ActorId, ids: Ids) -> Result<(Shared, LoadReport), LogFileError> {
+    open_in(path, actor, ids, owner_keys_dir().as_deref())
+}
+
+/// [`open`], with the owner keys this computer remembers in `owner_keys`
+/// (`None`: none is checked).
+pub fn open_in(
+    path: &Path,
+    actor: ActorId,
+    ids: Ids,
+    owner_keys: Option<&Path>,
+) -> Result<(Shared, LoadReport), LogFileError> {
+    finish_replacement(path)?;
     let dir = LogDir::for_budget(path);
+    if !dir.exists() {
+        return Err(LogFileError(format!(
+            "{}: no change log here",
+            dir.root().display()
+        )));
+    }
     let info = dir.info()?;
     let mut log = Log::new(actor, ids);
+    // Every signature is checked (decisions.md, entry 89).
+    log.set_verifier(Arc::new(sign::Ed25519));
+    // The owner's key as this computer first saw it, kept outside the
+    // folder (docs/research/owner-key.md, part 2), carried over when the
+    // folder now holds another budget than the one this computer knew here.
+    if let Some(d) = owner_keys {
+        if let Some(key) = carried_owner_key(d, path, &info)? {
+            log.pin_owner_key(key);
+        }
+    }
     // The owner is whoever started sharing, as `budget.json` records,
     // whatever order the segments are read in.
     log.set_genesis(info.genesis);
@@ -1395,7 +1479,7 @@ pub fn write_snapshot(shared: &Shared) -> Result<Projection, LogFileError> {
 /// Whether the budget at `path` is shared through a folder: a change log
 /// is beside it.
 pub fn is_shared(path: &Path) -> bool {
-    LogDir::for_budget(path).exists()
+    LogDir::for_budget(path).exists() || staging_dir(path).exists()
 }
 
 /// `budget` with the provenance of the file at `path` (the log doesn't
@@ -1418,6 +1502,20 @@ pub fn read_shared(path: &Path) -> Result<Budget, LogFileError> {
 /// What a program without a window is told when it has no person in a
 /// shared budget whose owner has set roles.
 pub const NO_PERSON: &str = "This computer has no person in this shared budget, and its owner has set who may change what, so nothing was written. Open the budget in Method Budget to join it; the owner can then give you a role.";
+
+/// What a program is told when changes in the budget are signed and this
+/// computer's person hasn't published their key yet (their app does when it
+/// opens the budget).
+pub const NO_KEY_YET: &str = "Changes in this shared budget are signed, and this computer's key isn't in it yet, so nothing was written. Open the budget in Method Budget once; it adds the key, and then this works.";
+
+/// What a program is told when the key published in this computer's
+/// person's name (or its own) isn't the key on this computer: someone else
+/// may have put it in (decisions.md, entry 89).
+pub const KEY_NOT_YOURS: &str = "A key in this computer's name is in this shared budget, and it isn't this computer's key, so nothing was written: someone else may have put it there. Tell the budget's owner before going on.";
+
+/// What a program is told when this computer's person was removed from a
+/// shared budget.
+pub const REMOVED: &str = "This computer's person was removed from this shared budget, so nothing was written. The owner can give you a role again in the Share dialog.";
 
 /// How many tool actors one computer keeps (one per program changing a
 /// shared budget at the same moment).
@@ -1510,7 +1608,14 @@ pub fn open_as_tool(
 ) -> Result<(Shared, LoadReport, ToolLock), LogFileError> {
     let tools = tools_root(person_file).join(person.hex());
     let (tool, lock) = take_tool_actor(&tools)?;
-    let (shared, report) = open(path, tool, Ids::from_os())?;
+    let (mut shared, report) = open(path, tool, Ids::from_os())?;
+    // A program signs with its person's key (decisions.md, entry 89): the
+    // same key file, beside the person's actor id.
+    let key = sign::load_or_make_key(&sign::key_path(person_file))?;
+    shared.log.set_signer(Arc::new(key));
+    // The owner's key, remembered the first time it is seen (docs/
+    // research/owner-key.md, part 2). The time is only a note for people.
+    remember_owner_key(&mut shared, &owner_keys_beside(person_file), person, "")?;
     Ok((shared, report, ToolLock(lock)))
 }
 
@@ -1557,6 +1662,20 @@ impl SharedEdit {
         })
     }
 
+    /// Whether a key published for this computer's person, or for the
+    /// program's own actor, isn't the key on this computer.
+    pub fn key_not_ours(&self) -> bool {
+        let Some(mine) = self.shared.log.signer_key() else {
+            return false;
+        };
+        self.shared.log.key_conflict().is_some()
+            || self
+                .shared
+                .log
+                .key_of(self.person)
+                .is_some_and(|k| k != mine)
+    }
+
     /// The program's own actor (the tool actor).
     pub fn actor(&self) -> ActorId {
         self.shared.log.actor()
@@ -1588,6 +1707,15 @@ impl SharedEdit {
         label: &str,
         time: &str,
     ) -> Result<bool, LogFileError> {
+        if self.key_not_ours() {
+            return Err(LogFileError(KEY_NOT_YOURS.into()));
+        }
+        if self.shared.log.owner_key_changed().is_some() {
+            return Err(LogFileError(OWNER_KEY_CHANGED.into()));
+        }
+        if self.shared.log.removed(self.person) {
+            return Err(LogFileError(REMOVED.into()));
+        }
         // Once roles are set, the tool actor says whose it is first, so it
         // has its person's role; the two go into the folder together, or
         // neither does.
@@ -1607,7 +1735,15 @@ impl SharedEdit {
             self.shared
                 .log
                 .acts_for(self.person, "Writes for this computer's person", time)
-                .map_err(|e| LogFileError(format!("This change couldn't be shared: {e}")))?;
+                .map_err(|e| match e {
+                    LogError::Unsigned { reason, .. }
+                        if reason == method_core::log::sign::why::PERSON_HAS_NO_KEY =>
+                    {
+                        LogFileError(NO_KEY_YET.into())
+                    }
+                    LogError::Removed { .. } => LogFileError(REMOVED.into()),
+                    e => LogFileError(format!("This change couldn't be shared: {e}")),
+                })?;
         }
         let recorded = self
             .shared
@@ -1618,6 +1754,12 @@ impl SharedEdit {
                     "Your role in this shared budget doesn't allow this change ({}), so nothing was written. The owner sets who may change what.",
                     refusal.reason
                 )),
+                LogError::Removed { .. } => LogFileError(REMOVED.into()),
+                LogError::Unsigned { reason, .. }
+                    if reason == method_core::log::sign::why::PERSON_HAS_NO_KEY =>
+                {
+                    LogFileError(NO_KEY_YET.into())
+                }
                 other => LogFileError(format!("This change couldn't be shared: {other}")),
             })?;
         if recorded.is_none() {
@@ -1690,6 +1832,395 @@ pub fn set_aside(shared: &Shared, time: &str) -> Result<Option<PathBuf>, LogFile
     write_sealed(&kept, text.as_bytes())?;
     write_snapshot(shared)?;
     Ok(Some(kept))
+}
+
+// ---------------------------------------------------------------------------
+// The owner's key (docs/research/owner-key.md): each computer remembers the
+// owner key it first saw for a budget (part 2), and the owner's computer can
+// start a budget again when a key in its name isn't its own (part 1).
+
+/// The file in a log folder that a budget started again replaced: the new
+/// budget's id. Every program ignores a folder holding it.
+pub const REPLACED_FILE: &str = "REPLACED";
+
+/// What a computer is told when the owner's key in a shared budget isn't
+/// the one it saw first.
+pub const OWNER_KEY_CHANGED: &str = "The owner\u{2019}s key in this shared budget isn\u{2019}t the one this computer saw before, so nothing was written. Ask the owner before you go on.";
+
+/// What a computer is told when the log beside a budget it knew now names
+/// another owner: someone else made it, whatever its folder says.
+pub const NOT_SAME_OWNER: &str = "The change log beside this budget was started by someone other than its owner, so it wasn\u{2019}t opened as shared: someone with the shared folder may have replaced it. Ask the owner before you go on.";
+
+/// What this computer knew of the shared budget at one path: which budget,
+/// its owner, and the owner's key when it had seen one.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileKnownBudget {
+    budget_id: String,
+    owner: String,
+    key: Option<String>,
+    seen: String,
+}
+
+fn known_file(dir: &Path, path: &Path) -> PathBuf {
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let name = sha256_hex(path.to_string_lossy().as_bytes());
+    dir.join("paths").join(format!("{name}.json"))
+}
+
+fn known_budget(dir: &Path, path: &Path) -> Option<FileKnownBudget> {
+    let text = read_text(known_file(dir, path)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn note_budget(
+    dir: &Path,
+    path: &Path,
+    info: &BudgetInfo,
+    key: Option<PublicKey>,
+    time: &str,
+) -> Result<(), LogFileError> {
+    let file = known_file(dir, path);
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent).map_err(|e| io_err(parent, e))?;
+    }
+    let f = FileKnownBudget {
+        budget_id: info.budget_id.clone(),
+        owner: info.genesis.actor.hex(),
+        key: key.map(|k| k.hex()),
+        seen: time.to_string(),
+    };
+    let mut text = serde_json::to_string_pretty(&f).expect("a known budget serializes");
+    text.push('\n');
+    write_sealed(&file, text.as_bytes())
+}
+
+/// The owner key to check the budget `info` describes against, as kept in
+/// `dir`. When the log beside `path` now holds another budget than the one
+/// this computer knew there (the owner started it again, or someone
+/// replaced it), what it knew is carried over (MReview on pull request #73):
+/// another owner is refused ([`NOT_SAME_OWNER`]); the owner's key it had
+/// seen is remembered for the new budget too, so the same key joins without
+/// a word and a different one is kept out until the person trusts it,
+/// whether or not the old folder is still there.
+fn carried_owner_key(
+    dir: &Path,
+    path: &Path,
+    info: &BudgetInfo,
+) -> Result<Option<PublicKey>, LogFileError> {
+    let pin = remembered_owner_key(dir, info);
+    let Some(known) = known_budget(dir, path) else {
+        return Ok(pin);
+    };
+    if known.budget_id == info.budget_id {
+        return Ok(pin);
+    }
+    if ActorId::parse(&known.owner) != Some(info.genesis.actor) {
+        return Err(LogFileError(NOT_SAME_OWNER.into()));
+    }
+    let key = pin.or_else(|| known.key.as_deref().and_then(PublicKey::parse));
+    if pin.is_none() {
+        if let Some(k) = key {
+            write_owner_key(dir, info, k, &known.seen)?;
+        }
+    }
+    note_budget(dir, path, info, key, &known.seen)?;
+    Ok(key)
+}
+
+/// One remembered owner key, as kept on this computer.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileOwnerKey {
+    owner: String,
+    key: String,
+    seen: String,
+}
+
+/// Where this computer keeps the owner keys it has seen:
+/// `$METHOD_OWNER_KEYS`, or `owner-keys/` beside the actor id. Never in the
+/// shared folder, which anyone in the budget can write.
+pub fn owner_keys_dir() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("METHOD_OWNER_KEYS") {
+        return Some(PathBuf::from(p));
+    }
+    actor_id_path().map(|p| owner_keys_beside(&p))
+}
+
+/// `owner-keys/` beside the actor id kept in `actor_file` (or
+/// `$METHOD_OWNER_KEYS`): where a program given its own actor file keeps
+/// them.
+pub fn owner_keys_beside(actor_file: &Path) -> PathBuf {
+    if let Some(p) = std::env::var_os("METHOD_OWNER_KEYS") {
+        return PathBuf::from(p);
+    }
+    actor_file
+        .parent()
+        .map_or_else(|| PathBuf::from("owner-keys"), |d| d.join("owner-keys"))
+}
+
+fn owner_key_file(dir: &Path, budget_id: &str) -> PathBuf {
+    dir.join(format!("{budget_id}.json"))
+}
+
+/// The owner key remembered in `dir` for the budget `info` describes, when
+/// one is remembered for that owner.
+pub fn remembered_owner_key(dir: &Path, info: &BudgetInfo) -> Option<PublicKey> {
+    let text = read_text(owner_key_file(dir, &info.budget_id)).ok()?;
+    let f: FileOwnerKey = serde_json::from_str(&text).ok()?;
+    if ActorId::parse(&f.owner)? != info.genesis.actor {
+        return None;
+    }
+    PublicKey::parse(&f.key)
+}
+
+fn write_owner_key(
+    dir: &Path,
+    info: &BudgetInfo,
+    key: PublicKey,
+    time: &str,
+) -> Result<(), LogFileError> {
+    let path = owner_key_file(dir, &info.budget_id);
+    fs::create_dir_all(dir).map_err(|e| io_err(dir, e))?;
+    let f = FileOwnerKey {
+        owner: info.genesis.actor.hex(),
+        key: key.hex(),
+        seen: time.to_string(),
+    };
+    let mut text = serde_json::to_string_pretty(&f).expect("an owner key serializes");
+    text.push('\n');
+    write_sealed(&path, text.as_bytes())
+}
+
+/// Remembers in `dir` the owner's key the first time this computer sees
+/// one in the log (docs/research/owner-key.md, part 2), and checks against
+/// it from then on. On the owner's own computer (`person` is the owner)
+/// only its own key is remembered, so a key planted before it looked is
+/// never taken for its own. True when it remembered one now.
+pub fn remember_owner_key(
+    shared: &mut Shared,
+    dir: &Path,
+    person: ActorId,
+    time: &str,
+) -> Result<bool, LogFileError> {
+    if shared.log.owner_key_pin().is_some() {
+        return Ok(false);
+    }
+    // Which budget is here and whose it is, so a replacement is told from
+    // a fresh budget (see `carried_owner_key`). An entry for another budget
+    // is moved on only by opening this one through it.
+    let known = known_budget(dir, &shared.path);
+    let ours = known
+        .as_ref()
+        .is_none_or(|k| k.budget_id == shared.info.budget_id);
+    if let Some(key) = remembered_owner_key(dir, &shared.info) {
+        shared.log.pin_owner_key(key);
+        if ours && known.as_ref().is_none_or(|k| k.key.is_none()) {
+            note_budget(dir, &shared.path, &shared.info, Some(key), time)?;
+        }
+        return Ok(false);
+    }
+    let owner = shared.info.genesis.actor;
+    let key = shared
+        .log
+        .key_of(owner)
+        .filter(|k| person != owner || shared.log.signer_key() == Some(*k));
+    if ours && (known.is_none() || key.is_some()) {
+        note_budget(dir, &shared.path, &shared.info, key, time)?;
+    }
+    let Some(key) = key else {
+        return Ok(false);
+    };
+    write_owner_key(dir, &shared.info, key, time)?;
+    shared.log.pin_owner_key(key);
+    Ok(true)
+}
+
+/// Trust the New Key (docs/research/owner-key.md, part 2): remembers `key`
+/// as the owner's for this budget in place of the one seen before, for an
+/// owner who moved to a new computer. The budget must be opened again to
+/// take in what the old key kept aside.
+pub fn trust_owner_key(
+    dir: &Path,
+    path: &Path,
+    info: &BudgetInfo,
+    key: PublicKey,
+    time: &str,
+) -> Result<(), LogFileError> {
+    write_owner_key(dir, info, key, time)?;
+    note_budget(dir, path, info, Some(key), time)
+}
+
+/// Whether the log folder beside this budget now belongs to another budget
+/// (the owner started it again): what a member's app notices.
+pub fn replaced(shared: &Shared) -> bool {
+    shared
+        .dir
+        .info()
+        .is_ok_and(|i| i.budget_id != shared.info.budget_id)
+}
+
+/// Where a budget started again is written before it takes the log
+/// folder's place: `.~Feature.mthd-log-new` beside it (sync services skip
+/// the `.~` prefix until the rename).
+fn staging_dir(path: &Path) -> LogDir {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("budget.mthd");
+    LogDir {
+        root: path.with_file_name(format!(".~{name}{LOG_DIR_SUFFIX}-new")),
+    }
+}
+
+/// Finishes a start-again that stopped after the old folder was marked
+/// [`REPLACED_FILE`] (it is moved aside) or after it was moved aside: the
+/// new one is moved into its place.
+fn finish_replacement(path: &Path) -> Result<(), LogFileError> {
+    let dir = LogDir::for_budget(path);
+    let staging = staging_dir(path);
+    if !staging.root.join("budget.json").is_file() {
+        return Ok(());
+    }
+    if dir.root().join(REPLACED_FILE).is_file() {
+        let aside = replaced_root(path, "unfinished");
+        fs::rename(dir.root(), &aside).map_err(|e| io_err(dir.root(), e))?;
+    }
+    if !dir.root().exists() {
+        fs::rename(&staging.root, dir.root()).map_err(|e| io_err(dir.root(), e))?;
+    }
+    Ok(())
+}
+
+/// Where the replaced folder is kept: `Feature.mthd-log-replaced-<date>`
+/// (the first ten characters of `time`), never over another folder.
+fn replaced_root(path: &Path, time: &str) -> PathBuf {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("budget.mthd");
+    let date: String = time.chars().take(10).collect();
+    let mut n = 1;
+    loop {
+        let candidate = if n == 1 {
+            path.with_file_name(format!("{name}{LOG_DIR_SUFFIX}-replaced-{date}"))
+        } else {
+            path.with_file_name(format!("{name}{LOG_DIR_SUFFIX}-replaced-{date}-{n}"))
+        };
+        if !candidate.exists() {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
+/// A department's categories and accounts in another projection of the
+/// same budget, matched by code.
+fn rebind(scope: &BTreeSet<Uid>, old: &Binding, new: &Binding) -> BTreeSet<Uid> {
+    let mut out = BTreeSet::new();
+    for (code, uid) in &old.categories {
+        if scope.contains(uid) {
+            out.extend(new.categories.get(code).copied());
+        }
+    }
+    for (code, uid) in &old.accounts {
+        if scope.contains(uid) {
+            out.extend(new.accounts.get(code).copied());
+        }
+    }
+    out
+}
+
+/// Starts the shared budget again (docs/research/owner-key.md, part 1), on
+/// the owner's computer, when the key in the owner's name isn't `signer`'s:
+/// a new change log from the budget as it stands, its genesis by this
+/// computer followed by this computer's key and everyone's roles, takes the
+/// old folder's place, and the old folder is kept aside with a
+/// [`REPLACED_FILE`] in it. Every program ignores the old folder from then
+/// on; members reopen the budget to join the new one. A stop at any point
+/// leaves the old budget or the new one, never a mix.
+pub fn start_again(
+    shared: &Shared,
+    signer: Arc<dyn Signer>,
+    owner_keys: Option<&Path>,
+    ids: Ids,
+    time: &str,
+) -> Result<Shared, LogFileError> {
+    let owner = shared.info.genesis.actor;
+    let me = shared.log.actor();
+    if me != owner {
+        return Err(LogFileError(
+            "Only the owner\u{2019}s computer can start a shared budget again.".into(),
+        ));
+    }
+    if shared
+        .log
+        .key_of(owner)
+        .is_none_or(|k| k == signer.public())
+    {
+        return Err(LogFileError(
+            "The key in your name is this computer\u{2019}s, so there is nothing to start again."
+                .into(),
+        ));
+    }
+    let old = shared.log.project();
+    let budget = with_file_provenance(old.budget.clone(), &shared.path);
+    let file = shared.info.file.clone();
+
+    // The new log, in memory first.
+    let mut log = Log::adopt(me, ids, &budget, &format!("Started {file} again"), time);
+    log.set_verifier(Arc::new(sign::Ed25519));
+    log.set_signer(signer);
+    log.publish_key_now("Added this computer\u{2019}s key", time)
+        .map_err(|e| {
+            LogFileError(format!(
+                "This computer\u{2019}s key couldn\u{2019}t be added: {e}"
+            ))
+        })?;
+    let new = log.project();
+    for (actor, role) in shared.log.members() {
+        if actor == owner {
+            continue;
+        }
+        let role = match role {
+            Role::Department(scope) => Role::Department(rebind(&scope, &old.binding, &new.binding)),
+            r => r,
+        };
+        log.grant(actor, role, "Carried over a role", time)
+            .map_err(|e| LogFileError(format!("A role couldn\u{2019}t be carried over: {e}")))?;
+    }
+    let genesis = log
+        .changes()
+        .next()
+        .expect("adopt makes one change")
+        .clone();
+
+    // Written beside the old folder, then moved into its place.
+    let staging = staging_dir(&shared.path);
+    if staging.root.exists() {
+        // Left by a start-again that stopped before the old folder moved.
+        fs::remove_dir_all(&staging.root).map_err(|e| io_err(&staging.root, e))?;
+    }
+    staging.create(&genesis, &file)?;
+    flush(&log, &staging)?;
+    let final_dir = LogDir::for_budget(&shared.path);
+    let marker = format!("{}\n", budget_id(&genesis));
+    write_sealed(&final_dir.root.join(REPLACED_FILE), marker.as_bytes())?;
+    let aside = replaced_root(&shared.path, time);
+    fs::rename(&final_dir.root, &aside).map_err(|e| io_err(&final_dir.root, e))?;
+    fs::rename(&staging.root, &final_dir.root).map_err(|e| io_err(&final_dir.root, e))?;
+    let info = final_dir.info()?;
+    let mut new_shared = Shared {
+        log,
+        dir: final_dir,
+        path: shared.path.clone(),
+        info,
+    };
+    write_snapshot(&new_shared)?;
+    if let Some(dir) = owner_keys {
+        remember_owner_key(&mut new_shared, dir, me, time)?;
+    }
+    Ok(new_shared)
 }
 
 #[cfg(test)]
@@ -1818,6 +2349,7 @@ mod tests {
                 })
                 .chain([Op::ActsFor { person: actor(3) }])
                 .collect(),
+            sig: None,
         };
         let line = change_to_json(&change);
         assert!(line.contains(r#""op":"grant""#), "{line}");

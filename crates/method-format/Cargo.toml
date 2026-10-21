@@ -10,6 +10,16 @@ publish = false
 method-core = { path = "../method-core" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
+# Signed changes in a shared budget (decisions.md, entry 89): every change in
+# the change log is signed by its author's Ed25519 key and checked against the
+# key they published. Pure Rust, BSD-3-Clause; the precomputed tables ("fast")
+# and zeroize, nothing else (no rand, no serde, no pkcs8).
+ed25519-dalek = { version = "=3.0.0", default-features = false, features = ["fast", "zeroize"] }
+
+# A new key pair's 32 random bytes come from the system (key files are made on
+# a desktop, never in a browser). Already in Cargo.lock through Tauri.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = "=0.3.4"
 
 [features]
 default = ["bundled-charts"]

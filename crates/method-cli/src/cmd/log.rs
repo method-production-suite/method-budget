@@ -72,6 +72,7 @@ fn text(shared: &Shared, report: &log::LoadReport, last: usize) -> String {
         shared.log.frontier().0.len(),
         shared.log.frontier().digest()
     );
+    let _ = writeln!(s, "{}", signed_line(shared));
     let _ = writeln!(s);
     let _ = writeln!(s, "Actors");
     for (actor, seq) in &shared.log.frontier().0 {
@@ -139,6 +140,23 @@ fn text(shared: &Shared, report: &log::LoadReport, last: usize) -> String {
     s
 }
 
+/// Whether changes are signed (decisions.md, entry 89), in a line.
+fn signed_line(shared: &Shared) -> String {
+    let keys = shared.log.state().keys().len();
+    if shared.log.signing_started() {
+        format!(
+            "Changes are signed; {keys} {} a key in the log.",
+            if keys == 1 {
+                "actor has"
+            } else {
+                "actors have"
+            }
+        )
+    } else {
+        "Changes aren't signed (they are from the owner's first role on).".into()
+    }
+}
+
 /// "3 ops: 1 create, 2 set".
 fn ops_summary(c: &Change) -> String {
     let mut counts: Vec<(&str, usize)> = Vec::new();
@@ -162,9 +180,13 @@ fn json(shared: &Shared, report: &log::LoadReport, last: usize) -> String {
         .iter()
         .map(|(a, seq)| {
             format!(
-                "{{\"actor\": {}, \"changes\": {seq}, \"this_computer\": {}}}",
+                "{{\"actor\": {}, \"changes\": {seq}, \"this_computer\": {}, \"key\": {}}}",
                 json_string(&a.hex()),
-                *a == shared.log.actor()
+                *a == shared.log.actor(),
+                shared
+                    .log
+                    .key_of(*a)
+                    .map_or_else(|| "null".to_string(), |k| json_string(&k.hex()))
             )
         })
         .collect();
@@ -205,12 +227,13 @@ fn json(shared: &Shared, report: &log::LoadReport, last: usize) -> String {
         })
         .sum::<usize>();
     format!(
-        "{{\"file\": {}, \"budget_id\": {}, \"log\": {}, \"changes\": {}, \"entities_created\": {created}, \"frontier\": {}, \"actors\": [{}], \"pending\": {}, \"rejected\": {}, \"skipped\": {}, \"review\": [{}], \"last\": [{}]}}\n",
+        "{{\"file\": {}, \"budget_id\": {}, \"log\": {}, \"changes\": {}, \"entities_created\": {created}, \"frontier\": {}, \"signed\": {}, \"actors\": [{}], \"pending\": {}, \"rejected\": {}, \"skipped\": {}, \"review\": [{}], \"last\": [{}]}}\n",
         json_string(&shared.info.file),
         json_string(&shared.info.budget_id),
         json_string(&shared.dir.root().display().to_string()),
         shared.log.len(),
         json_string(&shared.log.frontier().digest()),
+        shared.log.signing_started(),
         actors.join(", "),
         report.pending,
         report.rejected.len(),

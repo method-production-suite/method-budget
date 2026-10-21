@@ -37,17 +37,26 @@ this page goes ahead without waiting.
 
 ### Open decisions
 
+- **A key put in the owner's name before the owner's app does: decided by the owner
+  (2026-10-20)** (3.18; D89, D95): "build 3.18 options 1 and 3". Built (decision 95; design
+  docs/research/owner-key.md): (1) **Start Again**, offered only on the owner's computer
+  when a key in the owner's name isn't its own, makes a new shared budget from the budget as
+  it stands, signed with the owner's real key from its second change, with everyone's roles,
+  and keeps the old log folder aside; members' apps say the owner started again and refuse
+  edits until they reopen; (3) each computer **remembers the first owner key it sees**,
+  outside the shared folder, and keeps out changes signed with any other, with **Trust the
+  New Key…** for an owner who moved to a new computer. Needs a live check in the app.
+
 - **Signed changes in shared budgets: decided by the owner (2026-10-20)** (3.18; D89):
   "Method Budget may merge 3.18 signed changes with the shared log format 3", then "prepare
-  Budget 0.7.0 from main without 3.18". Built in pull request #73 (each person's key pair,
-  every change signed with `ed25519-dalek`, removal by cutoff), held until 0.7.0 is tagged,
-  so it ships in the release after.
-
-- **A key put in the owner's name before the owner's app does: decided by the owner
-  (2026-10-20)** (3.18; D89): "build 3.18 options 1 and 3". (1) Start again as a new signed
-  budget, offered only on the owner's computer when it finds a key in its name that isn't
-  its own, and (3) each computer remembering the first owner key it sees, to catch a later
-  swap. Design: docs/research/owner-key.md. Being built on top of #73.
+  Budget 0.7.0 from main without 3.18". Built: signed changes (each person's key pair,
+  every change signed, removal by cutoff) use the `ed25519-dalek` crate (3.0.0; pure Rust,
+  BSD-3-Clause, already on `deny.toml`'s licence list), with `sha2` held at 0.11.0 for the
+  14-day check; both the crate-age check and `cargo deny` pass. Signing raises the change
+  log's format to 3 once the owner's key is in, so Method Budget 0.7.0 and older refuse a
+  signed budget rather than take in unsigned changes. They ship in the release after 0.7.0,
+  whose notes say everyone sharing a budget with roles needs it. Later (the owner): key
+  rotation, and publishing a key from the command line.
 
 - **Which languages first** (3.14; D82, D94): the framework is built and English is
   the only language (docs/APP.md, "Languages"): one string table read by the page and
@@ -105,9 +114,8 @@ this page goes ahead without waiting.
   comments on setup items and the whole budget stay in the file, since those have no notes
   (giving them notes is a format change). **Recommend: keep these** until reviewers ask for
   more; any can be reversed.
-- **Roles in a shared budget, built on the recommendation** (3.18; D78): roles ship before
-  signatures (checked by every honest app, not yet secured; signing needs a new
-  dependency); until the owner sets a first role everyone edits everything, and after it
+- **Roles in a shared budget, built on the recommendation** (3.18; D78, D89): roles shipped
+  before signatures and are now secured by them (D89); until the owner sets a first role everyone edits everything, and after it
   someone without a role reads only (the design's 9.1); an editor changes everything but
   roles and locking the originals; a department editor changes only lines and notes in
   its categories. **Recommend: keep all four**; any can be reversed from the digest.
@@ -160,6 +168,16 @@ this page goes ahead without waiting.
       window. Quit, then `open -a "Method Budget" --args --check-for-updates`: the toolbar
       says "Checking for updates…", then the answer. Open a budget and quit: the data
       folder's `recent.json` is a list with `path` and `opened` for it.
+
+- [ ] **Signed changes and Remove person** (3.18; D89; on the next build after this
+      branch merges): on two computers sharing a test copy through a synced folder, set a
+      first role for the second person in File > Share: the dialog says changes are signed,
+      and within a minute "Signs changes" shows under both people. Edit on each and check the
+      Activity tab marks the changes "signed". Then Remove… the second person while they
+      edit offline: once they are back online, their offline edit is left out on both
+      computers, the status panel says "It was made after its author was removed.", and
+      their app refuses further edits. Set a role for them again and check a new edit
+      arrives.
 
 - [ ] **Engine checks in the reference product** (1.17; needs a licensed copy): run what is
       still open in "Engine checks to run" below (16, and the rest of 14: Amt starting at
@@ -246,10 +264,11 @@ reports with a live preview and PDF, imports from spreadsheets and from other pr
 exports, and a signed, notarized Mac build that updates itself through the suite's
 method-update (decision 83). Eighteen of Phase 3's twenty-two items are built, incentive
 modeling (3.6), the start window (3.19) and formulas walked without recursion (3.22) among
-them; localization (3.14) and working together on one budget (3.18) are partway; rate
-tables (3.9) and bid layouts (3.13) are partial: the machinery is built (decisions 90 and
-92, tables and bid layouts of your own), and only bundled public rate data and a
-ready-made industry bid form wait on the legal line above. Around the app: the `method-budget` command line, an MCP server for coding
+them; localization (3.14) and working together on one budget (3.18) are partway (3.18's
+folder mode, roles and signed changes with removal by cutoff are built, decision 89;
+invites and live sessions are left); rate tables (3.9) and bid layouts (3.13) are partial:
+the machinery is built (decisions 90 and 92, tables and bid layouts of your own), and only
+bundled public rate data and a ready-made industry bid form wait on the legal line above. Around the app: the `method-budget` command line, an MCP server for coding
 agents (3.17), a browser build for the website's demo, the Field Station sample opened once
 at the first start (3.20), and Method Launcher's two command-line options and recent list
 (3.21). Every release is rehearsed on main first, tests all three systems before anything is
@@ -381,7 +400,7 @@ Where competitors and the pain points (inv "Gaps and pain points", inv 24) say w
 | 3.15 | **Setup packs**: import and export sets of setup items (globals, groups, fringes, units, sets, locations, currencies, charges, credits, tag presets, overtime patterns) as shareable packs with their sources, and setup lists as spreadsheets. Built (decision 50): a pack is a `.mthd` with setup and no lines, provenance `setup_pack` with a title, description, author, version, effective date, region, notes and links; File > Export Setup Pack… and the Library tab's Setup packs section pick items by kind and folder with their dependencies; File > Import Setup Pack… and the listed packs (your Packs folder and the bundled `packs/`, empty but for a README) run Import Setup's review into a budget (one undo step) or the library, stamping what comes in (`setup_sources`); File > Export > Setup Lists… and Import Setup Lists… (a sheet per kind, checked row by row); `method-budget pack export`, `import` and `show`. Rate packs come from a separate data project after review. Needs a live check of the dialogs and the bundled folder | shareable setup, 2026-10-10; 3.9 | [have] | L | 1.20, 2.15 |
 | 3.16 | **Charts of accounts**: bundled chart templates and importing any chart. Built (decision 51; docs/TEMPLATES.md): File > Import Chart of Accounts… and `method-budget coa import` read a chart from any sheet of a workbook, CSV, tab-delimited text or another budget (flat lists, outlines, side-by-side columns, number and name in one cell, separators or none, lost leading zeros, header, total and level rows, the `kind,code,name,parent` layout), infer the numbering pattern (changeable) and preview with duplicates and gaps; into a new budget with no lines, or applied to this one (adds, renames by number, never removes an account with lines, one undo step). Seven charts written by us and the studio charts built from the owner's exports ship in New From Template under Charts of accounts and in `method-budget new --template`; the sources sit in `imports/coa-sources/` (never committed) and are built by `scripts/build-coa-templates.py`. Needs a live check of the dialogs in the app | top request: start from the studio's chart | [have] | L | 2.2, 1.20 |
 | 3.17 | **Agents can work on budgets**: a Model Context Protocol server so Claude Code and other coding agents open, read, edit, check and report on budgets with typed tools. Built (decision 52; docs/MCP.md): `method-budget mcp [--root DIR]... [--read-only]` over stdio, both protocol eras (the `initialize` handshake from 2024-11-05 to 2025-11-25, and 2026-07-28 per-request metadata); 43 tools: open and summarize, topsheet, accounts, lines with what they work out to, globals, setup tables, charges and credits, totals, explain, find, validate, diff, merge, add, update, delete, move and tag lines, setup add, change, rename everywhere and delete with a use check, charges and credits, categories, production totals and accounts, export and reports, spreadsheet import, new budgets from the starter or a template, copies and undo; every path inside a root (symlinks out, hidden folders and wrong extensions refused), atomic writes, a change refused when the file changed on disk since the server read it, shared copies read-only, input limits; an example agent skill in docs/agents/. A live bridge to the running app (edits through the session, in History and undo) is designed in docs/MCP.md, not built | agents should push the buttons too | [have] | L | 3.12 |
-| 3.18 | **Working together on one budget**: several people in the same budget, changes merging on their own; first through a shared folder you already use (Dropbox, iCloud Drive, Google Drive, LucidLink), then live sessions with presence and cursors over an encrypted peer-to-peer link; roles (edit everything, some categories, actuals, comment, read only), who-changed-this, per-person undo. Design: docs/research/collaboration.md. Built so far (decisions 62, 64 and 78): the change log under the budget and `method-budget log` and `method-budget sync`; in the app, folder mode end to end: File > Share, every edit recorded and shared through the folder, the keeper's file, the status item, presence, flashes, conflict badges, Review and Activity tabs, Who Changed This, per-person undo; roles (edit everything, some categories, actuals, notes, read only, admins, co-owners) set in the Share dialog, checked on every change where it was made, refused in plain words. Next: key pairs and signed changes with removal by cutoff (needs `ed25519-dalek`), invite links, muted cells and locks and access requests, then live sessions. Roles need a live check in the app | the reference only sends copies | [partial] | L | 3.1, 3.2 |
+| 3.18 | **Working together on one budget**: several people in the same budget, changes merging on their own; first through a shared folder you already use (Dropbox, iCloud Drive, Google Drive, LucidLink), then live sessions with presence and cursors over an encrypted peer-to-peer link; roles (edit everything, some categories, actuals, comment, read only), who-changed-this, per-person undo. Design: docs/research/collaboration.md. Built so far (decisions 62, 64, 78 and 89): the change log under the budget and `method-budget log` and `method-budget sync`; in the app, folder mode end to end: File > Share, every edit recorded and shared through the folder, the keeper's file, the status item, presence, flashes, conflict badges, Review and Activity tabs, Who Changed This, per-person undo; roles (edit everything, some categories, actuals, notes, read only, admins, co-owners) set in the Share dialog, checked on every change where it was made, refused in plain words; key pairs and signed changes (decision 89): each computer's key kept in the app's data folder, every change signed from the owner's first role on and checked by every computer, changes with a missing or wrong signature left out and listed, Remove person with a cutoff (later changes from them left out everywhere, a role given again brings them back), the command line and MCP signing with the person's key, the change log at format 3. Next: invite links, muted cells and locks and access requests, then live sessions; later, grants that expire; key rotation and publishing a key from the command line come later (the owner, 2026-10-20). Also later (review): settle a contested change number without refolding the whole log, so planting many forgeries can't make a large shared budget slow to open. Roles, signing and Remove need a live check in the app | the reference only sends copies | [partial] | L | 3.1, 3.2 |
 | 3.19 | **New project window**: start a budget from one window: title and production details, chart of accounts or template, schedule length, currency and union or location rate setup, then open it ready to fill. Design: docs/research/new-project-window.md. Phase 1 built (decision 63): a start window at launch when nothing is open and from File > New… (Cmd+N) with pinned and recent budgets (title, net total, last changed, folder), search, open, pin, show in folder and remove, all from the keyboard; New Budget with title, type (season, episode, episode count), dates, schedule length as globals, location, base currency, start from (starter, empty, bundled charts, a budget file), fringe posting and arithmetic, in a new tab as one undo step. Phase 2 (decision 65): the start window when the last tab closes, a chart-of-accounts step listing every bundled chart by budget type with its description and account count, Save In (a folder and file name, never over a file, opened as a saved tab), pinned and recent following files moved in the Finder (macOS bookmarks), net totals kept between runs. Setup step (decision 77): everything in the setup library and any setup packs ticked in the form come in before the form's details; built on the recommendation that what is ticked replaces the starting point's same-named items (the owner can reverse it), and two ticked sources that disagree are refused. The rest (decision 91): projects as folders down the start window's left (Add Folder…, or New Budget's "Make a project folder", built on the recommendation below), each read two levels deep with its budgets, the sub-budgets and copies made from them, setup packs, schedule days files and actuals exports; a thumbnail per budget (a bar per category from the topsheet's totals, kept in the app's data folder, never in the file); Duplicate (beside the file, never over one, opened as a saved tab); New Sub-Budget from This Category or Account (the row's accounts, lines and only the setup they use, totals the same as the row, beside the parent's file); Link a Schedule… at New Budget (shoot days to `SHOOT_DAYS` linked as Import Schedule Days links it, the dates to budget info); shared budgets marked with who was in them lately; sorting by last opened, name, last changed or net total. Rates from 3.9 when it lands; created dates and archived projects (design phase 4) not built. Needs a live check in the app | getting started fast | [have] | M | 1.20, 3.9, 3.16 |
 | 3.20 | **The sample budget**: Field Station, an invented feature of about a million dollars made from Method Schedule's schedule of the same production, showing the whole feature set, opened as an untitled copy marked Sample at the first start and from Help > Open Sample (SUITE-STANDARDS.md, section 8). Built (decision 84; docs/APP.md, "The sample budget"): the budget from Method Schedule's days file through `schedule-days --apply` (scripts/make-field-station.py, checked byte for byte in CI); the first-start rule and the copy in method-session's `sample`; Help > Open Sample; shown once at the first start, with no setting (decision 86, per the suite standard); the browser demo and its smoke test on the same file; the pictures retaken from it. Left: a live check in the app; copying the days file again when Method Schedule's PR #29 merges | something real to look at from the first minute | [have] | M | 3.8, 3.19 |
 | 3.21 | **Method Launcher contract**: the suite's launcher can start the app and read its recent files (SUITE-STANDARDS.md, section 2). Built (decision 85; docs/APP.md, "Command-line options"): `method-budget-app --check-for-updates` (as Help > Check for Updates…) and `--open-sample` (as Help > Open Sample, in place of the start window), read at the start, other options skipped; `recent.json` as the suite's array, newest first, `path`, `opened` (RFC 3339, UTC) and our optional `bookmark`, the old shape still read and rewritten. Left: a live check of the flags in the app | one launcher for the whole suite | [have] | S | 3.20 |

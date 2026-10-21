@@ -3,9 +3,11 @@
 Design for roadmap 3.18's open decision "A key put in the owner's name before the owner's
 app does" (docs/ROADMAP.md, Waiting on the owner). It builds on signed changes (decision
 89, in pull request #73, held until 0.7.0 is tagged) and the collaboration design
-(docs/research/collaboration.md, section 7). Nothing here is built: it waits on the
-owner's choice. This page describes the recommended pair, options (1) and (3), closely
-enough to build them in one pull request once the owner says yes.
+(docs/research/collaboration.md, section 7). The owner chose the recommended pair, options (1) and (3), on 2026-10-20;
+both are built (decision 95). Where the build differs from this page, decision 95 wins: the
+new budget's genesis is unsigned like any first change and the owner's key follows in the
+next change; remembered keys are `owner-keys/<budget id>.json` beside the actor id; the
+command line and MCP server refuse with the sentence the app shows.
 
 ## The problem
 
