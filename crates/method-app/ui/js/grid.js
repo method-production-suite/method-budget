@@ -11,6 +11,9 @@
 //   `edit` is the raw value to edit (a string); leave it undefined for
 //   read-only cells. `editSkip` rows (separators) can be selected, but moving
 //   on after an edit passes over them. `color` is a `#hex` text color.
+//   `locked` (any value) marks a row this person may not change in a shared
+//   budget: its cells don't open an editor or clear, and onLocked(locked)
+//   is called instead, so the page can say why.
 // Column:    { key, label, cls, title, width, min, pin, head }
 //   width/min: preferred and narrowest width in px. When every column has a
 //   width, the grid sizes them itself: preferred widths when they fit, else
@@ -38,6 +41,8 @@
 //                                                   helper { key(e), close(), place() }
 //                                                   that sees editor keys first
 //                                                   (autocomplete, quickentry.js)
+//            onLocked(locked)                       typing, F2, a double-click or Delete on a
+//                                                   cell of a `locked` row
 //            onCursor(at)                           the cursor cell or its content changed
 //                                                   (at: cursorCell(), or null)
 //            enterMovesDown                         true: Enter moves down (details)
@@ -1141,6 +1146,10 @@ export class Grid {
   startEdit(text = null) {
     const at = this.cursorCell();
     if (!at || at.cell.edit === undefined) return false;
+    if (at.row.locked && this.h.onLocked) {
+      this.h.onLocked(at.row.locked);
+      return false;
+    }
     this.ensureDrawn(this.cursorIndex());
     const td = this.cellFor(at.row.key, at.col.key);
     if (!td) return false;
@@ -1344,6 +1353,10 @@ export class Grid {
           return true;
         }
         const at = this.cursorCell();
+        if (at && at.row.locked && at.cell.edit !== undefined && this.h.onLocked) {
+          this.h.onLocked(at.row.locked);
+          return true;
+        }
         if (at && at.cell.edit !== undefined && at.cell.edit !== '' && this.h.onCommit) {
           this.h.onCommit(at.row.key, at.col.key, '');
         }

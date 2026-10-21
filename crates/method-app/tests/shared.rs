@@ -1158,3 +1158,320 @@ fn the_owner_starts_again_and_a_member_reopens_to_join() {
     let st = alex.shared().unwrap().status(Instant::now());
     assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
 }
+
+// ---------------------------------------------------------------------------
+// Muted cells and access requests (docs/research/collaboration.md, 9.7)
+
+/// A timer pass `secs` from now, so heartbeats are read again (they are
+/// read every few seconds, not every pass).
+fn tick_at(s: &mut Session, secs: u64) {
+    s.share_tick(Instant::now() + Duration::from_secs(secs));
+}
+
+/// An account in a category other than `category`.
+fn account_outside(s: &Session, category: &str) -> String {
+    s.budget()
+        .categories()
+        .filter(|c| c.code != category)
+        .flat_map(|c| &c.accounts)
+        .find(|a| {
+            a.details
+                .iter()
+                .any(|d| d.kind == method_core::RowKind::Line)
+        })
+        .unwrap()
+        .code
+        .clone()
+}
+
+fn first_line(s: &Session, account: &str) -> RowId {
+    s.budget()
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .find(|a| a.code == account)
+        .unwrap()
+        .details
+        .iter()
+        .find(|d| d.kind == method_core::RowKind::Line)
+        .unwrap()
+        .id
+}
+
+const KIM: ActorId = ActorId([3; 32]);
+
+#[test]
+fn a_department_editors_request_reaches_who_can_allow_it() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    let mut kim = Session::open(&path).unwrap();
+    kim.join_shared(KIM, person("Kim Park", "green")).unwrap();
+    let cat = category_of(&alex, "50-01");
+    let other = account_outside(&alex, &cat);
+    let other_cat = category_of(&alex, &other);
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "department", std::slice::from_ref(&cat))
+        .unwrap();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&KIM.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut kim);
+
+    // What Jordan's page mutes: every category but Jordan's, and every
+    // account outside it.
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.can_ask);
+    assert_eq!(st.ask_name, "Alex Kim");
+    assert!(!st.locked_categories.contains(&cat));
+    assert!(st.locked_categories.contains(&other_cat));
+    assert!(!st.locked_accounts.contains(&"50-01".to_string()));
+    assert!(st.locked_accounts.contains(&other));
+    let all_cats: Vec<String> = alex.budget().categories().map(|c| c.code.clone()).collect();
+    assert_eq!(st.locked_categories.len(), all_cats.len() - 1);
+    // Nobody else's page mutes anything, and only Jordan may ask.
+    for s in [&alex, &kim] {
+        let st = s.shared().unwrap().status(Instant::now());
+        assert!(st.locked_categories.is_empty() && st.locked_accounts.is_empty());
+        assert!(!st.can_ask);
+    }
+
+    // What is asked is checked before it is written.
+    let sh = jordan.shared_mut().unwrap();
+    assert!(sh
+        .request_access("editor", &["no-such".into()], "")
+        .unwrap_err()
+        .contains("no-such"));
+    assert!(sh.request_access("department", &[], "").is_err());
+    assert!(sh.request_access("admin", &[], "").is_err());
+    assert_eq!(
+        sh.request_access("department", std::slice::from_ref(&cat), ""),
+        Err("You can already change that.".to_string())
+    );
+    assert!(kim
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "")
+        .is_err());
+
+    // Jordan asks about the other account, from the cell they typed in:
+    // to edit that account, not everything (MReview on pull request #87).
+    let before = alex.shared().unwrap().log().len();
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access(
+            "department",
+            std::slice::from_ref(&other),
+            "  For the grip\nrentals ",
+        )
+        .unwrap();
+    let mine = jordan
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .my_request
+        .unwrap();
+    assert_eq!(mine.note, "For the grip rentals");
+    // Written into Jordan's heartbeat, not the change log.
+    let dir = method_format::log::LogDir::for_budget(&path);
+    let req = dir.read_presence(JORDAN).unwrap().request.unwrap();
+    assert_eq!(req.role, "department");
+    assert_eq!(req.codes, vec![other.clone()]);
+    tick_at(&mut alex, 60);
+    tick_at(&mut kim, 60);
+    assert_eq!(alex.shared().unwrap().log().len(), before);
+
+    // The owner sees it; another editor, who can't give roles, doesn't.
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.requests.len(), 1, "{:?}", st.requests);
+    let r = &st.requests[0];
+    assert_eq!(r.name, "Jordan Lee");
+    assert!(r.role_text.starts_with("Edits "), "{}", r.role_text);
+    assert_ne!(r.role_text, "Edits everything");
+    assert!(!r.only, "Allow already gives just what was asked");
+    assert!(r.codes_text.starts_with(&other), "{}", r.codes_text);
+    assert_eq!(r.at, mine.at);
+    assert!(kim
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .requests
+        .is_empty());
+
+    // Allow adds that account to Jordan's categories: a role change through
+    // the log, and the request is gone.
+    alex.shared_mut()
+        .unwrap()
+        .allow_request(&JORDAN.hex(), &r.at, false)
+        .unwrap();
+    assert_eq!(alex.shared().unwrap().log().len(), before + 1);
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.requests.is_empty());
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert_eq!(j.role, "department");
+    assert!(
+        j.scope.contains(&cat) && j.scope.contains(&other),
+        "{:?}",
+        j.scope
+    );
+    exchange(&mut alex, &mut jordan);
+    let line = first_line(&jordan, &other);
+    jordan.set_detail_field(line, "rate", "55").unwrap();
+    // Jordan's app takes the request back once it is given.
+    tick_at(&mut jordan, 60);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.my_request.is_none());
+    assert!(!st.locked_accounts.contains(&other));
+    assert!(dir.read_presence(JORDAN).unwrap().request.is_none());
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, line), "55");
+}
+
+#[test]
+fn a_read_only_persons_request_is_declined_on_one_computer_and_allowed() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    let dir = path.parent().unwrap().to_path_buf();
+    alex.shared_mut()
+        .unwrap()
+        .set_declined_dir(Some(dir.join("declined-alex")));
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    // Read only keeps its own state (no muted cells, edits refused) and may ask.
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.can_ask);
+    assert!(st.locked_accounts.is_empty());
+    assert!(jordan.check_writable().is_err());
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "")
+        .unwrap();
+    tick_at(&mut alex, 60);
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.requests.len(), 1);
+    let at = st.requests[0].at.clone();
+    assert!(
+        !st.requests[0].only,
+        "no categories named, no second choice"
+    );
+    let refused = alex
+        .shared_mut()
+        .unwrap()
+        .allow_request(&JORDAN.hex(), &at, true)
+        .unwrap_err();
+    assert!(refused.contains("doesn"), "{refused}");
+
+    // Declined: hidden on Alex's computer, and nothing in the log.
+    let before = alex.shared().unwrap().log().len();
+    alex.shared_mut()
+        .unwrap()
+        .decline_request(&JORDAN.hex(), &at)
+        .unwrap();
+    assert!(alex
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .requests
+        .is_empty());
+    assert_eq!(alex.shared().unwrap().log().len(), before);
+    assert!(jordan
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .my_request
+        .is_some());
+    // Remembered on that computer: the budget opened again there still
+    // hides it.
+    alex.share_flush();
+    let mut again = Session::open(&path).unwrap();
+    again.join_shared(ALEX, person("Alex Kim", "teal")).unwrap();
+    again
+        .shared_mut()
+        .unwrap()
+        .set_declined_dir(Some(dir.join("declined-alex")));
+    tick_at(&mut again, 60);
+    assert!(again
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .requests
+        .is_empty());
+    // Another computer of the owner's that didn't decline it still shows it,
+    // and allowing it there makes Jordan an editor.
+    let mut other = Session::open(&path).unwrap();
+    other.join_shared(ALEX, person("Alex Kim", "teal")).unwrap();
+    tick_at(&mut other, 60);
+    let st = other.shared().unwrap().status(Instant::now());
+    assert_eq!(st.requests.len(), 1);
+    other
+        .shared_mut()
+        .unwrap()
+        .allow_request(&JORDAN.hex(), &at, false)
+        .unwrap();
+    other.share_flush();
+    tick_at(&mut jordan, 60);
+    assert!(jordan.check_writable().is_ok());
+    assert_eq!(
+        jordan.shared().unwrap().status(Instant::now()).me.role,
+        "editor"
+    );
+    // Given: Jordan's app takes the request back.
+    tick_at(&mut jordan, 120);
+    assert!(jordan
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .my_request
+        .is_none());
+}
+
+#[test]
+fn a_removed_person_asks_and_is_let_back_in() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .remove_person(&JORDAN.hex())
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.can_ask);
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "Back on the show")
+        .unwrap();
+    tick_at(&mut alex, 60);
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.requests.len(), 1);
+    assert_eq!(st.requests[0].note, "Back on the show");
+    // Withdrawn: gone from the owner's list.
+    jordan.shared_mut().unwrap().withdraw_request();
+    tick_at(&mut alex, 120);
+    assert!(alex
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .requests
+        .is_empty());
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "")
+        .unwrap();
+    tick_at(&mut alex, 180);
+    let at = alex.shared().unwrap().status(Instant::now()).requests[0]
+        .at
+        .clone();
+    alex.shared_mut()
+        .unwrap()
+        .allow_request(&JORDAN.hex(), &at, false)
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert_eq!(st.me.role, "editor");
+    assert!(!st.me.removed);
+}

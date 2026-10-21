@@ -37,7 +37,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-pub use access::{Bounds, Refusal, Role};
+pub use access::{may_give, Bounds, Refusal, Role};
 pub use capture::Hint;
 pub use clock::{ChangeId, Frontier, Stamp};
 pub use ids::{ActorId, Ids, Uid};

@@ -139,6 +139,24 @@ where
         .map(|(_, v)| v)
 }
 
+/// Whether someone with role `granter` may give `given` to a person (not the
+/// owner) whose role is `target`: the owner anything but ownership, a
+/// co-owner anything but co-owners, an admin anything but admins and
+/// co-owners, nobody else anything. The rule [`check`] judges a `grant` by,
+/// for the interface to ask before it offers a choice.
+pub fn may_give(granter: &Role, target: &Role, given: &Role) -> bool {
+    if !granter.sets_roles() || *given == Role::Owner || *target == Role::Owner {
+        return false;
+    }
+    let co_owners = |r: &Role| *r == Role::CoOwner;
+    let admins = |r: &Role| matches!(r, Role::Admin | Role::CoOwner);
+    match granter {
+        Role::CoOwner => !(co_owners(given) || co_owners(target)),
+        Role::Admin => !(admins(given) || admins(target)),
+        _ => true,
+    }
+}
+
 /// How a granter ranks when grants made apart meet: owner over co-owner
 /// over admin (nobody else gives roles).
 pub fn rank(role: &Role) -> u8 {
@@ -528,17 +546,12 @@ pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(
                 return Err(refuse("the owner's role doesn't change".into()));
             }
             let target = role_at(state, *actor, deps);
-            let co_owners = |r: &Role| *r == Role::CoOwner;
-            let admins = |r: &Role| matches!(r, Role::Admin | Role::CoOwner);
-            if role == Role::CoOwner && (co_owners(given) || co_owners(&target)) {
-                return Err(refuse(
-                    "only the owner makes co-owners or changes a co-owner's role".into(),
-                ));
-            }
-            if role == Role::Admin && (admins(given) || admins(&target)) {
-                return Err(refuse(
-                    "only the owner and co-owners make admins or change an admin's role".into(),
-                ));
+            if !may_give(&role, &target, given) {
+                return Err(refuse(if role == Role::CoOwner {
+                    "only the owner makes co-owners or changes a co-owner's role".into()
+                } else {
+                    "only the owner and co-owners make admins or change an admin's role".into()
+                }));
             }
             continue;
         }

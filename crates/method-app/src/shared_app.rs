@@ -88,6 +88,11 @@ fn sign_with_this_key(s: &mut Session) {
     // Owner keys are remembered beside the actor id (docs/research/
     // owner-key.md, part 2).
     sh.set_owner_keys_dir(method_format::log::owner_keys_dir());
+    // Access requests declined here are remembered beside it too.
+    sh.set_declined_dir(
+        method_format::log::actor_id_path()
+            .and_then(|p| p.parent().map(|d| d.join("declined-requests"))),
+    );
     if let Err(e) = this_key().and_then(|k| sh.use_key(k)) {
         s.set_notice(format!(
             "This computer's key for signed changes couldn't be used, so changes you make here may be left out by others: {e}"
@@ -368,6 +373,71 @@ pub fn share_remove_person(
     Ok(sh.status(Instant::now()))
 }
 
+/// Ask for access (docs/APP.md, "Asking for access"): this person asks
+/// for `role` ("editor", "department", "actuals" or "comment") about the
+/// categories or accounts `codes`, with a short `note`. Written into this
+/// computer's heartbeat in the shared folder; nothing is sent anywhere.
+/// Returns the status.
+#[tauri::command]
+pub fn share_request_access(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    role: String,
+    codes: Option<Vec<String>>,
+    note: Option<String>,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.request_access(&role, &codes.unwrap_or_default(), &note.unwrap_or_default())?;
+    Ok(sh.status(Instant::now()))
+}
+
+/// Takes this person's access request back. Returns the status.
+#[tauri::command]
+pub fn share_withdraw_request(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.withdraw_request();
+    Ok(sh.status(Instant::now()))
+}
+
+/// Allows the access request by `actor` made at `at`: what it asks for, or
+/// with `only` the categories or accounts it names, recorded as a role
+/// change (checked and signed like one set in the Share dialog). Returns
+/// the status.
+#[tauri::command]
+pub fn share_allow_request(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    actor: String,
+    at: String,
+    only: Option<bool>,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.allow_request(&actor, &at, only.unwrap_or(false))?;
+    Ok(sh.status(Instant::now()))
+}
+
+/// Declines the access request by `actor` made at `at`: this computer
+/// doesn't show it again; nothing is written to the change log. Returns the
+/// status.
+#[tauri::command]
+pub fn share_decline_request(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    actor: String,
+    at: String,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.decline_request(&actor, &at)?;
+    Ok(sh.status(Instant::now()))
+}
+
 /// Start Again… in the status panel (docs/research/owner-key.md, part 1):
 /// on the owner's computer, when a key in the owner's name isn't its own, a
 /// new shared budget from this one takes the log folder's place. The budget
@@ -578,6 +648,10 @@ mod tests {
             "share_remove_person",
             "share_start_again",
             "share_reopen",
+            "share_request_access",
+            "share_withdraw_request",
+            "share_allow_request",
+            "share_decline_request",
         ] {
             assert!(APP_RS.contains(&format!("crate::shared_app::{c},")), "{c}");
         }

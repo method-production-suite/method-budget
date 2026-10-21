@@ -1992,17 +1992,49 @@ person sees "You were removed from this shared budget, so you can read it but no
 it." Giving them a role again lets them back in from then on (their left-out changes stay
 left out). The People list shows "Removed: reads only, and later changes are left out".
 
+**What a department editor sees** (decision 96; design 9.7). For a person who edits some
+categories, the categories and accounts outside them show as usual but in a muted text
+color, with a small lock beside each such category on the topsheet and each such account
+in the account list, and every line of such an account muted ("Read only for you" on
+hover). Typing, F2, a double-click, Delete, paste, cut or fill down in one doesn't open the
+cell; a message at the bottom says "2400 Grip is read only for you." with **Ask Alex Kim
+for access** (the owner's name). A person who reads only, or was removed, keeps the read-only
+state above (the chip, and every edit refused in words) and asks from the status panel.
+
+**Asking for access.** Asking writes a request into this computer's own heartbeat file in the
+shared folder (docs/FORMAT.md, "The heartbeat"): no email, nothing sent outside the budget.
+From a muted cell it asks to edit just that category or account; editing everything is asked
+for on purpose, from the status panel (for anyone who may change less than everything once
+roles are set), naming the account or category on screen if any, with an optional short
+note. The status panel then
+says "You asked Alex Kim for access..." with **Withdraw**; asking again replaces the request.
+The owner, co-owners and admins, whoever may give that role to that person under the rules
+above, see each waiting request in the status panel and as a badge on the status item ("1
+asking"): who, what Allow gives ("Allow gives: Edits everything"), the categories or accounts
+it names, the note, and **Allow**, **Allow 2400 Grip only** (that person edits those
+categories or accounts, added to the ones they have; not offered when Allow gives just that
+already, as it does for a request from a muted cell) and **Decline**. Allow records the role
+through the same path as the Share dialog's Set, so it is checked and signed like any role
+change. Decline is remembered on the computer that declined (beside its sharing id, in
+`~/.method/declined-requests/`, never in the shared folder) and changes nothing in the
+budget; the same request isn't shown there again, while another of the owner's computers
+still shows it. A request goes away once the person has what it asks for (their app then
+takes it out of their heartbeat) or when they withdraw it. People who can't give the role
+never see it. A request isn't signed, so someone with write access to the folder could put
+one in another person's name; it gives nothing until someone allowed to give roles allows
+it, and that is their own signed change.
+
 **Not yet** (later phases of the design): handing ownership itself on (the owner is one
 computer's id; a co-owner can do everything else), invite links, a new key for a person
 (a lost or stolen computer is removed, and comes back with a new sharing id), picking
-single accounts (not only whole categories) in the dialog, muted cells and
-locks on what a person can't change, access requests, live sessions with cursors,
+single accounts (not only whole categories) in the dialog, a notification for a new
+access request beyond the badge, live sessions with cursors,
 proposals, checkpoints for very long logs, and the service-by-service checks (iCloud,
 Google Drive, LucidLink) the design calls for.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`, `refused_changes`, `notice`, `signed`, `signed_text`; each person also has `role`, `role_text`, `scope`, `signs` and `removed`), or `null` when the budget isn't shared |
+| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`, `refused_changes`, `notice`, `signed`, `signed_text`, `requests` (each `actor`, `name`, `color`, `role`, `role_text`, `codes`, `codes_text`, `only`, `note`, `at`), `my_request`, `can_ask`, `ask_name`, `locked_categories`, `locked_accounts`; each person also has `role`, `role_text`, `scope`, `signs` and `removed`), or `null` when the budget isn't shared |
 | `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked`, `categories` (`[{code, name}]`, when this person sets roles) |
 | `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
 | `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
@@ -2014,6 +2046,10 @@ Google Drive, LucidLink) the design calls for.
 | `share_use_value` | `kind`, `key`, `field`, `index` | View, with the value put back as one change |
 | `share_set_role` | `actor` (64 hex characters), `role` (`co_owner`, `admin`, `editor`, `department`, `actuals`, `comment`, `read_only`), `scope` (category numbers, for `department`) | The status, with the role set as one change; refused unless this person is the owner, a co-owner or an admin who may give it |
 | `share_remove_person` | `actor` (64 hex characters) | The status, with the removal recorded as one change (read only, and a cutoff at what has reached this computer); refused by the same rules as `share_set_role`, and for the owner and oneself |
+| `share_request_access` | `role` (`editor`, `department`, `actuals`, `comment`), `codes` (category or account numbers), `note` | The status, with the request in this computer's heartbeat; refused before roles are set, for someone who changes everything, for an unknown number, a department without numbers, or what the person already has |
+| `share_withdraw_request` | none | The status, with the request taken out of the heartbeat |
+| `share_allow_request` | `actor`, `at` (the request's), `only` (give the numbers it names, as a department) | The status, with the role set as one change, by the rules of `share_set_role`; refused when the request was taken back or replaced |
+| `share_decline_request` | `actor`, `at` | The status, without that request (remembered on this computer; nothing in the change log) |
 
 Rust sends `share-status` (`{doc, status}`) whenever the status changes and
 `share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)
