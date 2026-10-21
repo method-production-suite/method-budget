@@ -12,6 +12,7 @@
 
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
+import { t } from './i18n.js';
 
 /**
  * A date-time as the page's local time, ISO 8601 with the offset:
@@ -42,7 +43,7 @@ export function versionsOf(view) {
 
 /** A name for the next version: "Version N", N one past the count. */
 function suggestedName(view) {
-  return `Version ${versionsOf(view).length + 1}`;
+  return t('versions.suggested_name', { n: versionsOf(view).length + 1 });
 }
 
 /**
@@ -97,14 +98,14 @@ export function showVersions(ctx) {
     nameInput.value = suggestedName(view);
     const noteInput = el('textarea', {
       class: 'modal-input versions-note',
-      attrs: { id: 'version-note', rows: '2', spellcheck: 'true', placeholder: 'Optional: what this version is for' },
+      attrs: { id: 'version-note', rows: '2', spellcheck: 'true', placeholder: t('versions.note_placeholder') },
     });
-    const saveBtn = el('button', { class: 'btn btn-primary', text: 'Save Version', attrs: { type: 'submit' } });
+    const saveBtn = el('button', { class: 'btn btn-primary', text: t('versions.save_version'), attrs: { type: 'submit' } });
     const form = el(
       'form',
-      { class: 'versions-save', attrs: { novalidate: true, 'aria-label': 'Save the budget as a version' } },
-      el('label', { class: 'modal-field', attrs: { for: 'version-name' } }, el('span', { text: 'Name' }), nameInput),
-      el('label', { class: 'modal-field', attrs: { for: 'version-note' } }, el('span', { text: 'Note' }), noteInput),
+      { class: 'versions-save', attrs: { novalidate: true, 'aria-label': t('versions.save_form_label') } },
+      el('label', { class: 'modal-field', attrs: { for: 'version-name' } }, el('span', { text: t('versions.name') }), nameInput),
+      el('label', { class: 'modal-field', attrs: { for: 'version-note' } }, el('span', { text: t('versions.note') }), noteInput),
       el('div', { class: 'versions-save-actions' }, saveBtn),
     );
     form.addEventListener('submit', async (e) => {
@@ -125,8 +126,8 @@ export function showVersions(ctx) {
       }
     });
 
-    const list = el('ul', { class: 'safety-list versions-list', attrs: { 'aria-label': 'Saved versions' } });
-    const empty = el('p', { class: 'versions-empty', text: 'No versions yet. Save one to keep a copy of the budget as it is now.' });
+    const list = el('ul', { class: 'safety-list versions-list', attrs: { 'aria-label': t('versions.list_label') } });
+    const empty = el('p', { class: 'versions-empty', text: t('versions.empty') });
 
     const button = (text, cls, onClick, title = '') => {
       const b = el('button', { class: cls, text, title: title || undefined, attrs: { type: 'button' } });
@@ -150,7 +151,7 @@ export function showVersions(ctx) {
       if (mode === 'rename') {
         const input = el('input', {
           class: 'modal-input versions-rename',
-          attrs: { type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '200', 'aria-label': `New name for ${v.name}` },
+          attrs: { type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '200', 'aria-label': t('versions.new_name_for', { name: v.name }) },
         });
         input.value = v.name;
         const save = () => run('rename_version', { id: v.id, name: input.value }, () => setTimeout(() => focusRow(v.id), 0));
@@ -168,12 +169,12 @@ export function showVersions(ctx) {
         });
         text.append(input);
         actions.append(
-          button('Cancel', 'btn', () => {
+          button(t('versions.cancel'), 'btn', () => {
             asking = null;
             draw();
             focusRow(v.id);
           }),
-          button('Rename', 'btn btn-primary', save),
+          button(t('versions.rename'), 'btn btn-primary', save),
         );
         setTimeout(() => {
           input.focus();
@@ -183,46 +184,46 @@ export function showVersions(ctx) {
       }
 
       text.append(el('div', { class: 'safety-item-main', text: v.name, title: v.name }));
-      text.append(el('div', { class: 'safety-item-sub', text: `Saved ${createdText(v.created)}`, title: v.created }));
+      text.append(el('div', { class: 'safety-item-sub', text: t('versions.saved_at', { when: createdText(v.created) }), title: v.created }));
       if (v.note) text.append(el('div', { class: 'safety-item-sub versions-item-note', text: v.note, title: v.note }));
 
       if (mode === 'restore' || mode === 'delete') {
         li.classList.add('asking');
         const question =
           mode === 'restore'
-            ? `Put "${v.name}" in place of the budget? The budget as it is now is kept as a version first, and Undo takes the restore back.`
-            : `Delete "${v.name}"? Undo brings it back.`;
+            ? t('versions.restore_question', { name: v.name })
+            : t('versions.delete_question', { name: v.name });
         text.append(el('div', { class: 'versions-question', text: question, attrs: { role: 'status' } }));
         actions.append(
-          button('Cancel', 'btn', () => {
+          button(t('versions.cancel'), 'btn', () => {
             asking = null;
             draw();
             focusRow(v.id);
           }),
           mode === 'restore'
-            ? button('Restore', 'btn btn-primary', () => run('restore_version', { id: v.id, created: localStamp() }, () => setTimeout(() => list.querySelector('button') && list.querySelector('button').focus(), 0)))
-            : button('Delete', 'btn btn-danger', () => run('delete_version', { id: v.id }, () => setTimeout(() => nameInput.focus(), 0))),
+            ? button(t('versions.restore'), 'btn btn-primary', () => run('restore_version', { id: v.id, created: localStamp() }, () => setTimeout(() => list.querySelector('button') && list.querySelector('button').focus(), 0)))
+            : button(t('versions.delete'), 'btn btn-danger', () => run('delete_version', { id: v.id }, () => setTimeout(() => nameInput.focus(), 0))),
         );
         setTimeout(() => focusRow(v.id, '.btn-primary, .btn-danger'), 0);
         return li;
       }
 
       actions.append(
-        button('Compare', 'btn', () => {
+        button(t('versions.compare'), 'btn', () => {
           close();
           ctx.compare(v.id);
-        }, 'Compare this version with the budget as it is now'),
-        button('Restore…', 'btn', () => {
+        }, t('versions.compare_tip')),
+        button(t('versions.restore_more'), 'btn', () => {
           asking = { id: v.id, mode: 'restore' };
           clearError();
           draw();
-        }, 'Put this version in place of the budget'),
-        button('Rename', 'btn', () => {
+        }, t('versions.restore_tip')),
+        button(t('versions.rename'), 'btn', () => {
           asking = { id: v.id, mode: 'rename' };
           clearError();
           draw();
         }),
-        button('Delete…', 'btn btn-danger-text', () => {
+        button(t('versions.delete_more'), 'btn btn-danger-text', () => {
           asking = { id: v.id, mode: 'delete' };
           clearError();
           draw();
@@ -239,14 +240,14 @@ export function showVersions(ctx) {
     }
     draw();
 
-    const done = button('Close', 'btn', close);
+    const done = button(t('versions.close'), 'btn', close);
     return el(
       'div',
       { class: 'modal versions-dialog', attrs: { role: 'dialog', 'aria-labelledby': 'versions-title', 'aria-describedby': 'versions-message' } },
-      el('h2', { class: 'modal-title', text: 'Versions', attrs: { id: 'versions-title' } }),
+      el('h2', { class: 'modal-title', text: t('versions.title'), attrs: { id: 'versions-title' } }),
       el('p', {
         class: 'modal-message',
-        text: 'Named copies of this budget, kept inside its file. Save one before a big change; restore it, or compare it with the budget as it is now, at any time.',
+        text: t('versions.message'),
         attrs: { id: 'versions-message' },
       }),
       form,

@@ -57,32 +57,33 @@ import { renderReview } from './review.js';
 import { renderComments } from './comments.js';
 import { renderActivity } from './activity.js';
 import { isWeb } from './host.js';
+import { t } from './i18n.js';
 
 const TOOL_TABS = [
-  { id: 'fringes', label: 'Fringes' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'globals', label: 'Globals' },
-  { id: 'units', label: 'Units' },
-  { id: 'presets', label: 'Presets' },
-  { id: 'sets', label: 'Sets' },
-  { id: 'locations', label: 'Locations' },
-  { id: 'currencies', label: 'Currency' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'find', label: 'Find' },
-  { id: 'library', label: 'Library' },
-  { id: 'history', label: 'History' },
-  { id: 'explain', label: 'Explain' },
-  { id: 'overtime', label: 'Overtime' },
-  { id: 'actuals', label: 'Actuals' },
+  { id: 'fringes', label: t('tools.tab.fringes') },
+  { id: 'groups', label: t('tools.tab.groups') },
+  { id: 'globals', label: t('tools.tab.globals') },
+  { id: 'units', label: t('tools.tab.units') },
+  { id: 'presets', label: t('tools.tab.presets') },
+  { id: 'sets', label: t('tools.tab.sets') },
+  { id: 'locations', label: t('tools.tab.locations') },
+  { id: 'currencies', label: t('tools.tab.currencies') },
+  { id: 'notes', label: t('tools.tab.notes') },
+  { id: 'find', label: t('tools.tab.find') },
+  { id: 'library', label: t('tools.tab.library') },
+  { id: 'history', label: t('tools.tab.history') },
+  { id: 'explain', label: t('tools.tab.explain') },
+  { id: 'overtime', label: t('tools.tab.overtime') },
+  { id: 'actuals', label: t('tools.tab.actuals') },
   // A shared budget's review list and everyone's changes (src/shared_app.rs).
-  { id: 'review', label: 'Review' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'review', label: t('tools.tab.review') },
+  { id: 'activity', label: t('tools.tab.activity') },
   // A review file's comments (src/review.rs).
-  { id: 'comments', label: 'Comments' },
+  { id: 'comments', label: t('tools.tab.comments') },
 ];
 
 const PANES = ['top', 'bottom'];
-const TAB_IDS = TOOL_TABS.map((t) => t.id);
+const TAB_IDS = TOOL_TABS.map((tab) => tab.id);
 
 const DEFAULT_LAYOUT = Object.freeze({
   panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain'], bottom: ['sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals', 'review', 'activity', 'comments'] },
@@ -90,9 +91,9 @@ const DEFAULT_LAYOUT = Object.freeze({
 });
 
 const POSITIONS = [
-  { id: 'right', label: 'Dock at right', icon: 'right' },
-  { id: 'bottom', label: 'Dock at bottom', icon: 'bottom' },
-  { id: 'window', label: 'Pop out into a window', icon: 'window' },
+  { id: 'right', label: t('tools.dock_right'), icon: 'right' },
+  { id: 'bottom', label: t('tools.dock_bottom'), icon: 'bottom' },
+  { id: 'window', label: t('tools.pop_out'), icon: 'window' },
 ];
 
 /**
@@ -155,10 +156,10 @@ export function selectToolsTab(tab) {
 /** Focuses the control with data-key `key` in the drawn panel (a tab). */
 export function focusToolsKey(key) {
   if (!last || !last.host || !key) return false;
-  const t = [...last.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key);
-  if (!t) return false;
-  t.focus();
-  if (typeof t.scrollIntoView === 'function') t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const target = [...last.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key);
+  if (!target) return false;
+  target.focus();
+  if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   return true;
 }
 
@@ -202,7 +203,7 @@ function rerender() {
 // Header: what is selected, and where the panel goes
 
 function header(position) {
-  const group = el('div', { class: 'tools-places', attrs: { role: 'group', 'aria-label': 'Tools panel position' } });
+  const group = el('div', { class: 'tools-places', attrs: { role: 'group', 'aria-label': t('tools.panel_position') } });
   // A browser has no windows of its own: no Pop Out there (host.js).
   for (const p of POSITIONS.filter((x) => x.id !== 'window' || !isWeb())) {
     const b = el(
@@ -252,7 +253,7 @@ function icon(kind) {
 // The two panes
 
 function paneLabel(p) {
-  return p === 'top' ? 'First tools pane' : 'Second tools pane';
+  return p === 'top' ? t('tools.first_pane') : t('tools.second_pane');
 }
 
 function panes(view, ctx) {
@@ -280,7 +281,7 @@ function pane(which, view, ctx) {
     data: { pane: which },
   });
   for (const id of ids) strip.append(tabButton(which, id, id === active));
-  if (!ids.length) strip.append(el('span', { class: 'tools-drop-hint', text: 'Drag a tab here' }));
+  if (!ids.length) strip.append(el('span', { class: 'tools-drop-hint', text: t('tools.drag_a_tab_here') }));
   sec.append(strip);
   if (active) {
     const body = el('div', {
@@ -344,15 +345,15 @@ function content(body, id, view, ctx) {
 }
 
 function tabLabel(id) {
-  const t = TOOL_TABS.find((x) => x.id === id);
-  return t ? t.label : id;
+  const tab = TOOL_TABS.find((x) => x.id === id);
+  return tab ? tab.label : id;
 }
 
 function tabButton(which, id, selected) {
   const b = el('button', {
     class: 'tools-tab',
     text: tabLabel(id),
-    title: `${tabLabel(id)}: drag to move it, or ${isMac ? 'Option' : 'Alt'}+Shift+arrows`,
+    title: t('tools.tab_tip', { name: tabLabel(id), key: isMac ? 'Option' : 'Alt' }),
     attrs: {
       type: 'button',
       role: 'tab',

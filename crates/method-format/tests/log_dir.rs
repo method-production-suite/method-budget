@@ -942,7 +942,7 @@ fn the_owner_starts_a_budget_again_after_a_key_is_planted() {
         .grant(
             actor(4),
             Role::Department([cat_uid].into_iter().collect()),
-            "Sam edits a category",
+            "Morgan edits a category",
             T,
         )
         .unwrap();
@@ -994,9 +994,9 @@ fn the_owner_starts_a_budget_again_after_a_key_is_planted() {
     assert_eq!(new.log.key_of(actor(1)), Some(mine));
     assert!(new.log.signing_started());
     assert_eq!(new.log.role_of(actor(3)), Role::Editor);
-    let sam = new.log.role_of(actor(4));
+    let morgan = new.log.role_of(actor(4));
     let new_cat = new.log.project().binding.categories[&cat];
-    assert_eq!(sam, Role::Department([new_cat].into_iter().collect()));
+    assert_eq!(morgan, Role::Department([new_cat].into_iter().collect()));
     let mut was = before.budget.clone();
     let mut now = new.log.project().budget;
     was.provenance = None;
@@ -1196,25 +1196,26 @@ fn a_genuine_start_again_joins_silently_where_the_real_key_was_known() {
     alex.dir.write_segment(&[planted]).unwrap();
     let real = log::sign::KeyPair::from_seed([1; 32]).public();
 
-    // Riley's computer saw the planted key; Sam's was told the real one.
+    // Riley's computer saw the planted key; Morgan's was told the real one.
     let riley_keys = dir.join("riley-keys");
     let (mut riley, _) = log::open_in(&path, actor(3), Ids::seeded(3), Some(&riley_keys)).unwrap();
     keyed(&mut riley.log, 3);
     assert!(log::remember_owner_key(&mut riley, &riley_keys, actor(3), T).unwrap());
-    let sam_keys = dir.join("sam-keys");
-    let (sam, _) = log::open_in(&path, actor(4), Ids::seeded(4), Some(&sam_keys)).unwrap();
-    log::trust_owner_key(&sam_keys, &path, &sam.info, real, T).unwrap();
+    let morgan_keys = dir.join("morgan-keys");
+    let (morgan, _) = log::open_in(&path, actor(4), Ids::seeded(4), Some(&morgan_keys)).unwrap();
+    log::trust_owner_key(&morgan_keys, &path, &morgan.info, real, T).unwrap();
 
     let (mut owner, _) = log::open_in(&path, actor(1), Ids::seeded(11), None).unwrap();
     keyed(&mut owner.log, 1);
     let signer = std::sync::Arc::new(log::sign::KeyPair::from_seed([1; 32]));
     let new = log::start_again(&owner, signer, None, Ids::seeded(12), T).unwrap();
 
-    let (sam, report) = log::open_in(&path, actor(4), Ids::seeded(5), Some(&sam_keys)).unwrap();
+    let (morgan, report) =
+        log::open_in(&path, actor(4), Ids::seeded(5), Some(&morgan_keys)).unwrap();
     assert!(report.rejected.is_empty(), "{:?}", report.rejected);
-    assert_eq!(sam.info.budget_id, new.info.budget_id);
-    assert_eq!(sam.log.owner_key_changed(), None);
-    assert_eq!(sam.log.key_of(actor(1)), Some(real));
+    assert_eq!(morgan.info.budget_id, new.info.budget_id);
+    assert_eq!(morgan.log.owner_key_changed(), None);
+    assert_eq!(morgan.log.key_of(actor(1)), Some(real));
 
     let (riley, _) = log::open_in(&path, actor(3), Ids::seeded(6), Some(&riley_keys)).unwrap();
     assert_eq!(riley.log.owner_key_changed(), Some(real));

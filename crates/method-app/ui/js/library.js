@@ -36,23 +36,24 @@ import { openContextMenu } from './menu.js';
 import { showReview } from './importsetup.js';
 import { packsSection } from './packs.js';
 import { mountFrame, actionStrip, stripButton, searchBox, gridTable, setFooterTotals } from './setupframe.js';
+import { t } from './i18n.js';
 
 /** The kinds, in the library's order: [kind, list heading]. */
 export const LIBRARY_KINDS = [
-  ['global', 'Globals'],
-  ['fringe', 'Fringes'],
-  ['group', 'Groups'],
-  ['unit', 'Units'],
-  ['set', 'Sets'],
-  ['location', 'Locations'],
-  ['currency', 'Currencies'],
-  ['charge', 'Charges'],
-  ['credit', 'Credits'],
-  ['tag_preset', 'Tag presets'],
-  ['line_preset', 'Line blocks'],
-  ['report_preset', 'Report presets'],
-  ['ot_pattern', 'Overtime patterns'],
-  ['rate_table', 'Rate tables'],
+  ['global', t('library.kind.global')],
+  ['fringe', t('library.kind.fringe')],
+  ['group', t('library.kind.group')],
+  ['unit', t('library.kind.unit')],
+  ['set', t('library.kind.set')],
+  ['location', t('library.kind.location')],
+  ['currency', t('library.kind.currency')],
+  ['charge', t('library.kind.charge')],
+  ['credit', t('library.kind.credit')],
+  ['tag_preset', t('library.kind.tag_preset')],
+  ['line_preset', t('library.kind.line_preset')],
+  ['report_preset', t('library.kind.report_preset')],
+  ['ot_pattern', t('library.kind.ot_pattern')],
+  ['rate_table', t('library.kind.rate_table')],
 ];
 
 const KIND_IDS = LIBRARY_KINDS.map(([k]) => k);
@@ -114,7 +115,7 @@ export function shownItems(k, folder, filter) {
 
 function panelCall(cmd, args = {}) {
   const c = st.ctx;
-  if (!c || typeof c.call !== 'function') return Promise.reject('Not connected');
+  if (!c || typeof c.call !== 'function') return Promise.reject(t('library.not_connected'));
   return c.call(cmd, args);
 }
 
@@ -175,47 +176,45 @@ async function load() {
 
 /** What makes the drawn library stale: another budget in front, tabs opened or closed, or edits in the library's own tab. */
 function signature(view) {
-  const tabs = Array.isArray(view.tabs) ? view.tabs.map((t) => `${t.id}:${t.name}`).join('|') : '';
+  const tabs = Array.isArray(view.tabs) ? view.tabs.map((tab) => `${tab.id}:${tab.name}`).join('|') : '';
   const rev = st.lib && st.lib.in_tab ? view.rev : '';
   return `${view.doc}#${tabs}#${rev}`;
 }
 
 /** The review's words when adding from the library to this budget. */
 const ADD_TEXT = {
-  title: () => 'Add from your library',
-  intro:
-    'Tick what to copy into this budget. What an item needs comes with it. Where this budget has an item of the same name set up differently, it keeps its own version unless you choose otherwise. The copies are not linked to the library.',
-  okText: 'Add to Budget',
-  keepText: "Keep this budget's version",
-  takeText: "Use the library's version",
-  renameText: (to) => `Add the library's as ${to}`,
-  choiceTitle: "The library's version replaces this budget's for everything here that uses it; a new name leaves this budget's as it is.",
-  hereLabel: 'Here',
-  otherLabel: 'Library',
-  status: { new: 'New', same: 'Same here', differs: 'Different here' },
-  emptyText: 'Nothing to add.',
-  doing: 'to add',
-  tickAll: (heading) => `Add every item in ${heading}`,
-  tickOne: (what) => `Add ${what}`,
+  title: () => t('library.add.title'),
+  intro: t('library.add.intro'),
+  okText: t('library.add.ok'),
+  keepText: t('library.add.keep'),
+  takeText: t('library.add.take'),
+  renameText: (to) => t('library.add.rename', { to }),
+  choiceTitle: t('library.add.choice_tip'),
+  hereLabel: t('library.add.here'),
+  otherLabel: t('library.add.other'),
+  status: { new: t('library.add.status_new'), same: t('library.add.status_same'), differs: t('library.add.status_differs') },
+  emptyText: t('library.add.empty'),
+  doing: t('library.add.doing'),
+  tickAll: (heading) => t('library.add.tick_all', { heading }),
+  tickOne: (what) => t('library.add.tick_one', { what }),
 };
 
 /** The review's words when saving this budget's items to the library. */
 const SAVE_TEXT = {
-  title: (p) => `Save to your library from ${p.source}`,
-  intro:
-    'Tick what to copy into your library. What an item needs comes with it. Where the library has an item of the same name set up differently, it keeps its own version unless you choose otherwise. New items go in no folder; the copies are not linked to this budget.',
-  okText: 'Save to Library',
-  keepText: "Keep the library's version",
-  takeText: "Replace it with this budget's",
-  renameText: (to) => `Add this budget's as ${to}`,
-  choiceTitle: "This budget's version replaces the library's; a new name leaves the library's as it is.",
-  hereLabel: 'Library',
-  otherLabel: 'This budget',
-  status: { new: 'New to the library', same: 'Same in the library', differs: 'Different in the library' },
-  emptyText: 'This budget has no setup items to save.',
-  doing: 'to save',
-  tickAll: (heading) => `Save every item in ${heading}`,
-  tickOne: (what) => `Save ${what}`,
+  title: (p) => t('library.save.title', { source: p.source }),
+  intro: t('library.save.intro'),
+  okText: t('library.save.ok'),
+  keepText: t('library.save.keep'),
+  takeText: t('library.save.take'),
+  renameText: (to) => t('library.save.rename', { to }),
+  choiceTitle: t('library.save.choice_tip'),
+  hereLabel: t('library.save.here'),
+  otherLabel: t('library.save.other'),
+  status: { new: t('library.save.status_new'), same: t('library.save.status_same'), differs: t('library.save.status_differs') },
+  emptyText: t('library.save.empty'),
+  doing: t('library.save.doing'),
+  tickAll: (heading) => t('library.save.tick_all', { heading }),
+  tickOne: (what) => t('library.save.tick_one', { what }),
 };
 
 function reviewCtx(call, toastFn) {
@@ -282,8 +281,8 @@ async function saveToLibrary(call, toastFn, picks) {
  */
 export function saveItemToLibrary(ctx, kind, name) {
   const call = (cmd, args) => ctx.call(cmd, args);
-  const t = (m) => typeof ctx.toast === 'function' && ctx.toast(m);
-  return saveToLibrary(call, t, [{ kind, name }]);
+  const say = (m) => typeof ctx.toast === 'function' && ctx.toast(m);
+  return saveToLibrary(call, say, [{ kind, name }]);
 }
 
 // ---------------------------------------------------------------------------
@@ -376,17 +375,17 @@ function noLibrary(parts) {
   parts.push(
     el('p', {
       class: 'setup-empty library-intro',
-      text: 'Keep the fringes, globals, groups and other setup you reuse in a library file of your own, then copy them into any budget. The library starts empty and stays on this computer, in a folder you choose.',
+      text: t('library.intro'),
     }),
     el(
       'div',
       { class: 'library-actions' },
-      button('Create Library…', 'library:create', () => pickFile('library_create'), {
+      button(t('library.create'), 'library:create', () => pickFile('library_create'), {
         primary: true,
-        title: `Choose a folder: the library is made there as “My Method Budget Library.mthd”`,
+        title: t('library.create_tip'),
       }),
-      button('Use Existing Library…', 'library:choose', () => pickFile('library_choose'), {
-        title: 'Choose a library (any Method Budget file)',
+      button(t('library.use_existing'), 'library:choose', () => pickFile('library_choose'), {
+        title: t('library.use_existing_tip'),
       }),
     ),
   );
@@ -397,15 +396,15 @@ function header(lib) {
     'div',
     { class: 'library-head' },
     el('span', { class: 'library-title', text: str(lib.name), title: str(lib.location) }),
-    button('Change…', 'library:choose', () => pickFile('library_choose'), { title: 'Use another library file' }),
-    button('New…', 'library:create', () => pickFile('library_create'), { title: 'Make a new library in a folder you choose' }),
+    button(t('library.change'), 'library:choose', () => pickFile('library_choose'), { title: t('library.change_tip') }),
+    button(t('library.new'), 'library:create', () => pickFile('library_create'), { title: t('library.new_tip') }),
   );
 }
 
 function kindSelect(lib) {
   const sel = el('select', {
     class: 'setup-input setup-select library-kind',
-    attrs: { 'aria-label': 'Kind of setup item' },
+    attrs: { 'aria-label': t('library.kind_of_item') },
     data: { key: 'library:kind' },
   });
   for (const [id, label] of LIBRARY_KINDS) {
@@ -426,11 +425,11 @@ function kindSelect(lib) {
 function folderSelect(k) {
   const sel = el('select', {
     class: 'setup-input setup-select library-folder-pick',
-    attrs: { 'aria-label': 'Folder' },
+    attrs: { 'aria-label': t('library.folder') },
     data: { key: 'library:folder' },
   });
-  sel.append(el('option', { text: 'All folders', attrs: { value: ALL } }));
-  sel.append(el('option', { text: 'Unfiled', attrs: { value: UNFILED } }));
+  sel.append(el('option', { text: t('library.all_folders'), attrs: { value: ALL } }));
+  sel.append(el('option', { text: t('library.unfiled'), attrs: { value: UNFILED } }));
   for (const f of k.folders || []) sel.append(el('option', { text: f, attrs: { value: f } }));
   sel.value = st.folder;
   sel.addEventListener('change', () => {
@@ -443,7 +442,7 @@ function folderSelect(k) {
 function filterBox() {
   const input = el('input', {
     class: 'setup-input apply-filter',
-    attrs: { type: 'text', placeholder: 'Filter', 'aria-label': 'Filter the library', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off' },
+    attrs: { type: 'text', placeholder: t('library.filter'), 'aria-label': t('library.filter_label'), autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off' },
     data: { key: 'library:filter' },
   });
   input.value = st.filter;
@@ -464,9 +463,9 @@ function filterBox() {
 
 /** The Move To menu: Unfiled and each folder, at `anchor` or a point. */
 function moveMenu(at, k, names, anchor) {
-  const items = [{ label: 'Unfiled', run: () => change('library_move', { kind: k.kind, names, folder: null }) }];
+  const items = [{ label: t('library.unfiled'), run: () => change('library_move', { kind: k.kind, names, folder: null }) }];
   for (const f of k.folders || []) items.push({ label: f, run: () => change('library_move', { kind: k.kind, names, folder: f }) });
-  openContextMenu(at, { label: 'Move to folder', items, returnFocus: () => anchor && anchor.focus && anchor.focus() });
+  openContextMenu(at, { label: t('library.move_to_folder'), items, returnFocus: () => anchor && anchor.focus && anchor.focus() });
 }
 
 function pointBelow(b) {
@@ -484,7 +483,7 @@ function itemRow(k, it, writable, grid = false) {
   const key = `library:item:${k.kind}:${it.name}`;
   const box = el('input', {
     class: 'library-tick',
-    attrs: { type: 'checkbox', 'aria-label': `Pick ${it.name}` },
+    attrs: { type: 'checkbox', 'aria-label': t('library.pick_item', { name: it.name }) },
     data: { key: `library:tick:${k.kind}:${it.name}` },
   });
   box.checked = st.ticked.has(it.name);
@@ -494,7 +493,7 @@ function itemRow(k, it, writable, grid = false) {
     redraw();
   });
   const needs = (it.needs || []).map((n) => n.name).filter(Boolean);
-  const tip = [str(it.definition), needs.length ? `Brings along: ${needs.join(', ')}` : '', 'Enter or a double-click adds it to this budget'].filter(Boolean).join('\n');
+  const tip = [str(it.definition), needs.length ? t('library.brings_along', { names: needs.join(', ') }) : '', t('library.item_tip')].filter(Boolean).join('\n');
   const name = el(
     'button',
     {
@@ -533,12 +532,12 @@ function itemRow(k, it, writable, grid = false) {
   name.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const names = st.ticked.has(it.name) && st.ticked.size > 1 ? [...st.ticked] : [it.name];
-    const what = names.length === 1 ? it.name : `${names.length} items`;
-    const items = [{ label: names.length === 1 ? 'Add to This Budget…' : `Add ${what} to This Budget…`, run: () => addToBudget(k.kind, names) }];
+    const what = names.length === 1 ? it.name : t('library.n_items', { count: names.length });
+    const items = [{ label: names.length === 1 ? t('library.add_to_budget') : t('library.add_what_to_budget', { what }), run: () => addToBudget(k.kind, names) }];
     if (writable && (k.folders || []).length) {
-      const sub = [{ label: 'Unfiled', run: () => change('library_move', { kind: k.kind, names, folder: null }) }];
+      const sub = [{ label: t('library.unfiled'), run: () => change('library_move', { kind: k.kind, names, folder: null }) }];
       for (const f of k.folders) sub.push({ label: f, run: () => change('library_move', { kind: k.kind, names, folder: f }) });
-      items.push({ label: 'Move To', items: sub });
+      items.push({ label: t('library.move_to_menu'), items: sub });
     }
     openContextMenu({ x: e.clientX, y: e.clientY }, { label: what, items, returnFocus: () => name.focus() });
   });
@@ -546,13 +545,13 @@ function itemRow(k, it, writable, grid = false) {
   if (grid) {
     parts.push(
       el('span', { class: 'sw-cell sw-cell-text library-def', text: str(it.definition), title: str(it.definition) || undefined }),
-      el('span', { class: 'sw-cell sw-cell-text library-in', text: str(it.folder), title: it.folder ? 'Its folder' : undefined }),
+      el('span', { class: 'sw-cell sw-cell-text library-in', text: str(it.folder), title: it.folder ? t('library.its_folder') : undefined }),
     );
     const row = el('li', { class: 'library-item sw-grid-row' }, ...parts);
     if (st.ticked.has(it.name)) row.classList.add('is-selected');
     return row;
   }
-  if (st.folder === ALL && it.folder) parts.push(el('span', { class: 'library-in', text: str(it.folder), title: 'Its folder' }));
+  if (st.folder === ALL && it.folder) parts.push(el('span', { class: 'library-in', text: str(it.folder), title: t('library.its_folder') }));
   return el('li', { class: 'library-item' }, ...parts);
 }
 
@@ -563,14 +562,14 @@ function folderButtons(k, writable) {
     'div',
     { class: 'library-actions' },
     button(
-      'New Folder…',
+      t('library.new_folder'),
       'library:folder:new',
       (b) =>
         anchoredDialog({
           anchor: b,
-          title: `New folder of ${label}`,
-          label: 'Name',
-          submitText: 'Make Folder',
+          title: t('library.new_folder_title', { kinds: label }),
+          label: t('library.name'),
+          submitText: t('library.make_folder'),
           onSubmit: async (v) => {
             const r = await panelCall('library_folder', { kind: k.kind, action: 'create', name: v, to: null });
             if (r && r.library) {
@@ -580,18 +579,18 @@ function folderButtons(k, writable) {
             redraw();
           },
         }),
-      { enabled: writable, title: `A folder to sort the library’s ${label} into` },
+      { enabled: writable, title: t('library.new_folder_tip', { kinds: label }) },
     ),
     button(
-      'Rename Folder…',
+      t('library.rename_folder'),
       'library:folder:rename',
       (b) =>
         anchoredDialog({
           anchor: b,
-          title: `Rename the folder ${st.folder}`,
-          label: 'Name',
+          title: t('library.rename_folder_title', { name: st.folder }),
+          label: t('library.name'),
           value: st.folder,
-          submitText: 'Rename',
+          submitText: t('library.rename'),
           onSubmit: async (v) => {
             const r = await panelCall('library_folder', { kind: k.kind, action: 'rename', name: st.folder, to: v });
             if (r && r.library) {
@@ -601,18 +600,18 @@ function folderButtons(k, writable) {
             redraw();
           },
         }),
-      { enabled: writable && real, title: real ? 'Rename the folder shown' : 'Show a folder first' },
+      { enabled: writable && real, title: real ? t('library.rename_folder_tip') : t('library.show_a_folder_first') },
     ),
     button(
-      'Delete Folder…',
+      t('library.delete_folder'),
       'library:folder:delete',
       (b) => {
         const name = st.folder;
         anchoredForm({
           anchor: b,
-          title: `Delete the folder ${name}?`,
-          message: 'Its items stay in the library, in no folder.',
-          submitText: 'Delete Folder',
+          title: t('library.delete_folder_title', { name }),
+          message: t('library.delete_folder_message'),
+          submitText: t('library.delete_folder_ok'),
           danger: true,
           onSubmit: async () => {
             st.folder = ALL;
@@ -620,7 +619,7 @@ function folderButtons(k, writable) {
           },
         });
       },
-      { enabled: writable && real, title: real ? 'Delete the folder shown; its items stay' : 'Show a folder first' },
+      { enabled: writable && real, title: real ? t('library.delete_folder_tip') : t('library.show_a_folder_first') },
     ),
   );
 }
@@ -629,7 +628,7 @@ function draw(host) {
   const lib = st.lib;
   const parts = [];
   if (!lib) {
-    parts.push(el('p', { class: 'setup-empty', text: st.loading ? 'Reading the library…' : 'The library could not be read.' }));
+    parts.push(el('p', { class: 'setup-empty', text: st.loading ? t('library.reading') : t('library.could_not_read') }));
   } else if (!lib.configured) {
     noLibrary(parts);
   } else {
@@ -639,29 +638,29 @@ function draw(host) {
     } else {
       const writable = !lib.in_tab;
       if (lib.in_tab) {
-        parts.push(el('p', { class: 'setup-empty', text: 'Your library is open as a budget tab: you can add from it here, and change it in that tab.' }));
+        parts.push(el('p', { class: 'setup-empty', text: t('library.open_as_tab') }));
       }
       const k = kindOf(lib, st.kind);
       parts.push(el('div', { class: 'library-picks' }, kindSelect(lib), folderSelect(k)));
       parts.push(el('div', { class: 'apply-tools' }, filterBox()));
       const shown = shownItems(k, st.folder, st.filter);
-      const list = el('ul', { class: 'apply-items library-list', attrs: { 'aria-label': `${kindLabel(k.kind)} in the library` } });
+      const list = el('ul', { class: 'apply-items library-list', attrs: { 'aria-label': t('library.kinds_in_library', { kinds: kindLabel(k.kind) }) } });
       for (const it of shown) list.append(itemRow(k, it, writable));
-      if (!(k.items || []).length) parts.push(el('p', { class: 'setup-empty', text: `No ${kindLabel(k.kind).toLowerCase()} in the library yet.` }));
-      else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: 'Nothing here matches.' }));
+      if (!(k.items || []).length) parts.push(el('p', { class: 'setup-empty', text: t('library.none_yet', { kinds: kindLabel(k.kind).toLowerCase() }) }));
+      else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: t('library.nothing_matches') }));
       parts.push(list);
       const ticked = [...st.ticked];
       parts.push(
         el(
           'div',
           { class: 'library-actions' },
-          button(ticked.length > 1 ? `Add ${ticked.length} to This Budget…` : 'Add to This Budget…', 'library:add', () => addToBudget(k.kind, ticked), {
+          button(ticked.length > 1 ? t('library.add_n_to_budget', { count: ticked.length }) : t('library.add_to_budget'), 'library:add', () => addToBudget(k.kind, ticked), {
             enabled: ticked.length > 0,
-            title: ticked.length ? 'Copy the picked items, and what they need, into this budget' : 'Tick items first (or double-click one)',
+            title: ticked.length ? t('library.add_tip') : t('library.tick_first'),
           }),
-          button('Move To…', 'library:move', (b) => moveMenu(pointBelow(b), k, ticked, b), {
+          button(t('library.move_to'), 'library:move', (b) => moveMenu(pointBelow(b), k, ticked, b), {
             enabled: writable && ticked.length > 0 && (k.folders || []).length > 0,
-            title: (k.folders || []).length ? 'Put the picked items in a folder' : 'Make a folder first',
+            title: (k.folders || []).length ? t('library.move_tip') : t('library.make_a_folder_first'),
           }),
         ),
       );
@@ -670,9 +669,9 @@ function draw(host) {
         el(
           'div',
           { class: 'library-actions library-save' },
-          button('Save to Library…', 'library:save', () => saveToLibrary(panelCall, toast, null), {
+          button(t('library.save_to_library'), 'library:save', () => saveToLibrary(panelCall, toast, null), {
             enabled: writable,
-            title: writable ? 'Copy setup items from this budget into the library' : 'The library is open as a tab: change it there',
+            title: writable ? t('library.save_tip') : t('library.open_as_tab_tip'),
           }),
         ),
       );
@@ -723,10 +722,10 @@ function folderKey(f) {
 function folderTree(k) {
   const items = k.items || [];
   const count = (f) => (f === ALL ? items.length : f === UNFILED ? items.filter((i) => !i.folder).length : items.filter((i) => i.folder === f).length);
-  const ul = el('ul', { class: 'sw-tree', attrs: { 'aria-label': 'Folders' } });
+  const ul = el('ul', { class: 'sw-tree', attrs: { 'aria-label': t('library.folders') } });
   const picks = [
-    [ALL, 'All folders'],
-    [UNFILED, 'Unfiled'],
+    [ALL, t('library.all_folders')],
+    [UNFILED, t('library.unfiled')],
     ...(k.folders || []).map((f) => [f, f]),
   ];
   for (const [f, label] of picks) {
@@ -735,12 +734,12 @@ function folderTree(k) {
       'button',
       {
         class: `sw-tree-item${real ? ' is-folder' : ''}`,
-        title: real ? `Show the folder ${f}` : f === ALL ? 'Show every item' : 'Show the items in no folder',
+        title: real ? t('library.show_folder', { name: f }) : f === ALL ? t('library.show_every_item') : t('library.show_unfiled'),
         attrs: { type: 'button', 'aria-pressed': String(st.folder === f) },
         data: { key: folderKey(f), nobusy: '1' },
       },
       el('span', { class: 'sw-tree-name', text: label }),
-      el('span', { class: 'sw-tree-count', text: String(count(f)), attrs: { 'aria-label': `${count(f)} items` } }),
+      el('span', { class: 'sw-tree-count', text: String(count(f)), attrs: { 'aria-label': t('library.n_items', { count: count(f) }) } }),
     );
     b.addEventListener('click', () => {
       st.folder = f;
@@ -765,13 +764,13 @@ function folderTree(k) {
 function sortPick() {
   const sel = el('select', {
     class: 'setup-input setup-select setup-sortpick',
-    attrs: { 'aria-label': 'Sort' },
+    attrs: { 'aria-label': t('library.sort') },
     data: { key: 'library:sort', nobusy: '1' },
   });
   for (const [v, text] of [
-    ['library', 'Library order'],
-    ['asc', 'Name, A to Z'],
-    ['desc', 'Name, Z to A'],
+    ['library', t('library.sort_library')],
+    ['asc', t('library.sort_asc')],
+    ['desc', t('library.sort_desc')],
   ]) {
     sel.append(el('option', { text, attrs: { value: v } }));
   }
@@ -790,16 +789,16 @@ function railLabel(text) {
 /** The rail: the library's name, its kind, the sort, then the folders. */
 function railParts() {
   const lib = st.lib;
-  if (!lib) return [el('p', { class: 'setup-empty', text: st.loading ? 'Reading the library…' : 'The library could not be read.' })];
-  if (!lib.configured) return [el('p', { class: 'setup-empty', text: 'No library yet.' })];
+  if (!lib) return [el('p', { class: 'setup-empty', text: st.loading ? t('library.reading') : t('library.could_not_read') })];
+  if (!lib.configured) return [el('p', { class: 'setup-empty', text: t('library.no_library_yet') })];
   const parts = [header(lib)];
   if (lib.problem) return parts;
   const k = kindOf(lib, st.kind);
   const writable = !lib.in_tab;
   parts.push(
-    el('div', { class: 'sw-rail-field' }, railLabel('Kind'), kindSelect(lib)),
-    el('div', { class: 'sw-rail-field' }, railLabel('Sort'), sortPick()),
-    el('div', { class: 'sw-rail-field' }, railLabel('Folders'), folderTree(k)),
+    el('div', { class: 'sw-rail-field' }, railLabel(t('library.kind_label')), kindSelect(lib)),
+    el('div', { class: 'sw-rail-field' }, railLabel(t('library.sort')), sortPick()),
+    el('div', { class: 'sw-rail-field' }, railLabel(t('library.folders')), folderTree(k)),
     folderButtons(k, writable),
   );
   return parts;
@@ -814,27 +813,27 @@ function mainFrame(main) {
   const ticked = [...st.ticked];
   const folders = k.folders || [];
   const strip = actionStrip(
-    'Library',
+    t('library.strip'),
     [
-      stripButton(ticked.length > 1 ? `Add ${ticked.length} to This Budget…` : 'Add to This Budget…', 'library:add', () => addToBudget(k.kind, ticked), {
+      stripButton(ticked.length > 1 ? t('library.add_n_to_budget', { count: ticked.length }) : t('library.add_to_budget'), 'library:add', () => addToBudget(k.kind, ticked), {
         enabled: usable && ticked.length > 0,
-        title: ticked.length ? 'Copy the picked items, and what they need, into this budget' : 'Tick items first (or double-click one)',
+        title: ticked.length ? t('library.add_tip') : t('library.tick_first'),
       }),
-      stripButton('Move To…', 'library:move', (b) => moveMenu(pointBelow(b), k, ticked, b), {
+      stripButton(t('library.move_to'), 'library:move', (b) => moveMenu(pointBelow(b), k, ticked, b), {
         enabled: writable && ticked.length > 0 && folders.length > 0,
-        title: folders.length ? 'Put the picked items in a folder' : 'Make a folder first',
+        title: folders.length ? t('library.move_tip') : t('library.make_a_folder_first'),
       }),
-      stripButton('Save to Library…', 'library:save', () => saveToLibrary(panelCall, toast, null), {
+      stripButton(t('library.save_to_library'), 'library:save', () => saveToLibrary(panelCall, toast, null), {
         enabled: writable,
-        title: writable ? 'Copy setup items from this budget into the library' : 'The library is open as a tab: change it there',
+        title: writable ? t('library.save_tip') : t('library.open_as_tab_tip'),
       }),
     ],
     usable
       ? searchBox({
           key: 'library:filter',
           value: st.filter,
-          label: 'Search the library',
-          placeholder: `Search the library’s ${kindLabel(k.kind).toLowerCase()}`,
+          label: t('library.search'),
+          placeholder: t('library.search_placeholder', { kinds: kindLabel(k.kind).toLowerCase() }),
           onChange: (v) => {
             st.filter = v;
             redraw();
@@ -845,14 +844,14 @@ function mainFrame(main) {
   const body = [];
   let shownCount = 0;
   if (!lib) {
-    body.push(el('p', { class: 'setup-empty', text: st.loading ? 'Reading the library…' : 'The library could not be read.' }));
+    body.push(el('p', { class: 'setup-empty', text: st.loading ? t('library.reading') : t('library.could_not_read') }));
   } else if (!lib.configured) {
     noLibrary(body);
   } else if (lib.problem) {
     body.push(el('p', { class: 'setup-error apply-error', text: lib.problem, attrs: { role: 'alert' } }));
   } else {
     if (lib.in_tab) {
-      body.push(el('p', { class: 'setup-empty', text: 'Your library is open as a budget tab: you can add from it here, and change it in that tab.' }));
+      body.push(el('p', { class: 'setup-empty', text: t('library.open_as_tab') }));
     }
     let shown = shownItems(k, st.folder, st.filter);
     if (st.sort !== 'library') {
@@ -864,19 +863,19 @@ function mainFrame(main) {
       if (st.sort === 'desc') shown.reverse();
     }
     shownCount = shown.length;
-    const list = el('ul', { class: 'apply-items library-list', attrs: { 'aria-label': `${kindLabel(k.kind)} in the library` } });
+    const list = el('ul', { class: 'apply-items library-list', attrs: { 'aria-label': t('library.kinds_in_library', { kinds: kindLabel(k.kind) }) } });
     for (const it of shown) list.append(itemRow(k, it, writable, true));
-    if (!(k.items || []).length) body.push(el('p', { class: 'setup-empty', text: `No ${kindLabel(k.kind).toLowerCase()} in the library yet.` }));
-    else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: 'Nothing here matches.' }));
+    if (!(k.items || []).length) body.push(el('p', { class: 'setup-empty', text: t('library.none_yet', { kinds: kindLabel(k.kind).toLowerCase() }) }));
+    else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: t('library.nothing_matches') }));
     if (shown.length) {
       body.push(
         gridTable(
           'library',
           [
             el('span', { class: 'sw-head' }),
-            el('span', { class: 'sw-head', text: 'Name' }),
-            el('span', { class: 'sw-head', text: 'Definition' }),
-            el('span', { class: 'sw-head', text: 'Folder' }),
+            el('span', { class: 'sw-head', text: t('library.name') }),
+            el('span', { class: 'sw-head', text: t('library.definition') }),
+            el('span', { class: 'sw-head', text: t('library.folder') }),
           ],
           list,
         ),
@@ -891,8 +890,8 @@ function mainFrame(main) {
   setFooterTotals(
     usable
       ? [
-          { label: '', value: shownCount === items ? `${items} ${items === 1 ? 'item' : 'items'}` : `${shownCount} of ${items} items` },
-          ticked.length ? { label: '', value: `${ticked.length} ticked` } : null,
+          { label: '', value: shownCount === items ? t('library.footer_items', { count: items }) : t('library.footer_shown_of', { shown: shownCount, total: items }) },
+          ticked.length ? { label: '', value: t('library.footer_ticked', { count: ticked.length }) } : null,
         ]
       : [],
   );

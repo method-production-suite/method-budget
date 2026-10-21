@@ -40,6 +40,7 @@ import { isSetupTab } from './setuptabs.js';
 import { openFind, findStep } from './find.js';
 import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 import { isModalOpen } from './modal.js';
+import { t } from './i18n.js';
 
 const state = {
   view: null,
@@ -55,9 +56,9 @@ setDefaultArgs(() => (state.view && typeof state.view.doc === 'number' ? { doc: 
 // The page
 
 function build() {
-  document.title = 'Tools';
+  document.title = t('toolswin.title');
   document.body.classList.add('tools-window');
-  const panel = el('aside', { class: 'panel', attrs: { id: 'panel', 'aria-label': 'Tools' } });
+  const panel = el('aside', { class: 'panel', attrs: { id: 'panel', 'aria-label': t('toolswin.title') } });
   const shell = document.querySelector('.app');
   if (shell) shell.replaceWith(panel);
   else document.body.prepend(panel);
@@ -65,13 +66,13 @@ function build() {
 
 let toastTimer = null;
 function toast(message) {
-  const t = $('toast');
-  if (!t) return;
-  t.textContent = String(message);
-  t.hidden = false;
+  const box = $('toast');
+  if (!box) return;
+  box.textContent = String(message);
+  box.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    t.hidden = true;
+    box.hidden = true;
   }, 6000);
 }
 
@@ -85,7 +86,7 @@ function emitTo(target, name, payload) {
 async function call(cmd, args = {}) {
   const v = await invoke(cmd, args);
   if (v && typeof v === 'object' && 'budget' in v) {
-    const front = Array.isArray(v.tabs) ? v.tabs.find((t) => t.active) : null;
+    const front = Array.isArray(v.tabs) ? v.tabs.find((tab) => tab.active) : null;
     if (front && front.id !== v.doc) {
       // The main window brought another budget forward meanwhile: follow it.
       refresh();
@@ -296,7 +297,7 @@ async function start() {
   build();
   window.addEventListener('keydown', onKeyDown);
   if (!connected) {
-    toast('Open this page in the Method Budget app.');
+    toast(t('toolswin.open_in_app'));
     return;
   }
   await listen();

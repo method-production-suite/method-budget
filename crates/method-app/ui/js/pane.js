@@ -19,6 +19,7 @@
 import { el, $ } from './dom.js';
 import { setRules, dynamicStyles } from './sheet.js';
 import { readPref, writePref } from './prefs.js';
+import { t } from './i18n.js';
 
 /** What one pane shows, and its elements. */
 export class Pane {
@@ -75,17 +76,17 @@ export function firstPane() {
 
 /** The second pane's elements (made the first time the window splits). */
 export function secondPane() {
-  const tabbar = el('div', { class: 'tabbar', attrs: { 'aria-label': 'Budgets in the right pane' } });
-  const crumbs = el('nav', { class: 'crumbs', attrs: { 'aria-label': 'Budget level, right pane' } });
+  const tabbar = el('div', { class: 'tabbar', attrs: { 'aria-label': t('pane.budgets_right') } });
+  const crumbs = el('nav', { class: 'crumbs', attrs: { 'aria-label': t('pane.budget_level_right') } });
   const banner = el('div', { class: 'banner', attrs: { role: 'status' } });
   banner.hidden = true;
   const converted = el('div', { class: 'convert-banner', attrs: { role: 'status' } });
   converted.hidden = true;
   const actions = el('div', { class: 'actions' });
-  const host = el('div', { class: 'grid-host', attrs: { 'aria-label': 'Budget grid, right pane' } });
+  const host = el('div', { class: 'grid-host', attrs: { 'aria-label': t('pane.budget_grid_right') } });
   const main = el('div', { class: 'main' }, crumbs, banner, converted, actions, host);
   const footer = el('footer', { class: 'footer' });
-  const root = el('section', { class: 'pane pane-1', attrs: { 'aria-label': 'Right pane' } }, tabbar, main, footer);
+  const root = el('section', { class: 'pane pane-1', attrs: { 'aria-label': t('pane.right_pane') } }, tabbar, main, footer);
   return new Pane(1, { root, tabbar, main, crumbs, banner, converted, actions, host, footer });
 }
 
@@ -188,15 +189,15 @@ export function setRatio(r, { save = false } = {}) {
 
 function build() {
   box = el('div', { class: 'panes', attrs: { id: 'panes' } });
-  firstColumn = el('section', { class: 'pane pane-0', attrs: { 'aria-label': 'Left pane' } });
+  firstColumn = el('section', { class: 'pane pane-0', attrs: { 'aria-label': t('pane.left_pane') } });
   divider = el('div', {
     class: 'pane-divider',
-    title: 'Drag to change how the panes share the width; double-click to split it evenly',
+    title: t('pane.divider_tip'),
     attrs: {
       role: 'separator',
       tabindex: '0',
       'aria-orientation': 'vertical',
-      'aria-label': 'Split between the panes',
+      'aria-label': t('pane.divider'),
       'aria-valuemin': String(RATIO_MIN * 100),
       'aria-valuemax': String(RATIO_MAX * 100),
       'aria-controls': 'panes',
