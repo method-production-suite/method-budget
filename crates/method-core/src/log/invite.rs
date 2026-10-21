@@ -29,11 +29,20 @@
 //!   wins. Every computer settles them alike, whatever order they arrive
 //!   in; a claim that loses is refused and listed.
 //!
+//! A claim's Lamport clock must also be above every change in its `deps`
+//! (checked in `Log::judge`), so it can't claim to come first with a clock
+//! of 0.
+//!
 //! A valid claim gives the claimant the invite's role exactly as a grant by
-//! the inviter would ([`super::State::apply`]). Expiry is the claim's own
-//! wall-clock time, a claim like every change's time: someone holding the
-//! link whose clock is wrong (or set back on purpose) can join after the
-//! expiry. Cancel is the dependable way to take an invite back.
+//! the inviter would ([`super::State::apply`]). **Sealing** (MReview on pull
+//! request #92): what a claim says it saw can be a lie, so someone who gets
+//! the link later could write a claim "made apart" with a low clock and win.
+//! So as soon as a computer that may give the invite's role has applied a
+//! claim, or sees the invite unused past its expiry by its own clock, it
+//! records a cancel ([`super::Log::seal_invites`]): the claim it saw stands,
+//! anything outside its `deps` is cut. Before a granter has seen the real
+//! claim, a forged one that says it saw only the invite can still win; once
+//! a granter is online, it can't. Expiry alone is the claim's own clock.
 
 use super::access::{self, Bounds};
 use super::clock::{ChangeId, Frontier};
@@ -65,6 +74,7 @@ pub mod why {
     pub const USED: &str = "the invite was already used by someone else";
     pub const OWNER: &str = "the owner doesn't take up an invite";
     pub const NOT_ALLOWED: &str = "the person who made the invite could no longer give that role";
+    pub const LAMPORT: &str = "its clock isn't ahead of the changes it says it had seen";
 }
 
 /// A claim applied: what judges claims of the same invite made apart.

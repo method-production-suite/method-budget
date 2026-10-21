@@ -1586,6 +1586,24 @@ fn an_invite_link_lets_someone_new_join_with_its_role_once() {
     assert_eq!(st.invites[0].state, "used");
     assert_eq!(st.invites[0].joined.as_deref(), Some("Riley"));
     assert!(!st.invites[0].can_cancel);
+    // Alex's app sealed the used invite as soon as Riley's claim arrived:
+    // one cancel, written to the folder, and none again on the next pass.
+    let seals = |s: &Session| {
+        s.shared()
+            .unwrap()
+            .log()
+            .changes()
+            .flat_map(|c| &c.ops)
+            .filter(|op| matches!(op, Op::CancelInvite { .. }))
+            .count()
+    };
+    assert_eq!(seals(&alex), 1);
+    tick_at(&mut alex, 40);
+    assert_eq!(seals(&alex), 1);
+    // Cancelling it by hand is allowed and changes nothing for Riley.
+    let used = st.invites[0].id.clone();
+    alex.shared_mut().unwrap().cancel_invite(&used).unwrap();
+    assert_eq!(seals(&alex), 1, "already sealed");
     // Riley already has a role: the link is no use to them again.
     let e = riley.shared_mut().unwrap().join_invite(&link).unwrap_err();
     assert!(e.contains("already have a role"), "{e}");

@@ -2057,9 +2057,15 @@ A link works once: of two people who use it at about the same time, every comput
 on the same one (the one whose change came first by the log's clock) and the other's claim
 is left out and listed. Cancel works against any use the canceller hadn't seen when they
 cancelled, even one made before on another computer; a use the canceller had seen stands.
-Expiry is judged by the joining computer's own clock, like every change's time: someone
-with the link and a wrong clock can join late. Cancel is the dependable way to take a link
-back. The first invite raises the shared folder's format to 4 (docs/FORMAT.md), so Method
+**Sealing.** As soon as the app of someone who may give the invite's role (its maker, the
+owner, a co-owner or an admin above it) sees the link used, it cancels the invite on its
+own, keeping that use; from then on a copy of the link that reaches someone else, even with
+a claim written to look earlier, can't take the person's place. It does the same for an
+unused link past its date by that computer's clock, so expiry holds once anyone who could
+give the role opens the budget after the date; until then it rests on the joining
+computer's clock. The window left is the time between someone joining and the next time a
+granter's app reads it. A claim whose clock isn't ahead of the changes it says it saw is
+refused. The first invite raises the shared folder's format to 4 (docs/FORMAT.md), so Method
 Budget 0.7.0 and older refuse the folder from then on and open the file on its own.
 
 **Not yet** (later phases of the design): handing ownership itself on (the owner is one

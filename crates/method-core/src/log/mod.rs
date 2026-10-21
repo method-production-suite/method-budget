@@ -191,6 +191,10 @@ pub struct Log {
     /// owner-key.md, part 2): a different key in the owner's name is
     /// refused here, whatever the folder holds.
     owner_key_pin: Option<PublicKey>,
+    /// The highest Lamport clock of any change taken in, refused ones
+    /// included: what this actor's next change must be above (a claim is
+    /// checked against every change in its `deps`, decisions.md entry 97).
+    seen_lamport: u64,
 }
 
 impl fmt::Debug for Log {
@@ -225,6 +229,7 @@ impl Log {
             folds: 0,
             forks: Vec::new(),
             owner_key_pin: None,
+            seen_lamport: 0,
         }
     }
 
@@ -328,9 +333,10 @@ impl Log {
         &self.frontier
     }
 
-    /// The highest Lamport clock applied.
+    /// The highest Lamport clock taken in (applied or refused): this
+    /// actor's next change has one more.
     pub fn lamport(&self) -> u64 {
-        self.state.lamport()
+        self.state.lamport().max(self.seen_lamport)
     }
 
     /// This actor's last sequence number.
@@ -407,7 +413,7 @@ impl Log {
         time: &str,
     ) -> Result<Option<ChangeId>, LogError> {
         let seq = self.own_seq() + 1;
-        let lamport = self.state.lamport() + 1;
+        let lamport = self.lamport() + 1;
         let ops = capture::capture(
             &self.state,
             before,
@@ -522,6 +528,16 @@ impl Log {
                 LogError::Removed { id },
             )));
         }
+        if change.claim().is_some() && !self.lamport_after_deps(change) {
+            let why = invite::why::LAMPORT;
+            return Err(Box::new((
+                format!("{}{why}", refused::INVITE),
+                LogError::Invite {
+                    id,
+                    reason: why.to_string(),
+                },
+            )));
+        }
         if let Err(why) = invite::judge(&self.state, &self.bounds, change, self.verifier.as_deref())
         {
             return Err(Box::new((
@@ -537,6 +553,25 @@ impl Log {
                 format!("{}{}", refused::NOT_ALLOWED, refusal.reason),
                 LogError::NotAllowed { id, refusal },
             ))
+        })
+    }
+
+    /// Whether `change`'s Lamport clock is above that of every change in its
+    /// `deps`, as this log took them in (applied or refused). Checked for
+    /// claims only (decisions.md, entry 97): an honest app's changes before
+    /// this version could have a `deps` holding a refused change with a
+    /// higher clock than any applied, so older changes may not satisfy it.
+    fn lamport_after_deps(&self, change: &Change) -> bool {
+        change.deps.0.iter().all(|(a, s)| {
+            if *s == 0 {
+                return true;
+            }
+            let id = ChangeId { actor: *a, seq: *s };
+            let taken = self
+                .changes
+                .get(&id)
+                .or_else(|| self.rejected.iter().map(|(c, _)| c).find(|c| c.id() == id));
+            taken.is_none_or(|c| change.lamport > c.lamport)
         })
     }
 
@@ -598,7 +633,7 @@ impl Log {
             actor: self.actor,
             seq: self.own_seq() + 1,
             deps: self.frontier.clone(),
-            lamport: self.state.lamport() + 1,
+            lamport: self.lamport() + 1,
             time: time.to_string(),
             label: label.to_string(),
             ops,
@@ -731,6 +766,7 @@ impl Log {
         let id = change.id();
         self.frontier.advance(change.actor, change.seq);
         self.received.push(id);
+        self.seen_lamport = self.seen_lamport.max(change.lamport);
         if let Err(b) = self.judge(&change) {
             let (reason, e) = *b;
             self.rejected.push((change, reason));
@@ -1119,6 +1155,48 @@ impl Log {
         time: &str,
     ) -> Result<ChangeId, LogError> {
         self.record_ops(vec![Op::CancelInvite { invite }], label, time)
+    }
+
+    /// Seals invites this actor may cancel (decisions.md, entry 97): one
+    /// whose claim is in, so no other claim made outside what this computer
+    /// has seen can take its place, and one unused past its expiry by this
+    /// computer's clock (`now`, seconds since 1970 UTC). One cancel per
+    /// invite, none when one is in already. Returns the cancels recorded.
+    pub fn seal_invites(&mut self, now: i64, time: &str) -> Vec<ChangeId> {
+        let role = self.role_of(self.actor);
+        let me = self.person_of(self.actor);
+        let due: Vec<Uid> = self
+            .state
+            .invites()
+            .values()
+            .filter(|r| r.cancelled.is_none())
+            .filter(|r| {
+                r.claimed.is_some()
+                    || invite::rfc3339_secs(&r.expires).is_none_or(|until| now > until)
+            })
+            .filter(|r| {
+                access::person_at(&self.state, r.by, &r.deps) == me
+                    || (role.sets_roles() && may_give(&role, &Role::ReadOnly, &r.role))
+            })
+            .map(|r| r.id)
+            .collect();
+        let mut out = Vec::new();
+        for id in due {
+            let label = if self
+                .state
+                .invites()
+                .get(&id)
+                .is_some_and(|r| r.claimed.is_some())
+            {
+                "Sealed a used invite"
+            } else {
+                "Sealed an expired invite"
+            };
+            if let Ok(c) = self.cancel_invite(id, label, time) {
+                out.push(c);
+            }
+        }
+        out
     }
 
     /// The person who joined through invite `invite`, when its claim is in.

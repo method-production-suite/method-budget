@@ -68,7 +68,8 @@ this page goes ahead without waiting.
   Link… checks it, picks the budget's `.mthd` in the newcomer's synced folder in Rust's own
   dialog, joins as this computer and records a signed claim, checked by every computer:
   single use (settled the same everywhere), expiry by the claim's own clock, Cancel as a
-  cutoff. No new dependency. Raises the shared log to format 4. Needs a live check in the
+  cutoff, and each invite sealed by a granter's app as soon as it sees it used or past its
+  date (after MReview on #92), with a claim's clock checked against what it saw. No new dependency. Raises the shared log to format 4. Needs a live check in the
   app. Later: clickable `methodbudget://` links (Tauri's deep-link plugin, single-instance
   handling, a static join page), if people ask; `method-budget invite` and `join`.
 

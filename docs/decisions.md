@@ -5148,10 +5148,34 @@ this records the choices.
   unless the invite was made after that removal. This was picked over "a claim that saw the
   cancel is refused" (the claimant's own word) because cancelling must work against a
   claimant who doesn't cooperate.
-- **Expiry is the claim's own clock.** Change times are claims (design 7: wall clocks are
-  not enforceable), so someone holding the link whose clock is wrong, or set back, can join
-  late. The docs say so; Cancel is the dependable way to take a link back. Nothing better is
-  possible without a server or a trusted clock.
+- **Expiry is the claim's own clock**, until a granter seals it (below). Change times are
+  claims (design 7: wall clocks are not enforceable), so someone holding the link whose
+  clock is wrong, or set back, can join late if no granter has opened the budget since the
+  date.
+- **Sealing, after review (MReview on pull request #92).** What a claim says it saw can be
+  a lie: someone who got the link later could write a claim whose `deps` hold only the
+  invite, with the lowest clock, count as "made apart" and lower, take the invite on every
+  computer and push out the real member and all their work. Three fixes:
+  - *Seal on use.* As soon as a computer that may give the invite's role (its maker, or
+    whoever `may_give` it to a newcomer) has applied a claim, its app records a
+    `cancel_invite` (`Log::seal_invites`, called on every timer pass in
+    `SharedDoc::tick`). As a cutoff it keeps the claim it saw and refuses every claim
+    outside its `deps`, whatever clock it carries. `cancel_invite` therefore accepts a used
+    invite, in the engine and in `SharedDoc::cancel_invite`. One seal per invite: none when
+    a cancel is already in; two granters sealing at once write two cancels, both keep the
+    claim both had seen, and the state keeps the lowest, so every computer agrees.
+  - *Seal on expiry.* Such a computer also records the cancel when it sees an unused
+    invite past its expiry by its own clock, so expiry holds as soon as any granter opens
+    the budget after the date; only before that does it rest on the claimant's clock.
+  - *A claim's clock must be ahead of its `deps`*: its `lamport` above that of every change
+    in its `deps` as the reader took them in, applied or refused (`invite::why::LAMPORT`).
+    Checked for claims only: an honest app's change before this version takes its clock
+    from the applied changes, but its `deps` count refused ones too, so older logs may hold
+    honest changes that don't satisfy it. From this version a log's own clock counts every
+    change taken in, refused ones included (`Log::lamport`), so its claims always pass.
+  The window left: between the real claim and the next time a granter's app reads it, a
+  forged claim that says it saw only the invite and carries the lowest clock that passes
+  can still win, as before. The docs name it.
 - **Order independence.** Claims and cancels join `Bounds` (`claims`, `cancels`) like
   removals: a claim or cancel arriving after a claim it judges differently makes the log
   fold again (`changes_verdict` compares `invite::cut` with and without it). The property
@@ -5188,6 +5212,16 @@ this records the choices.
   any change); a QR code; carrying waiting invites across Start Again (entry 95 carries
   roles, so a person who already joined keeps theirs; an invite not yet used must be made
   again); more than one use per link.
+- **Tests after review**: a claim whose clock is 0 or equal to the invite's is refused
+  (`LAMPORT`), one ahead passes before any seal, and an honest claim's clock is above a
+  refused change it saw; a granter seals a used invite once, a late claim saying it saw only
+  the invite and tying on the clock with a lower actor is refused in sixteen orders while
+  the member keeps their role and note (without the seal it wins: checked); a granter seals
+  an expired invite by its clock and a claim with its clock set back is refused; two
+  granters sealing at once converge and neither seals again; cancelling a used invite by
+  hand. The property test adds forged claims with only the invite in `deps` at clock 0 and
+  at the lowest clock that passes, and granters sealing each round. App: the owner's app
+  seals Riley's claim once, and a cancel of the used invite is accepted.
 - **Tests.** Core (stand-in signatures): an invite taken up gives its role as a grant would,
   publishes the claimant's key, works within the role and not outside it, in any order;
   the wrong secret, a proof copied from another actor, a claim after the expiry, an invite

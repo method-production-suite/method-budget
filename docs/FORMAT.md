@@ -1848,8 +1848,10 @@ same change or before, so it is signed): `invite` names it and `proof` is the in
 Ed25519 signature (128 hex characters) over the bytes `method-budget-log claim v1`, a
 newline, the invite's id (32 hex characters), a newline and the claiming actor (64 hex
 characters). A proof names its actor, so a claim seen in the folder can't be copied into
-anyone else's name. A reader refuses and lists a claim (reason prefix `invite: `) when the
-invite isn't within the claim's `deps`; when the proof doesn't verify against the invite's
+anyone else's name. A reader refuses and lists a claim (reason prefix `invite: `) when its
+`lamport` isn't above that of every change in its `deps` (as the reader took them in,
+applied or refused; checked for claims only, since changes written before version 4 may
+not satisfy it); when the invite isn't within the claim's `deps`; when the proof doesn't verify against the invite's
 `key`; when the claiming actor is (or writes for) the owner; when the claim's own `time` is
 later than `expires` (both RFC 3339); when the inviter's role at the claim's `deps` no
 longer lets them give that role to the claimant; and, judged against changes the claim may
@@ -1863,9 +1865,15 @@ never have seen:
   `(lamport, actor, seq)`.
 
 A claim that stands gives its actor the invite's `role` as a `grant` would, ranked as the
-inviter ranked at the claim's `deps`. Expiry is the claim's own wall-clock `time`, which is
-only as trustworthy as the claimant's clock; `cancel_invite` is the dependable way to take an
-invite back.
+inviter ranked at the claim's `deps`. A `cancel_invite` may name a used invite.
+
+**Sealing.** What a claim says it saw can't be checked, so a writer that may give an
+invite's role writes a `cancel_invite` for it as soon as it has applied a claim of it (the
+claim it saw stands; any other made outside its `deps` is cut), and when it sees it unused
+past `expires` by its own clock. It writes none when a cancel is already in; two written at
+once both stand and agree. Until a granter has seen the real claim, a claim that says it saw
+only the invite can still win; after, it can't. Expiry rests on the claim's own `time` only
+until a granter seals the invite.
 
 These (the owner's first `grant`, the owner's first `key`, each `revoke`, each `claim` and
 each `cancel_invite`) judge changes outside their own future, so a reader that applied a

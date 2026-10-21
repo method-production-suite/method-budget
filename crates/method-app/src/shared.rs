@@ -1103,6 +1103,13 @@ impl SharedDoc {
                 self.last_change = now;
             }
         }
+        // Invites used or past their date are sealed by whoever may give
+        // their role (decisions.md, entry 97), so a link that reaches someone
+        // later can't take the place of the person who joined.
+        if self.seal_invites() {
+            self.reproject();
+            *budget = self.proj.budget.clone();
+        }
         if self.keeper && self.keep_file(now, budget) {
             out.budget_changed = true;
         }
@@ -2606,6 +2613,27 @@ impl SharedDoc {
         })
     }
 
+    /// Seals the invites this person may cancel that were used, or are past
+    /// their date by this computer's clock: one cancel each, written like any
+    /// change. True when anything was recorded.
+    pub fn seal_invites(&mut self) -> bool {
+        if !self.can_invite() {
+            return false;
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as i64);
+        let sealed = self.shared.log.seal_invites(now, &iso_now());
+        if sealed.is_empty() {
+            return false;
+        }
+        let at = Instant::now();
+        self.last_edit = Some(at);
+        self.unwritten_since.get_or_insert(at);
+        self.last_change = at;
+        true
+    }
+
     /// The budget's file name, as the link names it.
     fn file_name(&self) -> String {
         self.shared
@@ -2666,7 +2694,8 @@ impl SharedDoc {
     }
 
     /// Cancels invite `id` (32 hex characters): a claim this computer
-    /// hasn't seen is refused on every computer.
+    /// hasn't seen is refused on every computer. A used invite may be
+    /// cancelled too, which seals it: the use this computer has seen stands.
     pub fn cancel_invite(&mut self, id: &str) -> Result<(), String> {
         let uid = Uid::parse(id).ok_or("Couldn\u{2019}t tell which invite that is.")?;
         let rec = self
@@ -2677,12 +2706,6 @@ impl SharedDoc {
             .get(&uid)
             .cloned()
             .ok_or("That invite isn\u{2019}t in this budget.")?;
-        if rec.claimed.is_some() {
-            return Err(format!(
-                "{} already joined with that invite, so there is nothing to cancel. Remove them instead.",
-                self.name_of(rec.claimed.map(|c| c.actor).unwrap_or(rec.by))
-            ));
-        }
         if rec.cancelled.is_some() {
             return Ok(());
         }

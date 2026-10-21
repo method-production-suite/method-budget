@@ -3355,6 +3355,7 @@ fn invites_claims_and_cancels_converge_in_any_order() {
     let mut used = 0;
     let mut cancelled = 0;
     let mut joined = 0;
+    let mut behind = 0;
     let roles = |log: &Log| {
         vec![
             Role::Editor,
@@ -3395,6 +3396,11 @@ fn invites_claims_and_cancels_converge_in_any_order() {
                     let (id, _) = *rng.pick(&made);
                     let _ = log.cancel_invite(id, "Cancel", T);
                 }
+                // The owner's and Kim's apps seal used and expired invites
+                // (by their clock, `T`) whenever they run.
+                if i < 2 && rng.chance(70) {
+                    log.seal_invites(now_at_t(), T);
+                }
                 // Newcomers take up invites they have seen, now and then
                 // with the wrong secret.
                 if i >= 2 && !made.is_empty() && rng.chance(50) {
@@ -3424,7 +3430,13 @@ fn invites_claims_and_cancels_converge_in_any_order() {
                     } else {
                         T
                     };
-                    extra.push(claim_change(ghost, seen, id, secret, time));
+                    extra.push(match rng.below(3) {
+                        0 => claim_change(ghost, seen, id, secret, time),
+                        // Saying it saw only the invite, with the lowest
+                        // clock, or the lowest that passes.
+                        1 => minimal_claim(ghost, seen, id, secret, 0),
+                        _ => minimal_claim(ghost, seen, id, secret, invite_lamport(seen, id) + 1),
+                    });
                     ghost += 1;
                 }
             }
@@ -3509,8 +3521,203 @@ fn invites_claims_and_cancels_converge_in_any_order() {
         };
         used += why(invites::why::USED);
         cancelled += why(invites::why::CANCELLED);
+        behind += why(invites::why::LAMPORT);
     }
+    assert!(behind > 3, "claims refused for their clock: {behind}");
     assert!(joined > 10, "invites taken up: {joined}");
     assert!(used > 3, "claims refused as used: {used}");
     assert!(cancelled > 3, "claims refused as cancelled: {cancelled}");
+}
+
+// ---------------------------------------------------------------------------
+// Sealing invites (MReview on pull request #92): a claim that says it saw
+// only the invite, with the lowest clock it can, written by someone who got
+// the link later.
+
+/// Seconds since 1970 of `T`: what a granter's clock says in these tests.
+fn now_at_t() -> i64 {
+    invites::rfc3339_secs(T).unwrap()
+}
+
+/// A claim of `invite` by `who` whose `deps` hold only the invite (and what
+/// the invite had seen), with clock `lamport`.
+fn minimal_claim(who: u8, seen: &Log, invite: Uid, secret: u8, lamport: u64) -> Change {
+    let rec = &seen.state().invites()[&invite];
+    let mut deps = rec.deps.clone();
+    deps.advance(rec.change.actor, rec.change.seq);
+    let mut c = claim_change(who, seen, invite, secret, T);
+    c.deps = deps;
+    c.lamport = lamport;
+    c.sig = None;
+    c.sig = Some(TestKey(who).sign(&c));
+    c
+}
+
+fn invite_lamport(log: &Log, invite: Uid) -> u64 {
+    let rec = &log.state().invites()[&invite];
+    log.change(rec.change).unwrap().lamport
+}
+
+#[test]
+fn a_claim_whose_clock_isnt_ahead_of_its_deps_is_refused() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xF1);
+    owner
+        .invite(inv, Role::Editor, EXPIRES, invite_key(90), "Invite", T)
+        .unwrap();
+    // Before anyone has used it: a clock of 0, or equal to the invite's.
+    for lamport in [0, invite_lamport(&owner, inv)] {
+        let c = minimal_claim(8, &owner, inv, 90, lamport);
+        let mut o = owner.clone();
+        let _ = o.apply(c.clone());
+        assert_eq!(
+            invite_reason(&o, c.id()).as_deref(),
+            Some(invites::why::LAMPORT)
+        );
+        assert_eq!(o.role_of(actor(8)), Role::ReadOnly);
+    }
+    // One ahead of the invite passes: until a granter has seen a real use,
+    // that is the window (decisions.md, entry 97).
+    let c = minimal_claim(8, &owner, inv, 90, invite_lamport(&owner, inv) + 1);
+    let mut o = owner.clone();
+    o.apply(c).unwrap();
+    assert_eq!(o.role_of(actor(8)), Role::Editor);
+    // An honest change's clock is above everything taken in, refused ones
+    // included.
+    let mut riley = signed_follower(6, &owner, 6);
+    let forged = forged(actor(9), 1, &owner, vec![title_op("Nope")]);
+    let _ = riley.apply(forged.clone());
+    assert!(reason_of(&riley, forged.id()).is_some());
+    let id = riley
+        .claim(inv, proof(90, inv, actor(6)), "Joined", T)
+        .unwrap();
+    assert!(riley.change(id).unwrap().lamport > forged.lamport);
+}
+
+#[test]
+fn a_granter_seals_a_used_invite_and_a_late_claim_never_takes_it() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xF2);
+    owner
+        .invite(inv, Role::Comment, EXPIRES, invite_key(91), "Invite", T)
+        .unwrap();
+    let at_invite = owner.clone();
+    let mut riley = signed_follower(6, &owner, 6);
+    riley
+        .claim(inv, proof(91, inv, actor(6)), "Joined", T)
+        .unwrap();
+    try_edit(&mut riley, |b| {
+        account_mut(b, "2100").unwrap().notes.push(Note {
+            id: 1,
+            text: "Riley's note".into(),
+            created: T.into(),
+            ..Note::default()
+        });
+    })
+    .unwrap()
+    .unwrap();
+    // The owner takes the claim in and seals the invite, once.
+    send(&riley, &mut owner);
+    let sealed = owner.seal_invites(now_at_t(), T);
+    assert_eq!(sealed.len(), 1);
+    assert!(owner.seal_invites(now_at_t(), T).is_empty(), "sealed once");
+    assert!(owner.state().invites()[&inv].cancelled.is_some());
+    // Cancelling a used invite by hand works too (and changes nothing).
+    owner.cancel_invite(inv, "Cancel", T).unwrap();
+    assert_eq!(owner.role_of(actor(6)), Role::Comment);
+    // Later, someone with the link writes the lowest claim that passes the
+    // clock check, saying it saw only the invite.
+    // Actor 5 is below Riley's 6 and the clocks tie, so without the seal it
+    // would win as "made apart".
+    let late = minimal_claim(5, &at_invite, inv, 91, invite_lamport(&at_invite, inv) + 1);
+    let all = [written(&[&owner, &riley]), vec![late.clone()]].concat();
+    let mut rng = Rng::new(29);
+    for n in 0..16 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert!(fresh.pending().is_empty());
+        assert_eq!(
+            invite_reason(&fresh, late.id()).as_deref(),
+            Some(invites::why::CANCELLED),
+            "order {n}"
+        );
+        assert_eq!(fresh.role_of(actor(6)), Role::Comment, "order {n}");
+        assert_eq!(fresh.role_of(actor(5)), Role::ReadOnly);
+        assert_eq!(fresh.invite_claimant(inv), Some(actor(6)));
+        assert_eq!(fresh.rejected().len(), 1, "{:?}", fresh.rejected());
+        assert_eq!(
+            normalized(&fresh.project().budget),
+            normalized(&riley.project().budget)
+        );
+    }
+}
+
+#[test]
+fn a_granter_seals_an_expired_invite_by_its_own_clock() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xF3);
+    owner
+        .invite(inv, Role::Editor, EXPIRES, invite_key(92), "Invite", T)
+        .unwrap();
+    let mut riley = signed_follower(6, &owner, 6);
+    // Not yet expired: nothing to seal.
+    assert!(owner.seal_invites(now_at_t(), T).is_empty());
+    let after = invites::rfc3339_secs(EXPIRES).unwrap() + 1;
+    assert_eq!(owner.seal_invites(after, T).len(), 1);
+    // A claim made apart, its clock set back to before the expiry: refused.
+    let c = riley
+        .claim(inv, proof(92, inv, actor(6)), "Joined", T)
+        .unwrap();
+    deliver(&mut owner, &written(&[&riley]));
+    assert_eq!(
+        invite_reason(&owner, c).as_deref(),
+        Some(invites::why::CANCELLED)
+    );
+    assert_eq!(owner.role_of(actor(6)), Role::ReadOnly);
+}
+
+#[test]
+fn two_granters_sealing_at_once_converge() {
+    let mut owner = signed_budget();
+    owner.grant(actor(3), Role::Admin, "Kim admin", T).unwrap();
+    let inv = Uid(0xF4);
+    owner
+        .invite(inv, Role::Actuals, EXPIRES, invite_key(93), "Invite", T)
+        .unwrap();
+    let at_invite = owner.clone();
+    let mut kim = signed_follower(3, &owner, 3);
+    let mut riley = signed_follower(6, &owner, 6);
+    riley
+        .claim(inv, proof(93, inv, actor(6)), "Joined", T)
+        .unwrap();
+    send(&riley, &mut owner);
+    send(&riley, &mut kim);
+    // Both seal before seeing the other's.
+    assert_eq!(owner.seal_invites(now_at_t(), T).len(), 1);
+    assert_eq!(kim.seal_invites(now_at_t(), T).len(), 1);
+    let late = minimal_claim(8, &at_invite, inv, 93, invite_lamport(&at_invite, inv) + 1);
+    let all = [written(&[&owner, &kim, &riley]), vec![late.clone()]].concat();
+    let mut rng = Rng::new(31);
+    let mut first: Option<Log> = None;
+    for n in 0..12 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert_eq!(fresh.role_of(actor(6)), Role::Actuals);
+        assert!(reason_of(&fresh, late.id()).is_some());
+        if let Some(f) = &first {
+            assert_eq!(fresh.state().invites(), f.state().invites());
+            assert_eq!(rejected_ids(&fresh), rejected_ids(f));
+        } else {
+            first = Some(fresh);
+        }
+    }
+    // Having seen each other's, neither seals again.
+    deliver(&mut owner, &written(&[&kim]));
+    deliver(&mut kim, &written(&[&owner]));
+    assert!(owner.seal_invites(now_at_t(), T).is_empty());
+    assert!(kim.seal_invites(now_at_t(), T).is_empty());
 }
