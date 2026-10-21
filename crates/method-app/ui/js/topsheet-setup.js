@@ -21,18 +21,19 @@ import { redrawLists } from './setuplist.js';
 import { mountFrame, actionStrip, stripButton, searchBox, gridTable, band, bandField, setFooterTotals, railHost } from './setupframe.js';
 import { obj } from './util.js';
 import { fringeRowOf } from './levels.js';
+import { t } from './i18n.js';
 
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SEPARATORS = [
-  ['-', 'Hyphen  11-01'],
-  ['.', 'Point  11.01'],
-  [' ', 'Space  11 01'],
-  ['/', 'Slash  11/01'],
-  [':', 'Colon  11:01'],
-  [',', 'Comma  11,01'],
-  [';', 'Semicolon  11;01'],
-  ['', 'None  1101'],
+  ['-', t('topsheet.sep.hyphen')],
+  ['.', t('topsheet.sep.point')],
+  [' ', t('topsheet.sep.space')],
+  ['/', t('topsheet.sep.slash')],
+  [':', t('topsheet.sep.colon')],
+  [',', t('topsheet.sep.comma')],
+  [';', t('topsheet.sep.semicolon')],
+  ['', t('topsheet.sep.none')],
 ];
 
 let k = null; // the kit from setup.js, set on every render
@@ -112,7 +113,7 @@ function checkbox(fieldKey, checked, labelText, onChange) {
 function windowCtx() {
   const c = k.state().ctx || {};
   return {
-    call: (cmd, args) => (typeof c.call === 'function' ? c.call(cmd, args) : Promise.reject(new Error('Not connected'))),
+    call: (cmd, args) => (typeof c.call === 'function' ? c.call(cmd, args) : Promise.reject(new Error(t('topsheet.not_connected')))),
     toast: (m) => typeof c.toast === 'function' && c.toast(m),
   };
 }
@@ -142,7 +143,7 @@ function bandButton(text, fieldKey, onClick) {
 
 // Chips for a set of names picked from `options`, with a select to add one,
 // as a band field.
-function chips({ fieldKey, label, selected, options, onChange, emptyText = 'None' }) {
+function chips({ fieldKey, label, selected, options, onChange, emptyText = t('topsheet.none') }) {
   const wrap = k.el('span', 'sw-band-field tss-chipfield');
   const head = k.el('span', 'sw-band-label', label);
   head.id = k.nextId();
@@ -165,7 +166,7 @@ function chips({ fieldKey, label, selected, options, onChange, emptyText = 'None
           if (addSel) addSel.focus({ preventScroll: true });
           onChange(selected.filter((n) => n !== name));
         },
-        `Remove ${name}`,
+        t('topsheet.remove_named', { name }),
       ),
     );
     row.append(chip);
@@ -176,8 +177,8 @@ function chips({ fieldKey, label, selected, options, onChange, emptyText = 'None
     addSel = sel;
     sel.id = k.nextId();
     sel.dataset.key = k.key(fieldKey, 'add');
-    sel.setAttribute('aria-label', `Add to ${label}`);
-    const first = k.el('option', null, 'Add…');
+    sel.setAttribute('aria-label', t('topsheet.add_to', { label }));
+    const first = k.el('option', null, t('topsheet.add_ellipsis'));
     first.value = '';
     sel.append(first);
     for (const o of left) {
@@ -214,7 +215,7 @@ function confirmBox(itemKey, opener, text, yesText, danger, build) {
   box.setAttribute('aria-describedby', p.id);
   const yes = k.el('button', danger ? 'setup-btn setup-btn-danger' : 'setup-btn setup-btn-primary', yesText);
   yes.type = 'button';
-  const no = k.el('button', 'setup-btn setup-btn-quiet', 'Cancel');
+  const no = k.el('button', 'setup-btn setup-btn-quiet', t('topsheet.cancel'));
   no.type = 'button';
   const close = () => {
     box.remove();
@@ -460,14 +461,14 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
     const ik = k.key(tab, i);
     const box = k.el('div', 'setup-confirm tss-confirm');
     box.setAttribute('role', 'group');
-    box.setAttribute('aria-label', `Delete ${what} ${items[i].name}`);
+    box.setAttribute('aria-label', t('topsheet.delete_what_named', { what, name: items[i].name }));
     const text = k.el('p', 'setup-confirm-text', deleteText(i));
     text.id = k.nextId();
-    const yes = k.el('button', 'setup-btn setup-btn-danger', 'Delete');
+    const yes = k.el('button', 'setup-btn setup-btn-danger', t('topsheet.delete'));
     yes.type = 'button';
     yes.dataset.key = k.key('del-yes', ik);
     yes.setAttribute('aria-describedby', text.id);
-    const no = k.el('button', 'setup-btn setup-btn-quiet', 'Cancel');
+    const no = k.el('button', 'setup-btn setup-btn-quiet', t('topsheet.cancel'));
     no.type = 'button';
     no.dataset.key = k.key('del-no', ik);
     const close = () => {
@@ -513,11 +514,11 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
   const busy = (fn) => () => {
     if (!k.isBusy()) fn();
   };
-  const neu = stripButton(`New ${what}…`, k.key('new', tab), focusAdd, { title: `Add a ${what} to this budget` });
-  const up = stripButton('Move up', k.key(tab, 'up'), busy(() => moveBy(-1)));
-  const down = stripButton('Move down', k.key(tab, 'down'), busy(() => moveBy(1)));
-  const del = stripButton('Delete…', k.key('del', tab), busy(confirmDelete));
-  const save = stripButton('Save to Library…', k.key('save', tab), () => {
+  const neu = stripButton(t('topsheet.new_what', { what }), k.key('new', tab), focusAdd, { title: t('topsheet.add_a_what', { what }) });
+  const up = stripButton(t('topsheet.move_up'), k.key(tab, 'up'), busy(() => moveBy(-1)));
+  const down = stripButton(t('topsheet.move_down'), k.key(tab, 'down'), busy(() => moveBy(1)));
+  const del = stripButton(t('topsheet.delete_ellipsis'), k.key('del', tab), busy(confirmDelete));
+  const save = stripButton(t('topsheet.save_to_library'), k.key('save', tab), () => {
     if (count) saveItemToLibrary(windowCtx(), library, items[at].name);
   });
 
@@ -534,7 +535,7 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
     b.title = it.title;
     b.setAttribute('aria-keyshortcuts', 'Alt+Shift+ArrowUp Alt+Shift+ArrowDown');
     b.append(k.el('span', 'sw-tree-name', it.name), k.el('span', it.applied ? 'sw-tree-count setup-num' : 'sw-tree-count', it.figure));
-    if (it.bad) b.append(k.el('span', 'setup-sr', `, ${what} has a problem`));
+    if (it.bad) b.append(k.el('span', 'setup-sr', t('topsheet.what_has_a_problem', { what })));
     b.addEventListener('click', () => pick(n));
     b.addEventListener('keydown', (e) => listKey(e, n));
     li.append(b);
@@ -576,11 +577,11 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
       b.title = on ? text : none;
       b.setAttribute('aria-label', on ? text : none);
     };
-    const first = `Add a ${what} first`;
-    able(up, count > 0 && at > 0, `Move ${what} ${name} up`, count ? `${name} is first` : first);
-    able(down, count > 0 && at < count - 1, `Move ${what} ${name} down`, count ? `${name} is last` : first);
-    able(del, count > 0, `Delete ${what} ${name}`, first);
-    able(save, count > 0, `Copy to your library, with what it needs: ${what} ${name}`, first);
+    const first = t('topsheet.add_a_what_first', { what });
+    able(up, count > 0 && at > 0, t('topsheet.move_what_up', { what, name }), count ? t('topsheet.name_is_first', { name }) : first);
+    able(down, count > 0 && at < count - 1, t('topsheet.move_what_down', { what, name }), count ? t('topsheet.name_is_last', { name }) : first);
+    able(del, count > 0, t('topsheet.delete_what_named', { what, name }), first);
+    able(save, count > 0, t('topsheet.copy_to_library', { what, name }), first);
     setFooterTotals(foot(at));
   };
 
@@ -597,7 +598,7 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
   const listLabel = k.el('span', 'sw-rail-label', label);
   listLabel.setAttribute('aria-hidden', 'true');
   const list = k.el('div', 'sw-rail-field');
-  list.append(listLabel, count ? ul : k.el('p', 'tss-pick-empty', 'None yet'));
+  list.append(listLabel, count ? ul : k.el('p', 'tss-pick-empty', t('topsheet.none_yet')));
   add.classList.add('tss-rail-add');
   const rail = railHost();
   if (rail) rail.append(list, add);
@@ -663,7 +664,7 @@ function currencyOptions(current) {
   const base = k.baseCode();
   const codes = k.entries(k.budget().currencies).map(([c]) => c);
   if (current && current !== base && !codes.includes(current)) codes.push(current);
-  return [['', base ? `${base} (base)` : 'Base currency'], ...codes.map((c) => [c, c])];
+  return [['', base ? t('topsheet.base_named', { base }) : t('topsheet.base_currency')], ...codes.map((c) => [c, c])];
 }
 
 // Per charge, what fills its editor's left-out totals when it shows, and
@@ -675,23 +676,23 @@ let chargeFeet = [];
 // it leaves out. `live` is a total figured from typed text (preview_charge);
 // `stale` dims it while the text isn't a number yet.
 function chargeFoot(i, live = null, stale = false) {
-  const out = [{ label: '', value: k.plural(chargeFeet.length, 'charge', 'charges') }];
+  const out = [{ label: '', value: t('topsheet.count.charges', { count: chargeFeet.length }) }];
   const f = chargeFeet[i];
   if (!f) return out;
   if (!f.applied) {
-    out.push({ label: 'Total charge', value: 'Not applied' });
+    out.push({ label: t('topsheet.total_charge'), value: t('topsheet.not_applied') });
     return out;
   }
-  const t = live || f.entry;
-  if (!t) return out;
+  const tot = live || f.entry;
+  if (!tot) return out;
   out.push(
     {
-      label: 'Total charge',
-      value: k.formatCents(t.amount),
-      title: stale ? 'Finish typing a number to see the new total' : chargeTitle(t, Boolean(live)),
+      label: t('topsheet.total_charge'),
+      value: k.formatCents(tot.amount),
+      title: stale ? t('topsheet.finish_typing_a_number_to_see_the') : chargeTitle(tot, Boolean(live)),
       dim: stale,
     },
-    { label: 'Left out', value: k.formatCents(t.excluded), title: 'Everything the charge leaves out: each line counts once, even when several rows pick it', dim: stale },
+    { label: t('topsheet.left_out'), value: k.formatCents(tot.excluded), title: t('topsheet.everything_the_charge_leaves_out_each_line'), dim: stale },
   );
   return out;
 }
@@ -708,13 +709,13 @@ function renderCharges(panel) {
     const entry = appliedEntry(charges, r && r.charges, i);
     const issues = issuesAt('charge', i);
     chargeFeet[i] = { applied: c.applied, entry: entry || null };
-    const fig = !c.applied ? 'Not applied' : entry ? k.formatCents(entry.amount) : '';
-    const figTitle = !c.applied ? 'Not applied' : entry ? `Total charge, ${chargeTitle(entry, false).toLowerCase()}` : '';
+    const fig = !c.applied ? t('topsheet.not_applied') : entry ? k.formatCents(entry.amount) : '';
+    const figTitle = !c.applied ? t('topsheet.not_applied') : entry ? t('topsheet.total_charge_on', { on: chargeTitle(entry, false).toLowerCase() }) : '';
     return {
       name: c.name,
       applied: c.applied,
       figure: fig,
-      title: [c.name, figTitle, issues.length ? 'This charge has a problem' : ''].filter(Boolean).join('\n'),
+      title: [c.name, figTitle, issues.length ? t('topsheet.this_charge_has_a_problem') : ''].filter(Boolean).join('\n'),
       bad: issues.length > 0,
       editor: chargeEditor(i, c0, c, issues),
     };
@@ -723,22 +724,22 @@ function renderCharges(panel) {
   const taken = {};
   for (const c of charges) taken[k.str(obj(c).name)] = true;
   const add = k.addForm('charges', {
-    title: 'New charge',
+    title: t('topsheet.new_charge'),
     fields: [
-      k.addInput('charges', 'name', { label: 'Name', placeholder: 'Insurance' }),
-      k.addSelect('charges', 'kind', 'Type', [
-        ['percent', 'Percent'],
-        ['flat', 'Flat fee'],
+      k.addInput('charges', 'name', { label: t('topsheet.name'), placeholder: t('topsheet.insurance') }),
+      k.addSelect('charges', 'kind', t('topsheet.type'), [
+        ['percent', t('topsheet.percent')],
+        ['flat', t('topsheet.flat_fee')],
       ]),
-      k.addInput('charges', 'value', { label: 'Percent or amount', placeholder: '10', num: true }),
+      k.addInput('charges', 'value', { label: t('topsheet.percent_or_amount'), placeholder: '10', num: true }),
     ],
     validate: (v) => {
       const name = v.name.trim();
-      if (name === '') return ['name', 'Enter a charge name.'];
-      if (taken[name]) return ['name', `There is already a charge named ${name}.`];
+      if (name === '') return ['name', t('topsheet.enter_a_charge_name')];
+      if (taken[name]) return ['name', t('topsheet.charge_exists', { name })];
       const val = v.value.trim();
-      if (val === '') return ['value', v.kind === 'flat' ? 'Enter an amount.' : 'Enter a percent.'];
-      if (v.kind !== 'flat' && !DECIMAL.test(val)) return ['value', 'The percent must be a number, like 10 or 2.5.'];
+      if (val === '') return ['value', v.kind === 'flat' ? t('topsheet.enter_an_amount') : t('topsheet.enter_a_percent')];
+      if (v.kind !== 'flat' && !DECIMAL.test(val)) return ['value', t('topsheet.the_percent_must_be_a_number_like')];
       return null;
     },
     build: (v) => {
@@ -771,14 +772,14 @@ function renderCharges(panel) {
 
   pickEditor(panel, {
     tab: 'charges',
-    what: 'charge',
-    label: 'Charges',
+    what: t('topsheet.what.charge'),
+    label: t('topsheet.charges'),
     library: 'charge',
     items,
     add,
-    empty: 'No charges yet.',
+    empty: t('topsheet.no_charges_yet'),
     move: 'move_charge',
-    deleteText: (i) => `Delete charge ${items[i].name}?`,
+    deleteText: (i) => t('topsheet.delete_charge', { name: items[i].name }),
     deleteBuild: (i) => ['delete_charge', { index: i }],
     foot: (i) => chargeFoot(i),
     onShow: (i) => {
@@ -795,18 +796,18 @@ function chargeEditor(i, c0, c, issues) {
   const fk = (f) => k.key('charges', i, f);
   const commit = (f, patchOf) => (v, old) =>
     k.run(ik, () => chargeArgs(i, patchOf(v)), { restore: [fk(f), old] });
-  const ed = editorShell(ik, `Charge ${c.name}`);
+  const ed = editorShell(ik, t('topsheet.charge_named', { name: c.name }));
 
   const name = k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) });
-  const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
+  const applied = checkbox(fk('applied'), c.applied, t('topsheet.applied'), (v) =>
     k.run(ik, () => chargeArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
   );
   const kind = k.selectInput({
     fieldKey: fk('kind'),
     value: c.kind,
     options: [
-      ['percent', 'Percent of the total'],
-      ['flat', 'Flat fee'],
+      ['percent', t('topsheet.percent_of_the_total')],
+      ['flat', t('topsheet.flat_fee')],
     ],
     onCommit: commit('kind', (v) => (cur) =>
       v === 'flat'
@@ -823,7 +824,7 @@ function chargeEditor(i, c0, c, issues) {
       onCommit: commit('percent', (v) => ({ percent: v.trim() })),
     });
     livePreview(pct, i);
-    values.push(bandInput('Percent', pct, { size: 'tss-w-pct', unit: '%' }));
+    values.push(bandInput(t('topsheet.percent'), pct, { size: 'tss-w-pct', unit: '%' }));
   } else {
     const amount = k.textInput({
       fieldKey: fk('amount'),
@@ -838,22 +839,22 @@ function chargeEditor(i, c0, c, issues) {
       options: currencyOptions(c.currency),
       onCommit: commit('currency', (v) => ({ currency: v === '' ? null : v })),
     });
-    values.push(bandInput('Amount', amount, { size: 'tss-w-num' }), bandInput('Currency', cur));
+    values.push(bandInput(t('topsheet.amount'), amount, { size: 'tss-w-num' }), bandInput(t('topsheet.currency'), cur));
   }
   const account = k.textInput({
     fieldKey: fk('account'),
     value: c.account || '',
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
   });
   ed.append(
     band(
-      `Charge ${c.name}`,
-      bandInput('Name', name, { size: 'tss-w-name' }),
+      t('topsheet.charge_named', { name: c.name }),
+      bandInput(t('topsheet.name'), name, { size: 'tss-w-name' }),
       applied,
-      bandInput('Type', kind),
+      bandInput(t('topsheet.type'), kind),
       ...values,
-      bandInput('Posts to account', account, { size: 'tss-w-acct' }),
+      bandInput(t('topsheet.posts_to_account'), account, { size: 'tss-w-acct' }),
     ),
   );
 
@@ -861,26 +862,26 @@ function chargeEditor(i, c0, c, issues) {
   const labels = [];
   if (c.kind === 'percent') {
     labels.push(
-      checkbox(fk('label-percent'), c.label_percent, 'Show the percent on the topsheet', (v) =>
+      checkbox(fk('label-percent'), c.label_percent, t('topsheet.show_the_percent_on_the_topsheet'), (v) =>
         k.run(ik, () => chargeArgs(i, { label_percent: v }), { restore: [fk('label-percent'), !v] }),
       ),
     );
   }
   labels.push(
-    checkbox(fk('label-excluded'), c.label_excluded, 'Show the amount left out on the topsheet', (v) =>
+    checkbox(fk('label-excluded'), c.label_excluded, t('topsheet.show_the_amount_left_out_on_the'), (v) =>
       k.run(ik, () => chargeArgs(i, { label_excluded: v }), { restore: [fk('label-excluded'), !v] }),
     ),
   );
-  ed.append(band('Topsheet label', bandTitle('Topsheet label'), ...labels));
+  ed.append(band(t('topsheet.topsheet_label'), bandTitle(t('topsheet.topsheet_label')), ...labels));
   ed.append(...chargeExclusions(i, c, ik));
   k.finishItem(ed, ik, issues, null);
   return ed;
 }
 
 // The footer figure's tooltip: what the charge is figured on.
-function chargeTitle(t, typing) {
-  const on = `On ${k.formatCents(t.base)}, less ${k.formatCents(t.excluded)} left out`;
-  return typing ? `${on} (with the value being typed)` : on;
+function chargeTitle(tot, typing) {
+  const params = { base: k.formatCents(tot.base), excluded: k.formatCents(tot.excluded) };
+  return typing ? t('topsheet.charge_on_typing', params) : t('topsheet.charge_on', params);
 }
 
 // Live preview: while a charge's percent, amount or a left-out amount is
@@ -925,10 +926,10 @@ async function runPreview(i) {
   const seq = ++preview.seq;
   const shown = () => seq === preview.seq && picked.charges === i && chargeFeet[i] === f;
   try {
-    const t = await invoke('preview_charge', { index: i, charge: draftCharge(i) });
+    const got = await invoke('preview_charge', { index: i, charge: draftCharge(i) });
     if (!shown()) return;
-    preview.live = { i, t };
-    setFooterTotals(chargeFoot(i, t));
+    preview.live = { i, t: got };
+    setFooterTotals(chargeFoot(i, got));
   } catch {
     // Not a number yet: keep the last total, dimmed as not current.
     if (!shown()) return;
@@ -963,9 +964,9 @@ function leftOutTotal(i, f, name, span) {
       excluded_accounts: [],
       [f]: [name],
     };
-    p = invoke('preview_charge', { index: i, charge: one }).then((t) => {
-      leftOut.last.set(id, t.excluded);
-      return t.excluded;
+    p = invoke('preview_charge', { index: i, charge: one }).then((got) => {
+      leftOut.last.set(id, got.excluded);
+      return got.excluded;
     });
     leftOut.now.set(id, p);
   }
@@ -995,9 +996,9 @@ function chargeExclusions(i, c, ik) {
   const named = (map, f) =>
     [...map.keys()].filter((code) => !c[f].includes(code)).map((code) => [code, `${code} ${map.get(code)}`.trim()]);
   const adders = band(
-    `Left out of ${c.name}`,
-    bandTitle('Left out'),
-    bandButton('Exclude amount', fk('amount-add'), () => {
+    t('topsheet.left_out_of', { name: c.name }),
+    bandTitle(t('topsheet.left_out')),
+    bandButton(t('topsheet.exclude_amount'), fk('amount-add'), () => {
       k.setFocusKey(fk(`amount-desc-${c.excluded_amounts.length}`));
       k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: [...cur.excluded_amounts, { description: '', amount: '0' }] })), {
         onError: () => k.setFocusKey(null),
@@ -1005,23 +1006,23 @@ function chargeExclusions(i, c, ik) {
     }),
     addPicker(
       fk('excl-add-group'),
-      'Exclude group…',
+      t('topsheet.exclude_group'),
       groupNames()
         .filter((g) => !c.excluded_groups.includes(g))
         .map((g) => [g, g]),
-      'No groups left',
+      t('topsheet.no_groups_left'),
       (g) => leave('excluded_groups', g),
     ),
-    addPicker(fk('excl-add-category'), 'Exclude category…', named(cats, 'excluded_categories'), 'No categories left', (v) =>
+    addPicker(fk('excl-add-category'), t('topsheet.exclude_category'), named(cats, 'excluded_categories'), t('topsheet.no_categories_left'), (v) =>
       leave('excluded_categories', v),
     ),
-    addPicker(fk('excl-add-account'), 'Exclude account…', named(accts, 'excluded_accounts'), 'No accounts left', (v) =>
+    addPicker(fk('excl-add-account'), t('topsheet.exclude_account'), named(accts, 'excluded_accounts'), t('topsheet.no_accounts_left'), (v) =>
       leave('excluded_accounts', v),
     ),
   );
 
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', `Left out of ${c.name}`);
+  ul.setAttribute('aria-label', t('topsheet.left_out_of', { name: c.name }));
   // Each row's delete key, so focus can go to a neighbour once one is removed.
   const rows = [];
   const focusAfter = (p) => {
@@ -1043,8 +1044,8 @@ function chargeExclusions(i, c, ik) {
     const desc = k.textInput({
       fieldKey: fk(`amount-desc-${n}`),
       value: x.description,
-      placeholder: 'Description',
-      label: `Description of amount ${n + 1}`,
+      placeholder: t('topsheet.description'),
+      label: t('topsheet.description_of_amount', { n: n + 1 }),
       cls: 'sw-cell-input',
       onCommit: (v, old) =>
         k.run(
@@ -1057,7 +1058,7 @@ function chargeExclusions(i, c, ik) {
       fieldKey: fk(`amount-value-${n}`),
       value: k.formatCents(obj(rawAmounts[n]).amount),
       num: true,
-      label: `Amount ${n + 1}`,
+      label: t('topsheet.amount_n', { n: n + 1 }),
       cls: 'sw-cell-input',
       onCommit: (v, old) =>
         k.run(
@@ -1068,19 +1069,20 @@ function chargeExclusions(i, c, ik) {
     });
     livePreview(amt, i);
     const delKey = fk(`amount-del-${n}`);
-    const del = removeButton(delKey, `Remove amount ${n + 1}`, (cur) => ({
+    const del = removeButton(delKey, t('topsheet.remove_amount', { n: n + 1 }), (cur) => ({
       excluded_amounts: cur.excluded_amounts.filter((_, j) => j !== n),
     }));
     rows.push({ del: delKey, amount: n });
     const li = gridRow();
-    li.append(lead(), textCell('Amount', { muted: true }), cell(desc, 'tss-span2'), cell(amt), acts(del));
+    li.append(lead(), textCell(t('topsheet.amount'), { muted: true }), cell(desc, 'tss-span2'), cell(amt), acts(del));
     ul.append(li);
   });
 
   const loads = [];
   const namedRow = (type, f, name, desc, known, title) => {
     const delKey = fk(`excl-${type}-del-${name}`);
-    const del = removeButton(delKey, `Remove ${type} ${name}`, (cur) => ({ [f]: cur[f].filter((x) => x !== name) }));
+    const removeLabel = { group: t('topsheet.remove_group', { name }), category: t('topsheet.remove_category', { name }), account: t('topsheet.remove_account', { name }) }[type];
+    const del = removeButton(delKey, removeLabel, (cur) => ({ [f]: cur[f].filter((x) => x !== name) }));
     rows.push({ del: delKey });
     const figure = k.el('span', 'sw-num');
     const total = cell(figure, 'sw-num');
@@ -1088,11 +1090,11 @@ function chargeExclusions(i, c, ik) {
       total.title = title;
       loads.push(() => leftOutTotal(i, f, name, figure));
     }
-    const descCell = known ? textCell(desc, { title: desc }) : textCell('Not in this budget', { muted: true });
+    const descCell = known ? textCell(desc, { title: desc }) : textCell(t('topsheet.not_in_this_budget'), { muted: true });
     const li = gridRow();
     li.append(
       lead(),
-      textCell(type[0].toUpperCase() + type.slice(1), { muted: true }),
+      textCell({ group: t('topsheet.excl.group'), category: t('topsheet.excl.category'), account: t('topsheet.excl.account') }[type], { muted: true }),
       textCell(name, { title: name }),
       descCell,
       total,
@@ -1100,11 +1102,11 @@ function chargeExclusions(i, c, ik) {
     );
     ul.append(li);
   };
-  const usual = 'Its lines with their fringes, as the totals stand now';
+  const usual = t('topsheet.its_lines_with_their_fringes_as_the');
   for (const g of c.excluded_groups) {
     const known = Object.prototype.hasOwnProperty.call(groupDefs, g);
     const def = obj(groupDefs[g]);
-    const title = def.in_budget_total === false ? 'Left out of the budget total, so nothing to leave out here' : usual;
+    const title = def.in_budget_total === false ? t('topsheet.left_out_of_the_budget_total_so') : usual;
     namedRow('group', 'excluded_groups', g, k.str(def.description), known, title);
   }
   for (const code of c.excluded_categories) {
@@ -1114,12 +1116,12 @@ function chargeExclusions(i, c, ik) {
     namedRow('account', 'excluded_accounts', code, accts.get(code) || '', accts.has(code), usual);
   }
   chargeLoaders[i] = () => loads.forEach((fn) => fn());
-  if (!rows.length) return [adders, k.emptyNote('Nothing left out.')];
+  if (!rows.length) return [adders, k.emptyNote(t('topsheet.nothing_left_out'))];
   return [
     adders,
     gridTable(
       'charge-excl',
-      [lead(), head('Type'), head('Name'), head('Description'), head('Total', { num: true, title: 'What leaving it out takes off the charge' }), head('')],
+      [lead(), head(t('topsheet.type')), head(t('topsheet.name')), head(t('topsheet.description')), head(t('topsheet.total'), { num: true, title: t('topsheet.what_leaving_it_out_takes_off_the') }), head('')],
       ul,
     ),
   ];
@@ -1197,38 +1199,38 @@ let creditFeet = [];
 // fringes left out, net spend and credit added up, then the discount and the
 // net credit taken off the grand total.
 function creditFoot(i) {
-  const out = [{ label: '', value: k.plural(creditFeet.length, 'credit', 'credits') }];
+  const out = [{ label: '', value: t('topsheet.count.credits', { count: creditFeet.length }) }];
   const f = creditFeet[i];
   if (!f) return out;
   if (!f.applied) {
     // Not taken off the grand total: its estimate, once it has come.
     const p = estimateOf(i);
     if (p && !isNone(p.amount)) {
-      out.push({ label: 'Qualified', value: k.formatCents(p.qualified), title: 'The rows’ net spend added up' });
+      out.push({ label: t('topsheet.qualified'), value: k.formatCents(p.qualified), title: t('topsheet.the_rows_net_spend_added_up') });
       out.push({
-        label: isNone(p.problem) ? 'Estimate' : 'Estimate (may be short)',
+        label: isNone(p.problem) ? t('topsheet.estimate') : t('topsheet.estimate_may_be_short'),
         value: k.formatCents(p.amount),
-        title: isNone(p.problem) ? 'What this credit would take off the grand total if applied' : k.str(p.problem),
+        title: isNone(p.problem) ? t('topsheet.what_this_credit_would_take_off_the') : k.str(p.problem),
       });
     } else {
-      out.push({ label: 'Net credit', value: 'Not applied' });
+      out.push({ label: t('topsheet.net_credit'), value: t('topsheet.not_applied') });
     }
     return out;
   }
   if (f.rows.length) {
     const add = (field) => {
-      const s = centsSum(f.rows.map((t) => (isNone(t[field]) ? 0 : t[field])));
+      const s = centsSum(f.rows.map((r) => (isNone(r[field]) ? 0 : r[field])));
       return s === null ? '' : k.formatCents(s);
     };
-    const credit = decimalSum(f.rows.map((t) => t.credit));
+    const credit = decimalSum(f.rows.map((r) => r.credit));
     out.push(
-      { label: 'Gross', value: add('gross'), title: 'The rows’ spend before fringes are left out' },
-      { label: 'Fringes out', value: add('excluded_fringes'), title: 'Fringes left out of the spend' },
-      { label: 'Net', value: add('net'), title: 'The spend the percents apply to' },
+      { label: t('topsheet.gross'), value: add('gross'), title: t('topsheet.the_rows_spend_before_fringes_are_left_2') },
+      { label: t('topsheet.fringes_out'), value: add('excluded_fringes'), title: t('topsheet.fringes_left_out_of_the_spend') },
+      { label: t('topsheet.net'), value: add('net'), title: t('topsheet.the_spend_the_percents_apply_to') },
       {
-        label: 'Credit',
+        label: t('topsheet.credit'),
         value: credit === null ? '' : money(credit),
-        title: credit === null ? '' : `The rows added up: exactly ${k.formatDecimal(credit)}, before the credit’s cap and discount`,
+        title: credit === null ? '' : t('topsheet.rows_added_up_exactly', { exact: k.formatDecimal(credit) }),
       },
     );
   }
@@ -1237,11 +1239,11 @@ function creditFoot(i) {
     const fee = isNone(e.fee) ? 0n : BigInt(e.fee);
     // Below the minimum spend the credit is 0 (decisions.md, entry 88).
     if (e.below_minimum === true) {
-      out.push({ label: 'Minimum', value: 'Not met', title: 'The rows’ net spend is below the credit’s minimum spend, so it pays nothing' });
+      out.push({ label: t('topsheet.minimum'), value: t('topsheet.not_met'), title: t('topsheet.the_rows_net_spend_is_below_the') });
     }
     // Its share of a cap it shares with other credits, in whole cents.
     if (!isNone(e.shared)) {
-      out.push({ label: 'Shared cap', value: k.formatCents(e.shared), title: `Its share of the shared cap; exactly ${k.formatDecimal(e.capped)} before it` });
+      out.push({ label: t('topsheet.shared_cap'), value: k.formatCents(e.shared), title: t('topsheet.share_of_shared_cap', { exact: k.formatDecimal(e.capped) }) });
     }
     // The discount comes off after the caps, then the fee; the credit is
     // rounded once.
@@ -1249,13 +1251,13 @@ function creditFoot(i) {
     const after = BigInt(e.amount) + fee;
     if (before !== null && before !== after) {
       out.push({
-        label: 'Discount',
+        label: t('topsheet.discount'),
         value: k.formatCents(before - after),
-        title: `Exactly ${isNone(e.shared) ? k.formatDecimal(e.capped) : k.formatCents(e.shared)} before the discount, after the caps`,
+        title: t('topsheet.exactly_before_discount', { exact: isNone(e.shared) ? k.formatDecimal(e.capped) : k.formatCents(e.shared) }),
       });
     }
-    if (fee !== 0n) out.push({ label: 'Broker’s fee', value: k.formatCents(fee), title: 'The flat fee, taken off after the discount' });
-    out.push({ label: 'Net credit', value: k.formatCents(e.amount), title: 'Credit taken off the grand total' });
+    if (fee !== 0n) out.push({ label: t('topsheet.brokers_fee'), value: k.formatCents(fee), title: t('topsheet.the_flat_fee_taken_off_after_the') });
+    out.push({ label: t('topsheet.net_credit'), value: k.formatCents(e.amount), title: t('topsheet.credit_taken_off_the_grand_total') });
   }
   return out;
 }
@@ -1273,8 +1275,8 @@ function renderCredits(panel) {
     return {
       name: c.name,
       applied: c.applied,
-      figure: !c.applied ? 'Not applied' : entry ? k.formatCents(entry.amount) : '',
-      title: [c.name, !c.applied ? 'Not applied' : entry ? 'Credit taken off the grand total' : '', issues.length ? 'This credit has a problem' : '']
+      figure: !c.applied ? t('topsheet.not_applied') : entry ? k.formatCents(entry.amount) : '',
+      title: [c.name, !c.applied ? t('topsheet.not_applied') : entry ? t('topsheet.credit_taken_off_the_grand_total') : '', issues.length ? t('topsheet.this_credit_has_a_problem') : '']
         .filter(Boolean)
         .join('\n'),
       bad: issues.length > 0,
@@ -1285,12 +1287,12 @@ function renderCredits(panel) {
   const taken = {};
   for (const c of credits) taken[k.str(obj(c).name)] = true;
   const add = k.addForm('credits', {
-    title: 'New credit',
-    fields: [k.addInput('credits', 'name', { label: 'Name', placeholder: 'State incentive' })],
+    title: t('topsheet.new_credit'),
+    fields: [k.addInput('credits', 'name', { label: t('topsheet.name'), placeholder: t('topsheet.state_incentive') })],
     validate: (v) => {
       const name = v.name.trim();
-      if (name === '') return ['name', 'Enter a credit name.'];
-      if (taken[name]) return ['name', `There is already a credit named ${name}.`];
+      if (name === '') return ['name', t('topsheet.enter_a_credit_name')];
+      if (taken[name]) return ['name', t('topsheet.credit_exists', { name })];
       return null;
     },
     build: (v) => {
@@ -1321,14 +1323,14 @@ function renderCredits(panel) {
 
   pickEditor(panel, {
     tab: 'credits',
-    what: 'credit',
-    label: 'Credits',
+    what: t('topsheet.what.credit'),
+    label: t('topsheet.credits'),
     library: 'credit',
     items,
     add,
-    empty: 'No credits yet.',
+    empty: t('topsheet.no_credits_yet'),
     move: 'move_credit',
-    deleteText: (i) => `Delete credit ${items[i].name} and its ${k.plural(arr(obj(credits[i]).rows).length, 'row', 'rows')}?`,
+    deleteText: (i) => t('topsheet.delete_credit', { name: items[i].name, count: arr(obj(credits[i]).rows).length }),
     deleteBuild: (i) => ['delete_credit', { index: i }],
     foot: (i) => creditFoot(i),
     extra: [programsBox()],
@@ -1384,16 +1386,16 @@ function fillEstimatedRows(i, rows) {
       if (!c) return;
       const span = c.querySelector('.sw-num');
       if (span) span.textContent = text;
-      c.title = title ? `Estimate. ${title}` : '';
+      c.title = title ? t('topsheet.estimate_title', { title }) : '';
     };
     if (isNone(rt.net)) return;
     const row = obj(arr(obj(arr(k.budget().credits)[i]).rows)[n]);
     const capKind = obj(row.cap).kind || 'none';
     const [overText, overTitle] = overCap(rt, { cap: { kind: capKind } });
-    set('gross', k.formatCents(rt.gross), 'The row’s spend before fringes are left out');
-    set('fringes', k.formatCents(rt.excluded_fringes), 'Fringes left out of the spend');
-    set('net', k.formatCents(rt.net), 'The spend the percent applies to');
-    set('credit', money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`);
+    set('gross', k.formatCents(rt.gross), t('topsheet.the_rows_spend_before_fringes_are_left'));
+    set('fringes', k.formatCents(rt.excluded_fringes), t('topsheet.fringes_left_out_of_the_spend'));
+    set('net', k.formatCents(rt.net), t('topsheet.the_spend_the_percent_applies_to'));
+    set('credit', money(rt.credit), t('topsheet.exactly_rows_added', { exact: k.formatDecimal(rt.credit) }));
     set('over', overText, overTitle);
   });
 }
@@ -1407,7 +1409,7 @@ function estimateOf(i) {
 // the spend at each location, filled once the estimates come.
 function programsBox() {
   const box = k.el('section', 'tss-programs');
-  box.setAttribute('aria-label', 'Programs side by side');
+  box.setAttribute('aria-label', t('topsheet.programs_side_by_side'));
   box.dataset.key = 'credits-programs';
   return box;
 }
@@ -1424,8 +1426,8 @@ function showEstimates() {
       const b = k.findByData('key', k.key('credits', 'pick', p.index));
       const fig = b && b.querySelector('.sw-tree-count');
       if (fig) {
-        fig.textContent = `Est. ${k.formatCents(p.amount)}`;
-        b.title = `${p.name}\nNot applied: estimated, not taken off the grand total`;
+        fig.textContent = t('topsheet.est_amount', { amount: k.formatCents(p.amount) });
+        b.title = t('topsheet.est_title', { name: p.name });
       }
     }
     if (picked.credits < programs.length) setFooterTotals(creditFoot(picked.credits));
@@ -1436,7 +1438,7 @@ function showEstimates() {
     }
     // From a cleaned copy of a budget with problems: say the figures may be short.
     if (got.partial === true) {
-      box.append(k.el('p', 'tss-note', 'Some cells have problems; these figures count them as blank, so an estimate may be short.'));
+      box.append(k.el('p', 'tss-note', t('topsheet.some_cells_have_problems_these_figures_count')));
     }
     if (programs.length) box.append(programsTable(programs));
     const spend = arr(got.locations).map(obj);
@@ -1447,66 +1449,66 @@ function showEstimates() {
 
 function where(list) {
   const names = arr(list).map(k.str);
-  return names.length ? names.join(', ') : 'Anywhere';
+  return names.length ? names.join(', ') : t('topsheet.anywhere');
 }
 
 function programsTable(programs) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Programs side by side');
+  ul.setAttribute('aria-label', t('topsheet.programs_side_by_side'));
   for (const p of programs) {
     const li = gridRow();
     const spend = arr(p.by_location)
       .map(obj)
-      .map((s) => `${isNone(s.location) ? 'No location' : k.str(s.location)} ${k.formatCents(s.net)}`)
+      .map((s) => `${isNone(s.location) ? t('topsheet.no_location') : k.str(s.location)} ${k.formatCents(s.net)}`)
       .join('; ');
     const f = obj(p.figures);
     const below = f.below_minimum === true;
     // Decisions.md, entry 88: the minimum, the shared cap and the fee.
     const minimum = isNone(p.minimum_spend) ? '' : k.formatCents(p.minimum_spend);
     const capName = isNone(p.shared_cap) ? '' : k.str(p.shared_cap);
-    const capOf = isNone(p.shared_cap_amount) ? 'not in the budget' : k.formatCents(p.shared_cap_amount);
+    const capOf = isNone(p.shared_cap_amount) ? t('topsheet.not_in_the_budget') : k.formatCents(p.shared_cap_amount);
     const shared = capName === '' ? '' : isNone(f.shared) ? capName : `${capName}: ${k.formatCents(f.shared)}`;
     const sharedTitle =
       capName === ''
         ? ''
         : isNone(p.shared_cap_amount)
-          ? `${capName} is not in the budget’s shared caps, so it holds nothing down`
+          ? t('topsheet.shared_cap_not_in_budget', { cap: capName })
           : isNone(f.shared)
-            ? `Shares ${capName} (${capOf}) and is within it`
-            : `Its share of ${capName} (${capOf}), in proportion to what each program sharing it comes to`;
+            ? t('topsheet.shares_cap_within', { cap: capName, amount: capOf })
+            : t('topsheet.share_of_cap', { cap: capName, amount: capOf });
     const fee = isNone(f.fee) || f.fee === 0 ? (p.broker_fee ? k.formatCents(0) : '') : k.formatCents(f.fee);
     li.append(
       lead(),
       textCell(k.str(p.name)),
       textCell(where(p.locations), { muted: !arr(p.locations).length }),
-      textCell(k.formatCents(p.qualified), { num: true, title: spend ? `Net spend by location: ${spend}` : '' }),
+      textCell(k.formatCents(p.qualified), { num: true, title: spend ? t('topsheet.net_spend_by_location', { spend }) : '' }),
       textCell(minimum, {
         num: true,
-        title: minimum === '' ? '' : below ? 'Below the minimum spend: the program pays nothing' : 'The qualified spend is at least the minimum',
+        title: minimum === '' ? '' : below ? t('topsheet.below_the_minimum_spend_the_program_pays') : t('topsheet.the_qualified_spend_is_at_least_the'),
       }),
       textCell(shared, { muted: isNone(f.shared), title: sharedTitle }),
-      textCell(fee, { num: true, title: p.broker_fee ? `A flat ${k.formatCents(p.broker_fee)} fee, after the discount, never below zero` : '' }),
+      textCell(fee, { num: true, title: p.broker_fee ? t('topsheet.flat_fee_title', { amount: k.formatCents(p.broker_fee) }) : '' }),
       textCell(isNone(p.amount) ? '' : k.formatCents(p.amount), {
         num: true,
         title: !isNone(p.problem)
           ? k.str(p.problem)
           : below
-            ? 'Below the minimum spend'
+            ? t('topsheet.below_the_minimum_spend')
             : p.capped
-              ? 'Held down by the credit’s cap'
+              ? t('topsheet.held_down_by_the_credits_cap')
               : '',
       }),
       textCell(
-        isNone(p.amount) ? 'Problem' : !isNone(p.problem) ? 'May be short' : below ? 'Below minimum' : p.applied ? 'Applied' : 'Estimate',
+        isNone(p.amount) ? t('topsheet.problem') : !isNone(p.problem) ? t('topsheet.may_be_short') : below ? t('topsheet.below_minimum') : p.applied ? t('topsheet.applied') : t('topsheet.estimate'),
         {
           muted: !p.applied,
           title: !isNone(p.problem)
             ? k.str(p.problem)
             : below
-              ? `The qualified spend ${k.formatCents(p.qualified)} is below the minimum of ${minimum}, so the program pays nothing`
+              ? t('topsheet.below_minimum_title', { qualified: k.formatCents(p.qualified), minimum })
               : p.applied
                 ? ''
-                : 'Not applied: worked out as if applied alongside the applied programs',
+                : t('topsheet.not_applied_worked_out_as_if_applied'),
         },
       ),
     );
@@ -1514,26 +1516,26 @@ function programsTable(programs) {
   }
   return gridTable('programs', [
     lead(),
-    head('Program'),
-    head('Spend at'),
-    head('Qualified', { num: true, title: 'The rows’ net spend added up' }),
-    head('Minimum', { num: true, title: 'The qualified spend below which the program pays nothing' }),
-    head('Shared cap', { title: 'A cap the program shares with others, and its share when the cap holds it down' }),
-    head('Fee', { num: true, title: 'The broker’s flat fee, taken off after the discount' }),
-    head('Credit', { num: true, title: 'After the minimum, the caps, the discount and the fee, rounded once' }),
+    head(t('topsheet.program')),
+    head(t('topsheet.spend_at')),
+    head(t('topsheet.qualified'), { num: true, title: t('topsheet.the_rows_net_spend_added_up') }),
+    head(t('topsheet.minimum'), { num: true, title: t('topsheet.the_qualified_spend_below_which_the_program') }),
+    head(t('topsheet.shared_cap'), { title: t('topsheet.a_cap_the_program_shares_with_others') }),
+    head(t('topsheet.fee'), { num: true, title: t('topsheet.the_brokers_flat_fee_taken_off_after') }),
+    head(t('topsheet.credit'), { num: true, title: t('topsheet.after_the_minimum_the_caps_the_discount') }),
     head(''),
   ], ul);
 }
 
 function locationsTable(spend) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Spend by location');
+  ul.setAttribute('aria-label', t('topsheet.spend_by_location'));
   for (const l of spend) {
     const li = gridRow();
-    const name = isNone(l.location) ? 'No location' : k.str(l.location);
+    const name = isNone(l.location) ? t('topsheet.no_location') : k.str(l.location);
     li.append(
       lead(),
-      textCell(name, { muted: isNone(l.location), title: l.known === false ? 'Not in the budget’s locations' : '' }),
+      textCell(name, { muted: isNone(l.location), title: l.known === false ? t('topsheet.not_in_the_budgets_locations') : '' }),
       textCell(k.formatCents(l.lines), { num: true }),
       textCell(k.formatCents(l.fringes), { num: true }),
       textCell(k.formatCents(l.total), { num: true }),
@@ -1542,13 +1544,13 @@ function locationsTable(spend) {
   }
   return gridTable('location-spend', [
     lead(),
-    head('Location'),
-    head('Lines', { num: true }),
-    head('Fringes', { num: true, title: 'The fringes the lines earn, wherever fringes post' }),
-    head('Spend', {
+    head(t('topsheet.location')),
+    head(t('topsheet.lines'), { num: true }),
+    head(t('topsheet.fringes'), { num: true, title: t('topsheet.the_fringes_the_lines_earn_wherever_fringes') }),
+    head(t('topsheet.spend'), {
       num: true,
       title:
-        'Each line with the fringes it earns, as the lines work out. It can differ from the topsheet when account totals are rounded to whole units or when fringes after the last production total are dropped.',
+        t('topsheet.each_line_with_the_fringes_it_earns'),
     }),
   ], ul);
 }
@@ -1582,19 +1584,19 @@ function whatIfPick() {
 }
 
 function placeName(l) {
-  return isNone(l) || l === '' ? 'No location' : k.str(l);
+  return isNone(l) || l === '' ? t('topsheet.no_location') : k.str(l);
 }
 
 // Works the what-if out and shows it (nothing changes).
 function runWhatIf() {
   if (whatIf.lines === '' || whatIf.to === null) {
     whatIf.got = null;
-    whatIf.status = 'Pick the lines and where to move them.';
+    whatIf.status = t('topsheet.pick_the_lines_and_where_to_move');
     redrawWhatIf();
     return;
   }
   const stamp = viewStamp();
-  whatIf.status = 'Working it out…';
+  whatIf.status = t('topsheet.working_it_out');
   redrawWhatIf();
   invoke('what_if', { pick: whatIfPick() }).then(
     (got) => {
@@ -1625,13 +1627,13 @@ function redrawWhatIf() {
 function whatIfPanel() {
   const box = k.el('section', 'tss-whatif');
   box.dataset.item = 'credits-whatif';
-  box.setAttribute('aria-label', 'What if lines moved');
-  const toggle = button(whatIf.open ? 'Close What if' : 'What if…', 'sw-act', 'credits-whatif-open', () => {
+  box.setAttribute('aria-label', t('topsheet.what_if_lines_moved'));
+  const toggle = button(whatIf.open ? t('topsheet.close_what_if') : t('topsheet.what_if_ellipsis'), 'sw-act', 'credits-whatif-open', () => {
     whatIf.open = !whatIf.open;
     redrawWhatIf();
   });
-  toggle.title = 'See what each program would come to if some lines were shot at another location';
-  box.append(band('What if', bandTitle('What if lines were shot somewhere else'), toggle));
+  toggle.title = t('topsheet.see_what_each_program_would_come_to');
+  box.append(band(t('topsheet.what_if'), bandTitle(t('topsheet.what_if_lines_were_shot_somewhere_else')), toggle));
   if (!whatIf.open) return box;
 
   const cats = categoryNames();
@@ -1642,11 +1644,11 @@ function whatIfPanel() {
     fieldKey: 'credits-whatif-lines',
     value: whatIf.lines,
     options: [
-      ['', 'Pick…'],
-      ...[...cats].map(([code, name]) => [`category:${code}`, `Category ${code} ${name}`.trim()]),
-      ...[...accts].map(([code, name]) => [`account:${code}`, `Account ${code} ${name}`.trim()]),
+      ['', t('topsheet.pick')],
+      ...[...cats].map(([code, name]) => [`category:${code}`, t('topsheet.category_code_name', { code, name }).trim()]),
+      ...[...accts].map(([code, name]) => [`account:${code}`, t('topsheet.account_code_name', { code, name }).trim()]),
     ],
-    label: 'Lines in',
+    label: t('topsheet.lines_in'),
     onCommit: (v) => {
       whatIf.lines = v;
       whatIf.except = [];
@@ -1656,8 +1658,8 @@ function whatIfPanel() {
   const fromSel = k.selectInput({
     fieldKey: 'credits-whatif-from',
     value: whatIf.from,
-    options: [['*', 'Anywhere'], ['', 'No location'], ...places.map((n) => [n, n])],
-    label: 'Now at',
+    options: [['*', t('topsheet.anywhere')], ['', t('topsheet.no_location')], ...places.map((n) => [n, n])],
+    label: t('topsheet.now_at'),
     onCommit: (v) => {
       whatIf.from = v;
       whatIf.except = [];
@@ -1667,8 +1669,8 @@ function whatIfPanel() {
   const toSel = k.selectInput({
     fieldKey: 'credits-whatif-to',
     value: whatIf.to === null ? '' : whatIf.to,
-    options: [...places.map((n) => [n, n]), ['', 'No location']],
-    label: 'Move to',
+    options: [...places.map((n) => [n, n]), ['', t('topsheet.no_location')]],
+    label: t('topsheet.move_to'),
     onCommit: (v) => {
       whatIf.to = v;
       runWhatIf();
@@ -1676,10 +1678,10 @@ function whatIfPanel() {
   });
   box.append(
     band(
-      'What if: which lines and where',
-      bandInput('Lines in', pickSel, { title: 'Every line of this category or account' }),
-      bandInput('Now at', fromSel, { title: 'Only the lines at this location now' }),
-      bandInput('Move to', toSel, { title: 'Where they would be shot' }),
+      t('topsheet.what_if_which_lines_and_where'),
+      bandInput(t('topsheet.lines_in'), pickSel, { title: t('topsheet.every_line_of_this_category_or_account') }),
+      bandInput(t('topsheet.now_at'), fromSel, { title: t('topsheet.only_the_lines_at_this_location_now') }),
+      bandInput(t('topsheet.move_to'), toSel, { title: t('topsheet.where_they_would_be_shot') }),
     ),
   );
 
@@ -1688,11 +1690,11 @@ function whatIfPanel() {
   if (whatIf.status) box.append(k.el('p', 'tss-note', whatIf.status));
   if (!got) return box;
   if (!fresh) {
-    box.append(k.el('p', 'tss-note', 'The budget has changed since; pick again to see it now.'));
+    box.append(k.el('p', 'tss-note', t('topsheet.the_budget_has_changed_since_pick_again')));
     return box;
   }
   if (got.partial === true) {
-    box.append(k.el('p', 'tss-note', 'Some cells have problems; these figures count them as blank, so a figure may be short.'));
+    box.append(k.el('p', 'tss-note', t('topsheet.some_cells_have_problems_these_figures_count_2')));
   }
   box.append(whatIfLines(got), whatIfPrograms(got), whatIfTotals(got));
   const spend = arr(got.locations).map(obj).filter((l) => l.before !== l.after);
@@ -1700,7 +1702,7 @@ function whatIfPanel() {
 
   const moving = arr(got.lines).length;
   const apply = button(
-    `Move ${k.plural(moving, 'line', 'lines')} to ${placeName(got.to)}`,
+    t('topsheet.move_lines_to', { count: moving, place: placeName(got.to) }),
     'setup-btn setup-btn-primary',
     'credits-whatif-apply',
     () => {
@@ -1709,23 +1711,23 @@ function whatIfPanel() {
         onOk: () => {
           whatIf.got = null;
           whatIf.except = [];
-          whatIf.status = `Moved ${k.plural(got.changed, 'line', 'lines')} to ${placeName(got.to)}. Undo in the budget window puts them back.`;
+          whatIf.status = t('topsheet.moved_lines_to', { count: got.changed, place: placeName(got.to) });
         },
       });
     },
   );
   apply.disabled = !got.changed;
   apply.title = got.changed
-    ? 'Changes these lines’ location in the budget, as one step you can undo'
-    : 'These lines are already there';
-  box.append(band('Apply the what-if', apply, k.el('span', 'tss-hint', 'Nothing changes until you apply it.')));
+    ? t('topsheet.changes_these_lines_location_in_the_budget')
+    : t('topsheet.these_lines_are_already_there');
+  box.append(band(t('topsheet.apply_the_what_if'), apply, k.el('span', 'tss-hint', t('topsheet.nothing_changes_until_you_apply_it'))));
   return box;
 }
 
 // The lines it moves, each with a box to leave it out.
 function whatIfLines(got) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Lines it moves');
+  ul.setAttribute('aria-label', t('topsheet.lines_it_moves'));
   const lines = arr(got.lines).map(obj);
   for (const l of lines) {
     const li = gridRow();
@@ -1733,7 +1735,7 @@ function whatIfLines(got) {
     box.type = 'checkbox';
     box.checked = true;
     box.dataset.key = k.key('credits-whatif-line', l.id);
-    box.setAttribute('aria-label', `Move ${k.str(l.description) || `line ${l.line}`}`);
+    box.setAttribute('aria-label', t('topsheet.move_named', { name: k.str(l.description) || t('topsheet.line_n', { n: l.line }) }));
     box.addEventListener('change', () => {
       if (k.isBusy()) return;
       whatIf.except = [...whatIf.except, l.id];
@@ -1747,44 +1749,44 @@ function whatIfLines(got) {
       textCell(`${k.str(l.account)}:${l.line}`),
       textCell(k.str(l.description)),
       textCell(placeName(l.location), { muted: isNone(l.location) }),
-      textCell(k.formatCents(l.total), { num: true, title: `Fringes it earns: ${k.formatCents(l.fringes)}` }),
+      textCell(k.formatCents(l.total), { num: true, title: t('topsheet.fringes_it_earns', { amount: k.formatCents(l.fringes) }) }),
     );
     ul.append(li);
   }
-  if (!lines.length) return k.emptyNote('No lines there: nothing would move.');
-  return gridTable('whatif-lines', [lead(), head(''), head('Line'), head('Description'), head('Now at'), head('Total', { num: true })], ul);
+  if (!lines.length) return k.emptyNote(t('topsheet.no_lines_there_nothing_would_move'));
+  return gridTable('whatif-lines', [lead(), head(''), head(t('topsheet.line')), head(t('topsheet.description')), head(t('topsheet.now_at')), head(t('topsheet.total'), { num: true })], ul);
 }
 
 // Every program before and after, and the change.
 function whatIfPrograms(got) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Programs before and after');
+  ul.setAttribute('aria-label', t('topsheet.programs_before_and_after'));
   for (const p of arr(got.programs).map(obj)) {
     const li = gridRow();
-    const d = isNone(p.difference) ? '' : p.difference === 0 ? 'No change' : `${p.difference > 0 ? '+' : ''}${k.formatCents(p.difference)}`;
+    const d = isNone(p.difference) ? '' : p.difference === 0 ? t('topsheet.no_change') : `${p.difference > 0 ? '+' : ''}${k.formatCents(p.difference)}`;
     li.append(
       lead(),
       textCell(k.str(p.name)),
-      textCell(p.applied ? 'Applied' : 'Estimate', { muted: !p.applied, title: p.applied ? 'Taken off the grand total' : 'Not applied: worked out as if applied alongside the applied programs' }),
-      textCell(isNone(p.before) ? '' : k.formatCents(p.before), { num: true, title: `Qualified spend ${k.formatCents(p.qualified_before)}` }),
-      textCell(isNone(p.after) ? '' : k.formatCents(p.after), { num: true, title: `Qualified spend ${k.formatCents(p.qualified_after)}` }),
+      textCell(p.applied ? t('topsheet.applied') : t('topsheet.estimate'), { muted: !p.applied, title: p.applied ? t('topsheet.taken_off_the_grand_total') : t('topsheet.not_applied_worked_out_as_if_applied') }),
+      textCell(isNone(p.before) ? '' : k.formatCents(p.before), { num: true, title: t('topsheet.qualified_spend_amount', { amount: k.formatCents(p.qualified_before) }) }),
+      textCell(isNone(p.after) ? '' : k.formatCents(p.after), { num: true, title: t('topsheet.qualified_spend_amount', { amount: k.formatCents(p.qualified_after) }) }),
       textCell(d, { num: true, title: isNone(p.problem) ? '' : k.str(p.problem) }),
     );
     ul.append(li);
   }
-  return gridTable('whatif-programs', [lead(), head('Program'), head(''), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
+  return gridTable('whatif-programs', [lead(), head(t('topsheet.program')), head(''), head(t('topsheet.before'), { num: true }), head(t('topsheet.after'), { num: true }), head(t('topsheet.change'), { num: true })], ul);
 }
 
 // The credits taken off, the estimates and the net total, before and after.
 function whatIfTotals(got) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Totals before and after');
+  ul.setAttribute('aria-label', t('topsheet.totals_before_and_after'));
   const b = obj(got.before);
   const a = obj(got.after);
   for (const [label, f, title] of [
-    ['Credits taken off', 'credits_total', 'The applied programs'],
-    ['Estimates, not applied', 'estimates_total', 'The programs not applied, each as if applied'],
-    ['Net total after credits', 'net_total', 'The grand total less the applied programs'],
+    [t('topsheet.credits_taken_off'), 'credits_total', t('topsheet.the_applied_programs')],
+    [t('topsheet.estimates_not_applied'), 'estimates_total', t('topsheet.the_programs_not_applied_each_as_if')],
+    [t('topsheet.net_total_after_credits'), 'net_total', t('topsheet.the_grand_total_less_the_applied_programs')],
   ]) {
     const li = gridRow();
     const d = a[f] - b[f];
@@ -1793,17 +1795,17 @@ function whatIfTotals(got) {
       textCell(label, { title }),
       textCell(k.formatCents(b[f]), { num: true }),
       textCell(k.formatCents(a[f]), { num: true }),
-      textCell(d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${k.formatCents(d)}`, { num: true }),
+      textCell(d === 0 ? t('topsheet.no_change') : `${d > 0 ? '+' : ''}${k.formatCents(d)}`, { num: true }),
     );
     ul.append(li);
   }
-  return gridTable('whatif-totals', [lead(), head('Totals'), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
+  return gridTable('whatif-totals', [lead(), head(t('topsheet.totals')), head(t('topsheet.before'), { num: true }), head(t('topsheet.after'), { num: true }), head(t('topsheet.change'), { num: true })], ul);
 }
 
 // The spend at the locations that change.
 function whatIfSpend(spend) {
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', 'Spend by location before and after');
+  ul.setAttribute('aria-label', t('topsheet.spend_by_location_before_and_after'));
   for (const l of spend) {
     const li = gridRow();
     li.append(
@@ -1815,7 +1817,7 @@ function whatIfSpend(spend) {
     );
     ul.append(li);
   }
-  return gridTable('whatif-totals', [lead(), head('Spend at'), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
+  return gridTable('whatif-totals', [lead(), head(t('topsheet.spend_at')), head(t('topsheet.before'), { num: true }), head(t('topsheet.after'), { num: true }), head(t('topsheet.change'), { num: true })], ul);
 }
 
 // Credit `i`'s editor: a band with its name, Applied, cap, discount and
@@ -1829,17 +1831,17 @@ function creditEditor(i, c0, c, entry, issues) {
   const fk = (f) => k.key('credits', i, f);
   const commit = (f, patchOf) => (v, old) =>
     k.run(ik, () => creditArgs(i, patchOf(v)), { restore: [fk(f), old] });
-  const ed = editorShell(ik, `Credit ${c.name}`);
+  const ed = editorShell(ik, t('topsheet.credit_named', { name: c.name }));
 
   const name = k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) });
-  const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
+  const applied = checkbox(fk('applied'), c.applied, t('topsheet.applied'), (v) =>
     k.run(ik, () => creditArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
   );
   const cap = k.textInput({
     fieldKey: fk('cap'),
     value: isNone(raw.cap) ? '' : k.formatCents(raw.cap),
     num: true,
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     onCommit: commit('cap', (v) => ({ cap: v.trim() === '' ? null : v.trim() })),
   });
   const discount = k.textInput({
@@ -1851,26 +1853,26 @@ function creditEditor(i, c0, c, entry, issues) {
   const account = k.textInput({
     fieldKey: fk('account'),
     value: c.account || '',
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
   });
   ed.append(
     band(
-      `Credit ${c.name}`,
-      bandInput('Name', name, { size: 'tss-w-name' }),
+      t('topsheet.credit_named', { name: c.name }),
+      bandInput(t('topsheet.name'), name, { size: 'tss-w-name' }),
       applied,
-      bandInput('Cap on the credit', cap, { size: 'tss-w-num' }),
-      bandInput('Discount', discount, { size: 'tss-w-pct', unit: '%' }),
-      bandInput('Posts to account', account, { size: 'tss-w-acct' }),
+      bandInput(t('topsheet.cap_on_the_credit'), cap, { size: 'tss-w-num' }),
+      bandInput(t('topsheet.discount'), discount, { size: 'tss-w-pct', unit: '%' }),
+      bandInput(t('topsheet.posts_to_account'), account, { size: 'tss-w-acct' }),
     ),
   );
 
   ed.append(
     band(
-      'Fringes left out of the spend',
+      t('topsheet.fringes_left_out_of_the_spend'),
       chips({
         fieldKey: fk('fringes'),
-        label: 'Fringes left out of the spend',
+        label: t('topsheet.fringes_left_out_of_the_spend'),
         selected: c.excluded_fringes,
         options: withKept(fringeNames(), c.excluded_fringes),
         onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
@@ -1882,13 +1884,13 @@ function creditEditor(i, c0, c, entry, issues) {
   // account rows (decisions.md, entry 80); none picked: every line.
   ed.append(
     band(
-      'Spend at these locations',
+      t('topsheet.spend_at_these_locations'),
       chips({
         fieldKey: fk('locations'),
-        label: 'Spend at these locations',
+        label: t('topsheet.spend_at_these_locations'),
         selected: c.locations,
         options: withKept(locationNames(), c.locations),
-        emptyText: 'Anywhere',
+        emptyText: t('topsheet.anywhere'),
         onChange: (list) => k.run(ik, () => creditArgs(i, { locations: list })),
       }),
     ),
@@ -1902,28 +1904,28 @@ function creditEditor(i, c0, c, entry, issues) {
     fieldKey: fk('minimum'),
     value: isNone(raw.minimum_spend) ? '' : k.formatCents(raw.minimum_spend),
     num: true,
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     onCommit: commit('minimum', (v) => ({ minimum_spend: v.trim() === '' ? null : v.trim() })),
   });
   const fee = k.textInput({
     fieldKey: fk('fee'),
     value: isNone(raw.broker_fee) || raw.broker_fee === 0 ? '' : k.formatCents(raw.broker_fee),
     num: true,
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     onCommit: commit('fee', (v) => ({ broker_fee: v.trim() === '' ? null : v.trim() })),
   });
   const capAmount = k.textInput({
     fieldKey: fk('shared-amount'),
     value: capName !== '' && !isNone(caps[capName]) ? k.formatCents(caps[capName]) : '',
     num: true,
-    placeholder: capName === '' ? 'No shared cap' : 'Amount',
+    placeholder: capName === '' ? t('topsheet.no_shared_cap') : t('topsheet.amount'),
     onCommit: commit('shared-amount', (v) => ({ shared_cap_amount: v.trim() === '' ? null : v.trim() })),
   });
   if (capName === '') capAmount.disabled = true;
   const shared = k.textInput({
     fieldKey: fk('shared'),
     value: capName,
-    placeholder: 'None',
+    placeholder: t('topsheet.none'),
     // A new name keeps the amount shown, so it is never a cap without one.
     onCommit: commit('shared', (v) => {
       const n = v.trim();
@@ -1933,27 +1935,29 @@ function creditEditor(i, c0, c, entry, issues) {
     }),
   });
   const sharing = Object.keys(caps).length
-    ? `Shared caps in this budget: ${Object.entries(caps)
-        .map(([n, a]) => `${n} ${k.formatCents(a)}`)
-        .join(', ')}. Credits naming the same one never come to more than it together.`
-    : 'Credits naming the same shared cap never come to more than it together.';
+    ? t('topsheet.shared_caps_in_budget', {
+        list: Object.entries(caps)
+          .map(([n, a]) => `${n} ${k.formatCents(a)}`)
+          .join(', '),
+      })
+    : t('topsheet.credits_naming_the_same_shared_cap_never');
   ed.append(
     band(
-      `Terms of ${c.name}`,
-      bandInput('Minimum spend', minimum, {
+      t('topsheet.terms_of', { name: c.name }),
+      bandInput(t('topsheet.minimum_spend'), minimum, {
         size: 'tss-w-num',
-        title: 'Below this qualified spend (the rows’ net spend at its locations, before any cap) the credit pays nothing',
+        title: t('topsheet.below_this_qualified_spend_the_rows_net'),
       }),
-      bandInput('Broker’s fee', fee, { size: 'tss-w-num', title: 'A flat fee taken off after the cap and the discount, never below zero' }),
-      bandInput('Shared cap', shared, { size: 'tss-w-name', title: sharing }),
-      bandInput('Shared cap amount', capAmount, {
+      bandInput(t('topsheet.brokers_fee'), fee, { size: 'tss-w-num', title: t('topsheet.a_flat_fee_taken_off_after_the') }),
+      bandInput(t('topsheet.shared_cap'), shared, { size: 'tss-w-name', title: sharing }),
+      bandInput(t('topsheet.shared_cap_amount'), capAmount, {
         size: 'tss-w-num',
-        title: 'The shared cap’s amount, for every credit sharing it. A new shared cap needs one.',
+        title: t('topsheet.the_shared_caps_amount_for_every_credit'),
       }),
     ),
   );
 
-  const addRow = bandButton('Add row', fk('add-row'), () => {
+  const addRow = bandButton(t('topsheet.add_row'), fk('add-row'), () => {
     k.setFocusKey(k.key('credits', i, c.rows.length, 'description'));
     k.run(
       ik,
@@ -1964,7 +1968,7 @@ function creditEditor(i, c0, c, entry, issues) {
       { onError: () => k.setFocusKey(null) },
     );
   });
-  ed.append(band(`Rows of ${c.name}`, bandTitle('Rows'), addRow));
+  ed.append(band(t('topsheet.rows_of', { name: c.name }), bandTitle(t('topsheet.rows')), addRow));
   ed.append(creditGrid(i, c, raw, entry, ik));
   k.finishItem(ed, ik, issues, null);
   return ed;
@@ -1973,32 +1977,32 @@ function creditEditor(i, c0, c, entry, issues) {
 // A credit's rows as one table: what each is a percent of, its figures from
 // the totals, its cap. Their sums are the footer's.
 function creditGrid(i, c, raw, entry, ik) {
-  if (!c.rows.length) return k.emptyNote('No rows yet.');
+  if (!c.rows.length) return k.emptyNote(t('topsheet.no_rows_yet'));
   // An unapplied credit shows the figures it would have applied, marked as
   // an estimate (decisions.md, entry 93).
   const est = !c.applied;
   const totals = est ? estimatedRows(i) : entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [];
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', est ? `Rows of ${c.name}, figures estimated` : `Rows of ${c.name}`);
+  ul.setAttribute('aria-label', est ? t('topsheet.rows_of_estimated', { name: c.name }) : t('topsheet.rows_of', { name: c.name }));
   c.rows.forEach((row, n) => ul.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length, est)));
   const table = gridTable('credit-rows', [
     lead(),
-    head('Spend'),
-    head('Description'),
-    head('Amount', { num: true }),
-    head('Gross', { num: true, title: 'The row’s spend before fringes are left out' }),
-    head('Fringes out', { num: true, title: 'Fringes left out of the spend' }),
-    head('Net', { num: true, title: 'The spend the percent applies to' }),
-    head('Cap type'),
-    head('Cap', { num: true }),
+    head(t('topsheet.spend')),
+    head(t('topsheet.description')),
+    head(t('topsheet.amount'), { num: true }),
+    head(t('topsheet.gross'), { num: true, title: t('topsheet.the_rows_spend_before_fringes_are_left') }),
+    head(t('topsheet.fringes_out'), { num: true, title: t('topsheet.fringes_left_out_of_the_spend') }),
+    head(t('topsheet.net'), { num: true, title: t('topsheet.the_spend_the_percent_applies_to') }),
+    head(t('topsheet.cap_type')),
+    head(t('topsheet.cap'), { num: true }),
     head('%', { num: true }),
-    head('Credit', { num: true }),
-    head('Over cap', { num: true }),
+    head(t('topsheet.credit'), { num: true }),
+    head(t('topsheet.over_cap'), { num: true }),
     head(''),
   ], ul);
   if (!est) return table;
   const wrap = k.el('div', 'tss-estimated');
-  wrap.append(k.el('p', 'tss-note', 'Not applied: the row figures are an estimate, worked out as if this credit were applied alongside the applied ones.'), table);
+  wrap.append(k.el('p', 'tss-note', t('topsheet.not_applied_the_row_figures_are_an')), table);
   return wrap;
 }
 
@@ -2007,7 +2011,7 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
   const fk = (f) => k.key('credits', i, n, f);
   const send = (f, old) => (v) => k.run(ik, () => creditArgs(i, rowPatch(n, () => v)), old === undefined ? {} : { restore: [f, old] });
   const rawRow = obj(arr(raw.rows)[n]);
-  const of = (what) => `${what} of row ${n + 1}`;
+  const of = (what) => t('topsheet.of_row', { what, n: n + 1 });
 
   const groups = groupNames();
   const cats = categoryNames();
@@ -2020,15 +2024,15 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
         : row.source.kind === 'account'
           ? `account:${row.source.account}`
           : 'flat';
-  const catLabel = (code) => (cats.get(code) ? `Category: ${code} ${cats.get(code)}` : `Category: ${code}`);
-  const acctLabel = (code) => (accts.get(code) ? `Account: ${code} ${accts.get(code)}` : `Account: ${code}`);
+  const catLabel = (code) => (cats.get(code) ? t('topsheet.category_colon_named', { code, name: cats.get(code) }) : t('topsheet.category_colon', { code }));
+  const acctLabel = (code) => (accts.get(code) ? t('topsheet.account_colon_named', { code, name: accts.get(code) }) : t('topsheet.account_colon', { code }));
   const spend = k.selectInput({
     fieldKey: fk('source'),
     value: current,
     cls: 'sw-cell-input',
     options: [
-      ['flat', 'Amount typed in'],
-      ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
+      ['flat', t('topsheet.amount_typed_in')],
+      ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, t('topsheet.group_colon', { name: g })]),
       // A topsheet category's total with its fringes (decisions.md, entry 57).
       ...withKept([...cats.keys()], row.source.kind === 'category' ? [row.source.category] : []).map((code) => [`category:${code}`, catLabel(code)]),
       // An account's total with its fringes (decisions.md, entry 61).
@@ -2045,13 +2049,13 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
               : { source: { kind: 'group', group: v.slice(6) } },
       ),
   });
-  spend.setAttribute('aria-label', of('Spend'));
+  spend.setAttribute('aria-label', of(t('topsheet.spend')));
   spend.title = spend.options[spend.selectedIndex] ? spend.options[spend.selectedIndex].textContent : '';
 
   const desc = k.textInput({
     fieldKey: fk('description'),
     value: row.description,
-    label: of('Description'),
+    label: of(t('topsheet.description')),
     cls: 'sw-cell-input',
     onCommit: (v, old) => send(fk('description'), old)({ description: v }),
   });
@@ -2062,7 +2066,7 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
           fieldKey: fk('amount'),
           value: k.formatCents(obj(rawRow.source).amount || 0),
           num: true,
-          label: of('Amount'),
+          label: of(t('topsheet.amount')),
           cls: 'sw-cell-input',
           onCommit: (v, old) => send(fk('amount'), old)({ source: { kind: 'flat', amount: v.trim() } }),
         })
@@ -2073,21 +2077,21 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
     value: row.cap.kind,
     cls: 'sw-cell-input',
     options: [
-      ['none', 'None'],
-      ['qualified_spend', 'Qualified spend'],
-      ['credit', 'Credit cap'],
+      ['none', t('topsheet.none')],
+      ['qualified_spend', t('topsheet.qualified_spend')],
+      ['credit', t('topsheet.credit_cap')],
     ],
     onCommit: (v, old) => send(fk('cap-kind'), old)({ cap: v === 'none' ? { kind: 'none' } : { kind: v, amount: row.cap.amount || '0' } }),
   });
-  capKind.setAttribute('aria-label', of('Cap type'));
-  capKind.title = 'Qualified spend caps the spend the percent applies to; Credit cap caps the row’s credit';
+  capKind.setAttribute('aria-label', of(t('topsheet.cap_type')));
+  capKind.title = t('topsheet.qualified_spend_caps_the_spend_the_percent');
   const capAmount =
     row.cap.kind !== 'none'
       ? k.textInput({
           fieldKey: fk('cap-amount'),
           value: k.formatCents(obj(rawRow.cap).amount || 0),
           num: true,
-          label: of('Cap'),
+          label: of(t('topsheet.cap')),
           cls: 'sw-cell-input',
           onCommit: (v, old) => send(fk('cap-amount'), old)({ cap: { kind: row.cap.kind, amount: v.trim() } }),
         })
@@ -2096,7 +2100,7 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
     fieldKey: fk('percent'),
     value: row.percent,
     num: true,
-    label: of('Percent'),
+    label: of(t('topsheet.percent')),
     cls: 'sw-cell-input',
     onCommit: (v, old) => send(fk('percent'), old)({ percent: v.trim() }),
   });
@@ -2105,7 +2109,7 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
   // Each figure cell is found by its key, so an estimate can fill it in
   // when it comes; an estimate's tooltip says so.
   const fig = (v, title, f) => {
-    const c = textCell(has ? v : '', { num: true, title: has && title ? (est ? `Estimate. ${title}` : title) : '' });
+    const c = textCell(has ? v : '', { num: true, title: has && title ? (est ? t('topsheet.estimate_title', { title }) : title) : '' });
     c.dataset.fig = k.key('credits', i, n, f);
     return c;
   };
@@ -2117,20 +2121,20 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
   const del = button('×', 'setup-del', fk('del'), () => {
     k.setFocusKey(after);
     k.run(ik, () => creditArgs(i, (cur) => ({ rows: cur.rows.filter((_, j) => j !== n) })), { onError: () => k.setFocusKey(null) });
-  }, `Delete row ${n + 1}`);
+  }, t('topsheet.delete_row', { n: n + 1 }));
 
   li.append(
     lead(),
     cell(spend),
     cell(desc),
     cell(amount),
-    fig(has ? k.formatCents(rt.gross) : '', 'The row’s spend before fringes are left out', 'gross'),
-    fig(has ? k.formatCents(rt.excluded_fringes) : '', 'Fringes left out of the spend', 'fringes'),
-    fig(has ? k.formatCents(rt.net) : '', 'The spend the percent applies to', 'net'),
+    fig(has ? k.formatCents(rt.gross) : '', t('topsheet.the_rows_spend_before_fringes_are_left'), 'gross'),
+    fig(has ? k.formatCents(rt.excluded_fringes) : '', t('topsheet.fringes_left_out_of_the_spend'), 'fringes'),
+    fig(has ? k.formatCents(rt.net) : '', t('topsheet.the_spend_the_percent_applies_to'), 'net'),
     cell(capKind),
     cell(capAmount),
     cell(percent),
-    fig(has ? money(rt.credit) : '', has ? `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding` : '', 'credit'),
+    fig(has ? money(rt.credit) : '', has ? t('topsheet.exactly_rows_added', { exact: k.formatDecimal(rt.credit) }) : '', 'credit'),
     fig(overText, overTitle, 'over'),
     acts(del),
   );
@@ -2141,13 +2145,20 @@ function creditRow(i, n, row, raw, rt, ik, count, est = false) {
 // under), and a tooltip that says which and by exactly how much.
 function overCap(rt, row) {
   if (isNone(rt.cap_variance) || row.cap.kind === 'none') return ['', ''];
-  const what = row.cap.kind === 'qualified_spend' ? 'Spend' : 'Credit';
   const exact = k.formatDecimal(k.str(rt.cap_variance).replace(/^-/, ''));
   const c = dollarsToCents(rt.cap_variance);
-  if (c === null) return [k.str(rt.cap_variance), `Exactly ${exact} against the cap`];
-  if (c === 0n) return [k.formatCents(0), 'At the cap'];
+  if (c === null) return [k.str(rt.cap_variance), t('topsheet.exactly_against_cap', { exact })];
+  if (c === 0n) return [k.formatCents(0), t('topsheet.at_the_cap')];
   const over = c < 0n;
-  return [k.formatCents(-c), `${what} ${over ? 'over' : 'under'} the cap by exactly ${exact}`];
+  const spend = row.cap.kind === 'qualified_spend';
+  const title = spend
+    ? over
+      ? t('topsheet.spend_over_cap', { exact })
+      : t('topsheet.spend_under_cap', { exact })
+    : over
+      ? t('topsheet.credit_over_cap', { exact })
+      : t('topsheet.credit_under_cap', { exact });
+  return [k.formatCents(-c), title];
 }
 
 // Dollars as a decimal string ("1307.375") rounded half away from zero to
@@ -2170,15 +2181,15 @@ function money(v) {
 // Budget info
 
 const INFO_KINDS = [
-  ['text', 'Text'],
-  ['number', 'Number'],
-  ['date', 'Date'],
+  ['text', t('topsheet.kind.text')],
+  ['number', t('topsheet.kind.number')],
+  ['date', t('topsheet.kind.date')],
 ];
 
 function infoCheck(kind, value) {
   const v = value.trim();
-  if (kind === 'number' && !DECIMAL.test(v)) return 'Enter a number, like 30 or 2.5.';
-  if (kind === 'date' && !DATE.test(v)) return 'Enter a date as YYYY-MM-DD, like 2027-03-01.';
+  if (kind === 'number' && !DECIMAL.test(v)) return t('topsheet.enter_a_number_like_30_or_2');
+  if (kind === 'date' && !DATE.test(v)) return t('topsheet.enter_a_date_as_yyyy_mm_dd');
   return null;
 }
 
@@ -2189,17 +2200,17 @@ function newInfoField(anchor) {
   let added = null;
   anchoredForm({
     anchor,
-    title: 'New field',
+    title: t('topsheet.new_field'),
     fields: [
-      { key: 'name', label: 'Label', value: '', placeholder: 'Director' },
-      { key: 'kind', label: 'Kind', type: 'select', options: INFO_KINDS, value: 'text' },
-      { key: 'value', label: 'Value', value: '' },
+      { key: 'name', label: t('topsheet.label'), value: '', placeholder: t('topsheet.director') },
+      { key: 'kind', label: t('topsheet.kind'), type: 'select', options: INFO_KINDS, value: 'text' },
+      { key: 'value', label: t('topsheet.value'), value: '' },
     ],
-    submitText: 'Add',
+    submitText: t('topsheet.add'),
     onSubmit: (v) => {
       const name = k.str(v.name).trim();
-      if (name === '') return Promise.reject('Enter a label.');
-      if (k.own(k.budget().info, name) !== undefined) return Promise.reject(`There is already a field named ${name}.`);
+      if (name === '') return Promise.reject(t('topsheet.enter_a_label'));
+      if (k.own(k.budget().info, name) !== undefined) return Promise.reject(t('topsheet.field_exists', { name }));
       const kind = k.str(v.kind) || 'text';
       const bad = infoCheck(kind, k.str(v.value));
       if (bad) return Promise.reject(bad);
@@ -2227,7 +2238,7 @@ function renderInfo(panel) {
   const names = items.map(([n]) => n);
   const selected = () => (st.selected.info !== undefined && k.own(k.budget().info, st.selected.info) !== undefined ? st.selected.info : null);
 
-  const remove = stripButton('Delete…', k.key('strip', 'info', 'delete'), () => {
+  const remove = stripButton(t('topsheet.delete_ellipsis'), k.key('strip', 'info', 'delete'), () => {
     const n = selected();
     if (n === null || k.isBusy()) return;
     const d = k.findByData('key', k.key('del', k.key('info', n)));
@@ -2237,16 +2248,16 @@ function renderInfo(panel) {
     const n = selected();
     if (n === null) remove.setAttribute('aria-disabled', 'true');
     else remove.removeAttribute('aria-disabled');
-    remove.title = n === null ? 'Select a field first' : `Delete field ${n}`;
+    remove.title = n === null ? t('topsheet.select_a_field_first') : t('topsheet.delete_field', { name: n });
   };
   const strip = actionStrip(
-    'Info',
-    [stripButton('New field…', k.key('add', 'info'), (btn) => newInfoField(btn), { title: 'Add a field to this budget' }), remove],
+    t('topsheet.info'),
+    [stripButton(t('topsheet.new_field_ellipsis'), k.key('add', 'info'), (btn) => newInfoField(btn), { title: t('topsheet.add_a_field_to_this_budget') }), remove],
     searchBox({
       key: k.key('search', 'info'),
       value: k.str(st.filters.info),
-      label: 'Search info',
-      placeholder: 'Search info',
+      label: t('topsheet.search_info'),
+      placeholder: t('topsheet.search_info'),
       onChange: (v) => {
         st.filters.info = v;
         redrawLists();
@@ -2254,7 +2265,7 @@ function renderInfo(panel) {
     }),
   );
 
-  const ul = k.list('Budget information');
+  const ul = k.list(t('topsheet.budget_information'));
   items.forEach(([name, v0], i) => {
     const v = obj(v0);
     const kind = ['text', 'number', 'date'].includes(v.kind) ? v.kind : 'text';
@@ -2275,8 +2286,8 @@ function renderInfo(panel) {
       fieldKey: valueKey,
       value: k.str(v.value),
       num: kind === 'number',
-      placeholder: kind === 'date' ? 'YYYY-MM-DD' : '',
-      label: `${name} value`,
+      placeholder: kind === 'date' ? t('topsheet.date_placeholder') : '',
+      label: t('topsheet.name_value', { name }),
       cls: 'sw-cell-input',
       onCommit: (val, old) => k.run(ik, () => ['set_info', { name, value: { kind, value: val } }], { restore: [valueKey, old] }),
     });
@@ -2284,7 +2295,7 @@ function renderInfo(panel) {
       fieldKey: k.key('info', name, 'kind'),
       value: kind,
       options: INFO_KINDS,
-      label: `${name} kind`,
+      label: t('topsheet.name_kind', { name }),
       cls: 'sw-cell-input',
       onCommit: (nk, old) =>
         k.run(ik, () => ['set_info', { name, value: { kind: nk, value: k.str(obj(k.own(k.budget().info, name)).value) } }], {
@@ -2301,7 +2312,7 @@ function renderInfo(panel) {
           itemKey: ik,
           name,
           what: 'field',
-          confirmText: `Delete the field ${name}?`,
+          confirmText: t('topsheet.delete_the_field', { name }),
           build: () => ['delete_info', { name }],
           neighborKey: k.neighbor('info', names, i, k.key('add', 'info')),
         }),
@@ -2311,13 +2322,13 @@ function renderInfo(panel) {
     ul.append(li);
   });
   const body = [];
-  if (!all.length) body.push(k.emptyNote('No fields yet.'));
-  else if (!items.length) body.push(k.emptyNote('Nothing matches the search.'));
-  else body.push(gridTable('info', [lead(), head('Name'), head('Kind'), head('Value'), head('')], ul));
+  if (!all.length) body.push(k.emptyNote(t('topsheet.no_fields_yet')));
+  else if (!items.length) body.push(k.emptyNote(t('topsheet.nothing_matches_the_search')));
+  else body.push(gridTable('info', [lead(), head(t('topsheet.name')), head(t('topsheet.kind')), head(t('topsheet.value')), head('')], ul));
   mountFrame(panel, { strip, body });
   syncStrip();
   setFooterTotals([
-    { label: '', value: items.length === all.length ? k.plural(all.length, 'field', 'fields') : `${items.length} of ${k.plural(all.length, 'field', 'fields')}` },
+    { label: '', value: items.length === all.length ? t('topsheet.count.fields', { count: all.length }) : t('topsheet.shown_of_fields', { shown: items.length, count: all.length }) },
   ]);
 }
 
@@ -2351,11 +2362,11 @@ function exampleNumber(p) {
 // The pattern rules from method_core::coding, so the form can explain a problem
 // before it is applied. The app checks them again.
 function codingProblem(p) {
-  if (p.category_width < 1) return 'Every account number starts with a category, so its width is at least 1.';
+  if (p.category_width < 1) return t('topsheet.every_account_number_starts_with_a_category');
   // The sub-account and the set each need the account; the set may follow
   // the account directly when there is no sub-account.
-  if (p.sub_width > 0 && p.account_width === 0) return 'The sub-account part needs the account part before it.';
-  if (p.set_width > 0 && p.account_width === 0) return 'The set part needs the account part before it.';
+  if (p.sub_width > 0 && p.account_width === 0) return t('topsheet.the_sub_account_part_needs_the_account');
+  if (p.set_width > 0 && p.account_width === 0) return t('topsheet.the_set_part_needs_the_account_part');
   return null;
 }
 
@@ -2394,10 +2405,10 @@ function tsRow(labelText, controls, { hint = '', tip = '', group = false } = {})
     described.push(h.id);
   }
   if (tip) {
-    const t = k.el('span', 'setup-sr', tip);
-    t.id = k.nextId();
-    ctl.append(t);
-    described.push(t.id);
+    const tipEl = k.el('span', 'setup-sr', tip);
+    tipEl.id = k.nextId();
+    ctl.append(tipEl);
+    described.push(tipEl.id);
   }
   if (described.length) {
     for (const c of ctl.querySelectorAll('input, select')) {
@@ -2424,7 +2435,7 @@ function renderSettings(panel) {
 
   // Currency: a pointer to where it moved.
   const cur = k.el('div', 'tss-group');
-  cur.append(heading('Currency'), k.el('p', 'ts-hint ts-pointer', 'The base currency and Show totals in are on the Currency tab.'));
+  cur.append(heading(t('topsheet.currency')), k.el('p', 'ts-hint ts-pointer', t('topsheet.the_base_currency_and_show_totals_in')));
 
   // Fringe posting
   const fk = k.key('settings', 'fringes');
@@ -2437,23 +2448,23 @@ function renderSettings(panel) {
     fieldKey: k.key('settings', 'posting'),
     value: mode,
     options: [
-      ['category', 'An account at the end of each category'],
-      ['account', 'A line at the end of each account'],
-      ['production_level', 'A row above each production total'],
-      ['budget', 'One total for the whole budget'],
+      ['category', t('topsheet.an_account_at_the_end_of_each')],
+      ['account', t('topsheet.a_line_at_the_end_of_each')],
+      ['production_level', t('topsheet.a_row_above_each_production_total')],
+      ['budget', t('topsheet.one_total_for_the_whole_budget')],
     ],
     onCommit: (v, old) => k.run(fk, () => ['set_fringe_posting', { mode: v, suffix: null }], { restore: [k.key('settings', 'posting'), old] }),
   });
   modeSel.classList.add('ts-w-l');
   fr.append(
-    heading('Fringe totals'),
+    heading(t('topsheet.fringe_totals')),
     tsRow(
-      'Fringes show as',
+      t('topsheet.fringes_show_as'),
       [modeSel],
       mode === 'budget'
         ? {
-            hint: 'Percent charges count it.',
-            tip: 'A budget-wide fringe total sits outside above- and below-the-line. It is in the grand total, and percent charges count it; excluding a line, account or category from a charge takes its fringes off too.',
+            hint: t('topsheet.percent_charges_count_it'),
+            tip: t('topsheet.a_budget_wide_fringe_total_sits_outside'),
           }
         : {},
     ),
@@ -2467,13 +2478,13 @@ function renderSettings(panel) {
     });
     suf.classList.add('ts-w-s');
     const ex = fringeAccountExample(coding(), suffix);
-    fr.append(tsRow('Account number ends in', [suf], { hint: ex ? `Category ${ex.cat}: ${ex.number}` : '' }));
+    fr.append(tsRow(t('topsheet.account_number_ends_in'), [suf], { hint: ex ? t('topsheet.category_number_example', { code: ex.cat, number: ex.number }) : '' }));
   }
   if (mode === 'budget') fr.append(...fringeRowRows(fk));
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
 
   mountFrame(panel, {
-    strip: actionStrip('Settings'),
+    strip: actionStrip(t('topsheet.settings')),
     body: [
       cur,
       fr,
@@ -2515,13 +2526,13 @@ function fringeRowRows(fk) {
   desc.classList.add('ts-w-m');
   // Its place: after the summary rows, or above one of the topsheet's rows.
   const ts = arr(b.topsheet);
-  const options = [['', 'After the summary rows']];
+  const options = [['', t('topsheet.after_the_summary_rows')]];
   ts.forEach((r, i) => {
     const row = obj(r);
     const label = row.kind === 'production_total' ? k.str(row.name) : `${k.str(row.code)} ${k.str(row.name)}`.trim();
-    options.push([String(i), `Above ${label}`]);
+    options.push([String(i), t('topsheet.above_row', { name: label })]);
   });
-  if (ts.length) options.push([String(ts.length), 'After the last topsheet row']);
+  if (ts.length) options.push([String(ts.length), t('topsheet.after_the_last_topsheet_row')]);
   const at = now.position === null ? '' : String(Math.min(now.position, ts.length));
   const place = k.selectInput({
     fieldKey: k.key('settings', 'fringe_row', 'position'),
@@ -2532,10 +2543,10 @@ function fringeRowRows(fk) {
   });
   place.classList.add('ts-w-l');
   return [
-    tsRow('Fringe row number', [acct], { hint: 'Blank for none.' }),
-    tsRow('Fringe row description', [desc]),
-    tsRow('Fringe row place', [place], {
-      tip: 'Where the budget’s fringe row shows on the topsheet. Moving it changes no total.',
+    tsRow(t('topsheet.fringe_row_number'), [acct], { hint: t('topsheet.blank_for_none') }),
+    tsRow(t('topsheet.fringe_row_description'), [desc]),
+    tsRow(t('topsheet.fringe_row_place'), [place], {
+      tip: t('topsheet.where_the_budgets_fringe_row_shows_on'),
     }),
   ];
 }
@@ -2555,8 +2566,8 @@ function calculationGroup() {
     fieldKey: k.key('settings', 'arithmetic'),
     value: arith,
     options: [
-      ['binary', 'Spreadsheet (binary)'],
-      ['exact', 'Exact decimal'],
+      ['binary', t('topsheet.spreadsheet_binary')],
+      ['exact', t('topsheet.exact_decimal')],
     ],
     onCommit: (v, old) => k.run(ck, () => ['set_arithmetic', { value: v }], { restore: [k.key('settings', 'arithmetic'), old] }),
   });
@@ -2564,8 +2575,8 @@ function calculationGroup() {
     fieldKey: k.key('settings', 'trailing'),
     value: trailing,
     options: [
-      ['keep', 'Keep'],
-      ['drop', 'Drop'],
+      ['keep', t('topsheet.keep')],
+      ['drop', t('topsheet.drop')],
     ],
     onCommit: (v, old) =>
       k.run(ck, () => ['set_trailing_level_fringes', { value: v }], { restore: [k.key('settings', 'trailing'), old] }),
@@ -2579,29 +2590,29 @@ function calculationGroup() {
     onCommit: (v, old) => k.run(ck, () => ['set_cutoff_factor', { value: v }], { restore: [k.key('settings', 'cutoff_factor'), old] }),
   });
   const wholeKey = k.key('settings', 'round_account_totals');
-  const whole = checkbox(wholeKey, b.round_account_totals === true, 'Round account totals to whole units', (on) =>
+  const whole = checkbox(wholeKey, b.round_account_totals === true, t('topsheet.round_account_totals_to_whole_units'), (on) =>
     k.run(ck, () => ['set_round_account_totals', { value: on }], { restore: [wholeKey, !on] }),
   );
   arithSel.classList.add('ts-w-m');
   trailingSel.classList.add('ts-w-s');
   factorSel.classList.add('ts-w-xs');
   group.append(
-    heading('Calculation'),
-    tsRow('Rounding', [arithSel], {
-      hint: '1 x 1.005: 1.00 binary, 1.01 exact.',
-      tip: 'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01.',
+    heading(t('topsheet.calculation')),
+    tsRow(t('topsheet.rounding'), [arithSel], {
+      hint: t('topsheet.rounding_example'),
+      tip: t('topsheet.spreadsheet_rounding_works_in_binary_numbers_so'),
     }),
-    tsRow('Account totals', [whole], {
-      hint: 'Categories and the grand total add up the rounded accounts.',
-      tip: 'Each account’s total is rounded to the nearest whole unit (3,426.50 is 3,427.00), and categories, levels, charges and the grand and net totals are worked out from the rounded accounts. Lines and fringes keep their cents.',
+    tsRow(t('topsheet.account_totals'), [whole], {
+      hint: t('topsheet.categories_and_the_grand_total_add_up'),
+      tip: t('topsheet.each_accounts_total_is_rounded_to_the'),
     }),
-    tsRow('Percent fringe cutoff factor', [factorSel], {
-      hint: 'Multiplies every percent fringe’s cutoff.',
-      tip: 'Every percent fringe’s cutoff is multiplied by this: a 2,222.22 cutoff at 1.5 is 3,333.33. Flat fringes have no cutoff.',
+    tsRow(t('topsheet.percent_fringe_cutoff_factor'), [factorSel], {
+      hint: t('topsheet.multiplies_every_percent_fringes_cutoff'),
+      tip: t('topsheet.every_percent_fringes_cutoff_is_multiplied_by'),
     }),
-    tsRow('Fringes after the last total', [trailingSel], {
-      hint: 'Only when fringes post above each production total.',
-      tip: 'Fringes of categories after the last production total. Dropped fringes count in no total; this only applies when fringes post above each production total.',
+    tsRow(t('topsheet.fringes_after_the_last_total'), [trailingSel], {
+      hint: t('topsheet.only_when_fringes_post_above_each_production'),
+      tip: t('topsheet.fringes_of_categories_after_the_last_production'),
     }),
   );
   if (k.state().errors.has(ck)) group.append(k.errorLine(k.state().errors.get(ck)));
@@ -2610,11 +2621,11 @@ function calculationGroup() {
 
 // What a line inserted in the grid copies from its neighbor (a budget setting).
 const NEW_LINE_FIELDS = [
-  ['fringes', 'Fringes'],
-  ['groups', 'Groups'],
-  ['set', 'Set'],
-  ['location', 'Location'],
-  ['currency', 'Currency'],
+  ['fringes', t('topsheet.fringes')],
+  ['groups', t('topsheet.groups')],
+  ['set', t('topsheet.set')],
+  ['location', t('topsheet.location')],
+  ['currency', t('topsheet.currency')],
 ];
 
 function newLineDefaults() {
@@ -2638,10 +2649,10 @@ function newLinesGroup() {
     );
   });
   group.append(
-    heading('New lines'),
-    tsRow('Copy from the line above', boxes, {
+    heading(t('topsheet.new_lines')),
+    tsRow(t('topsheet.copy_from_the_line_above'), boxes, {
       group: true,
-      tip: 'A line you insert copies these from the line above it (or the line below, when there is none above).',
+      tip: t('topsheet.a_line_you_insert_copies_these_from'),
     }),
   );
   if (k.state().errors.has(nk)) group.append(k.errorLine(k.state().errors.get(nk)));
@@ -2655,10 +2666,10 @@ function codingForm() {
   form.noValidate = true;
   form.dataset.item = ck;
   const widths = [
-    ['category_width', 'Category', 1],
-    ['account_width', 'Account', 0],
-    ['sub_width', 'Sub-account', 0],
-    ['set_width', 'Set', 0],
+    ['category_width', t('topsheet.category'), 1],
+    ['account_width', t('topsheet.account'), 0],
+    ['sub_width', t('topsheet.sub_account'), 0],
+    ['set_width', t('topsheet.set'), 0],
   ];
   const sels = {};
   const widthCells = [];
@@ -2668,7 +2679,7 @@ function codingForm() {
     sel.name = f;
     sel.dataset.key = k.key('settings', 'coding', f);
     for (let w = min; w <= 6; w += 1) {
-      const o = k.el('option', null, w === 0 ? 'Not used' : String(w));
+      const o = k.el('option', null, w === 0 ? t('topsheet.not_used') : String(w));
       o.value = String(w);
       sel.append(o);
     }
@@ -2700,13 +2711,13 @@ function codingForm() {
     set_width: Number(sels.set_width.value),
     separator: sep.value,
   });
-  const apply = k.el('button', 'sw-act sw-act-primary', 'Apply');
+  const apply = k.el('button', 'sw-act sw-act-primary', t('topsheet.apply'));
   apply.type = 'submit';
   apply.dataset.key = k.key('settings', 'coding', 'apply');
   const update = () => {
     const q = read();
     const bad = codingProblem(q);
-    example.replaceChildren(k.el('span', 'setup-muted', 'Example '), k.el('strong', 'setup-num', bad ? '?' : exampleNumber(q)));
+    example.replaceChildren(k.el('span', 'setup-muted', t('topsheet.example')), k.el('strong', 'setup-num', bad ? '?' : exampleNumber(q)));
     problem.textContent = bad || '';
     problem.hidden = !bad;
     const same = Object.keys(q).every((f) => q[f] === p[f]);
@@ -2747,11 +2758,11 @@ function codingForm() {
     });
   });
   const tip =
-    'Numbers you type from now on are read and written with this pattern. When numbers already in the budget would change, Apply offers to renumber them.';
+    t('topsheet.numbers_you_type_from_now_on_are');
   form.append(
-    heading('Account numbers'),
-    tsRow('Digits per part', widthCells, { group: true, tip }),
-    tsRow('Separator', [sep, example, apply]),
+    heading(t('topsheet.account_numbers')),
+    tsRow(t('topsheet.digits_per_part'), widthCells, { group: true, tip }),
+    tsRow(t('topsheet.separator'), [sep, example, apply]),
     problem,
   );
   if (k.state().errors.has(ck)) form.append(k.errorLine(k.state().errors.get(ck)));
@@ -2785,7 +2796,7 @@ function renderBaseline(panel) {
 
   if (has) {
     const ul = k.el('ul');
-    ul.setAttribute('aria-label', 'Original and current totals');
+    ul.setAttribute('aria-label', t('topsheet.original_and_current_totals'));
     const line = (label, ch0, fallback) => {
       const ch = obj(ch0);
       const orig = isNone(ch.original) ? fallback : ch.original;
@@ -2802,54 +2813,54 @@ function renderBaseline(panel) {
       );
       ul.append(li);
     };
-    line('Grand total', variance && variance.grand_total, b.baseline.grand_total);
-    line('Net total', variance && variance.net_total, b.baseline.net_total);
-    box.append(gridTable('baseline', [lead(), head(''), head('Original', { num: true }), head('Current', { num: true }), head('Change', { num: true })], ul));
+    line(t('topsheet.grand_total'), variance && variance.grand_total, b.baseline.grand_total);
+    line(t('topsheet.net_total'), variance && variance.net_total, b.baseline.net_total);
+    box.append(gridTable('baseline', [lead(), head(''), head(t('topsheet.original'), { num: true }), head(t('topsheet.current'), { num: true }), head(t('topsheet.change'), { num: true })], ul));
     if (variance) {
       // Views list only the rows on screen; the count covers every row.
       const lines = typeof variance.rows_changed === 'number' ? variance.rows_changed : changedCount(variance.rows);
       const accounts = changedCount(variance.accounts);
       foot.push(
         lines || accounts
-          ? { label: 'Changed since locked', value: `${k.plural(lines, 'line', 'lines')} in ${k.plural(accounts, 'account', 'accounts')}` }
-          : { label: '', value: 'Nothing has changed since the totals were locked' },
+          ? { label: t('topsheet.changed_since_locked'), value: t('topsheet.lines_in_accounts', { lines: t('topsheet.count.lines', { count: lines }), accounts: t('topsheet.count.accounts', { count: accounts }) }) }
+          : { label: '', value: t('topsheet.nothing_has_changed_since_the_totals_were') },
       );
     } else {
-      foot.push({ label: '', value: 'Current totals can’t be worked out right now, so there is nothing to compare' });
+      foot.push({ label: '', value: t('topsheet.current_totals_cant_be_worked_out_right') });
     }
-    if (view.partial) box.append(k.el('p', 'setup-hint tss-note', 'Current totals are partial while the budget has errors.'));
+    if (view.partial) box.append(k.el('p', 'setup-hint tss-note', t('topsheet.current_totals_are_partial_while_the_budget')));
     const frozen = b.baseline.frozen === true;
     const frozenKey = k.key('baseline', 'frozen');
     box.append(
-      checkbox(frozenKey, frozen, 'Freeze the original totals', (on) =>
+      checkbox(frozenKey, frozen, t('topsheet.freeze_the_original_totals'), (on) =>
         k.run(ik, () => ['set_baseline_frozen', { frozen: on }], { restore: [frozenKey, !on] }),
       ),
     );
-    const offWhileFrozen = 'Off while the original totals are frozen';
-    const relock = stripButton('Lock again…', k.key('baseline', 'relock'), () => {
-      if (!k.isBusy()) confirmBox(ik, relock, 'Replace the original totals with the current ones?', 'Lock again', false, () => ['lock_baseline', {}]);
-    }, { title: frozen ? offWhileFrozen : 'Replace the original totals with the current ones', enabled: !frozen });
-    const clear = stripButton('Clear…', k.key('baseline', 'clear'), () => {
-      if (!k.isBusy()) confirmBox(ik, clear, 'Clear the original totals? The budget stops showing what changed.', 'Clear', true, () => ['clear_baseline', {}]);
-    }, { title: frozen ? offWhileFrozen : 'Clear the original totals', enabled: !frozen });
+    const offWhileFrozen = t('topsheet.off_while_the_original_totals_are_frozen');
+    const relock = stripButton(t('topsheet.lock_again_ellipsis'), k.key('baseline', 'relock'), () => {
+      if (!k.isBusy()) confirmBox(ik, relock, t('topsheet.replace_the_original_totals_with_the_current'), t('topsheet.lock_again'), false, () => ['lock_baseline', {}]);
+    }, { title: frozen ? offWhileFrozen : t('topsheet.replace_the_original_totals_with_the_current_2'), enabled: !frozen });
+    const clear = stripButton(t('topsheet.clear_ellipsis'), k.key('baseline', 'clear'), () => {
+      if (!k.isBusy()) confirmBox(ik, clear, t('topsheet.clear_the_original_totals_the_budget_stops'), t('topsheet.clear'), true, () => ['clear_baseline', {}]);
+    }, { title: frozen ? offWhileFrozen : t('topsheet.clear_the_original_totals'), enabled: !frozen });
     actions.push(relock, clear);
   } else {
     box.append(
       k.emptyNote(
         view.error
-          ? 'No original totals locked yet. The budget has a problem to fix before its totals can be locked.'
-          : 'No original totals locked yet.',
+          ? t('topsheet.no_original_totals_locked_yet_the_budget')
+          : t('topsheet.no_original_totals_locked_yet'),
       ),
     );
     actions.push(
-      stripButton('Lock current totals', k.key('baseline', 'lock'), () => {
+      stripButton(t('topsheet.lock_current_totals'), k.key('baseline', 'lock'), () => {
         if (k.isBusy()) return;
         k.setFocusKey(k.key('baseline', 'relock'));
         k.run(ik, () => ['lock_baseline', {}], { onError: () => k.setFocusKey(null) });
-      }, { primary: true, title: 'Keep the current totals as the original budget' }),
+      }, { primary: true, title: t('topsheet.keep_the_current_totals_as_the_original') }),
     );
   }
   if (k.state().errors.has(ik)) box.append(k.errorLine(k.state().errors.get(ik)));
-  mountFrame(panel, { strip: actionStrip('Baseline', actions), body: [box] });
+  mountFrame(panel, { strip: actionStrip(t('topsheet.baseline'), actions), body: [box] });
   setFooterTotals(foot);
 }

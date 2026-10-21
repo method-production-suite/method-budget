@@ -4886,6 +4886,14 @@ the framework is built and adding a language is a table.
   `topsheet-setup.js`, `report.js` and `reportsetup.js` (and their styles), and the engine's
   log, incentive and bid code. They and the rest of the page are converted in later
   passes.
+- **Second pass** (about 900 more entries, about 2,100 in all): sharing (`share.js`), the
+  tools panel's Activity tab (`activity.js`), Budget Setup's Charges, Credits, Info,
+  Settings and Baseline tabs (`topsheet-setup.js`), the printed reports (`report.js`) and
+  File > Print's report setup (`reportsetup.js`) read the table, and the test holds all
+  five to it. Same rules as the first pass: the wording is unchanged, sentences put
+  together from pieces became one entry with names in it, and counts became plural
+  entries. Words that arrive from Rust as data (a role's text, an engine warning) are
+  shown as they come.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -4899,8 +4907,8 @@ the framework is built and adding a language is a table.
   the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
-- **Not built** (3.14 stays partial): the scripts kept out above and the rest of the
-  page, engine messages with stable codes, the native dialogs, room for longer words and
+- **Not built** (3.14 stays partial): the rest of the page (the tools panel's other tabs
+  and dialogs, `util.js`'s shared phrases, the toolbar), engine messages with stable codes, the native dialogs, room for longer words and
   a right-to-left check, a language override in the preferences, and the languages
   themselves, which wait on the owner's choice.
 
