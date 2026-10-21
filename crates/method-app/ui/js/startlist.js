@@ -37,6 +37,17 @@ export function startForKind(kind, charts) {
 /** The chart groups (src/start.rs, ChartChoice.group), in the order shown. */
 const CHART_GROUPS = ['Feature', 'Television', 'Commercial', 'Other'];
 
+/** A chart group's name as shown (the group is Rust's id). */
+export function chartGroupName(group) {
+  const names = {
+    Feature: t('start.chart_group.feature'),
+    Television: t('start.chart_group.television'),
+    Commercial: t('start.chart_group.commercial'),
+    Other: t('start.chart_group.other'),
+  };
+  return Object.prototype.hasOwnProperty.call(names, group) ? names[group] : group;
+}
+
 /** The chart group a production type looks in first. */
 const GROUP_FOR_KIND = {
   feature: 'Feature',

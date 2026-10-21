@@ -14,6 +14,7 @@ import { decimal } from './format.js';
 import { Assist, canonicalName } from './autocomplete.js';
 import { anchoredDialog } from './modal.js';
 import { orderedNames, hasCustomOrder } from './order.js';
+import { t } from './i18n.js';
 
 // { grid, view(), level(), act(cmd, args), call(cmd, args), toast(message) }
 let ctx = null;
@@ -32,8 +33,8 @@ function budget() {
 }
 
 function table(name) {
-  const t = budget()[name];
-  return t && typeof t === 'object' && !Array.isArray(t) ? t : {};
+  const tbl = budget()[name];
+  return tbl && typeof tbl === 'object' && !Array.isArray(tbl) ? tbl : {};
 }
 
 function text(v) {
@@ -84,10 +85,10 @@ export function assistConfig(colKey) {
     const units = table('units');
     const candidates = orderedNames(budget(), 'units').map((name) => {
       const u = units[name] || {};
-      const hours = u.hours !== undefined && u.hours !== null ? `${decimal(u.hours)} h` : '';
+      const hours = u.hours !== undefined && u.hours !== null ? t('quickentry.unit_hours', { hours: decimal(u.hours) }) : '';
       return { name, hint: text(u.description) || hours };
     });
-    return { mode: 'whole', candidates, addKind: 'unit', addLabel: 'unit', label: 'Units', ordered: ordered('units') };
+    return { mode: 'whole', candidates, addKind: 'unit', addLabel: 'unit', label: t('quickentry.units'), ordered: ordered('units') };
   }
   if (FORMULA_FIELDS.has(colKey)) {
     const v = ctx.view();
@@ -97,7 +98,7 @@ export function assistConfig(colKey) {
       name,
       hint: values[name] !== undefined ? decimal(values[name]) : text(globals[name]),
     }));
-    return { mode: 'formula', candidates, addKind: 'global', label: 'Globals', ordered: ordered('globals') };
+    return { mode: 'formula', candidates, addKind: 'global', label: t('quickentry.globals'), ordered: ordered('globals') };
   }
   if (colKey === 'currency') {
     const base = text(budget().base_currency);
@@ -106,25 +107,24 @@ export function assistConfig(colKey) {
       const c = currencies[name] || {};
       return { name, hint: text(c.description) || (c.rate !== undefined ? `${decimal(c.rate)} ${base}` : '') };
     });
-    if (base) candidates.push({ name: base, hint: 'Base currency' });
-    return { mode: 'whole', candidates, addKind: 'currency', addLabel: 'currency', label: 'Currencies', ordered: ordered('currencies') };
+    if (base) candidates.push({ name: base, hint: t('quickentry.base_currency') });
+    return { mode: 'whole', candidates, addKind: 'currency', addLabel: 'currency', label: t('quickentry.currencies'), ordered: ordered('currencies') };
   }
-  if (colKey === 'set') return { mode: 'whole', candidates: described('sets'), addKind: 'set', addLabel: 'set', label: 'Sets', ordered: ordered('sets') };
+  if (colKey === 'set') return { mode: 'whole', candidates: described('sets'), addKind: 'set', addLabel: 'set', label: t('quickentry.sets'), ordered: ordered('sets') };
   if (colKey === 'location') {
-    return { mode: 'whole', candidates: described('locations'), addKind: 'location', addLabel: 'location', label: 'Locations', ordered: ordered('locations') };
+    return { mode: 'whole', candidates: described('locations'), addKind: 'location', addLabel: 'location', label: t('quickentry.locations'), ordered: ordered('locations') };
   }
   // The people lines already pay (decisions.md, entry 79); a new name is just typed.
   if (colKey === 'person') {
     const v = ctx.view();
     const people = (v && v.persons) || {};
     const candidates = Object.values(people).map((p) => {
-      const n = p.lines;
-      return { name: p.name, hint: `${n} ${n === 1 ? 'line' : 'lines'}` };
+      return { name: p.name, hint: t('quickentry.person_lines', { count: p.lines }) };
     });
-    return { mode: 'whole', candidates, label: 'People' };
+    return { mode: 'whole', candidates, label: t('quickentry.people') };
   }
-  if (colKey === 'fringes') return { mode: 'list', candidates: described('fringes'), label: 'Fringes', ordered: ordered('fringes') };
-  if (colKey === 'groups') return { mode: 'list', candidates: described('groups'), label: 'Groups', ordered: ordered('groups') };
+  if (colKey === 'fringes') return { mode: 'list', candidates: described('fringes'), label: t('quickentry.fringes'), ordered: ordered('fringes') };
+  if (colKey === 'groups') return { mode: 'list', candidates: described('groups'), label: t('quickentry.groups'), ordered: ordered('groups') };
   return null;
 }
 
@@ -152,11 +152,11 @@ async function createGlobal(item) {
   const rowId = Number(taken.rowKey.slice(1));
   const ok = await anchoredDialog({
     anchor,
-    title: `New global ${item.name}`,
-    message: 'Its value can be a number, or a formula that uses other globals.',
-    label: 'Value',
-    placeholder: 'e.g. 30',
-    submitText: 'Create',
+    title: t('quickentry.new_global', { name: item.name }),
+    message: t('quickentry.new_global_message'),
+    label: t('quickentry.value'),
+    placeholder: t('quickentry.value_placeholder'),
+    submitText: t('quickentry.create'),
     onSubmit: (value) =>
       ctx.call('set_cell_creating', {
         rowId,
@@ -186,7 +186,7 @@ export function commitDetailCell(rowKey, colKey, value) {
         .then((v) => {
           if (v && kind === 'currency') {
             const base = text(budget().base_currency);
-            ctx.toast(`Added ${typed} to Currencies at 1 ${base} per ${typed}. Set its exchange rate there.`);
+            ctx.toast(t('quickentry.added_currency', { name: typed, base }));
           }
           return v;
         });
@@ -231,7 +231,7 @@ export async function editNote() {
     const num = row.cells && row.cells.num ? row.cells.num.text : '';
     const desc = text(d.description).trim();
     owner = { row: rowId };
-    what = desc ? `Line ${num}: ${desc}` : `Line ${num}`;
+    what = desc ? t('quickentry.line_desc', { num, desc }) : t('quickentry.line', { num });
     count = noteCount(d.notes);
     col = 'description';
   } else if (level === 'accounts' && String(row.key).startsWith('a')) {
@@ -239,19 +239,18 @@ export async function editNote() {
     const a = cat ? cat.accounts.find((x) => x.code === row.code) : null;
     if (!a) return;
     owner = { account: text(a.code) };
-    what = `Account ${text(a.code)} ${text(a.name)}`.trim();
+    what = t('quickentry.account', { name: `${text(a.code)} ${text(a.name)}`.trim() });
     count = noteCount(a.notes);
   } else if (level === 'topsheet' && row.kind === 'category') {
     const c = top[row.ti];
     if (!c) return;
     owner = { category: text(c.code) };
-    what = `Category ${text(c.code)} ${text(c.name)}`.trim();
+    what = t('quickentry.category', { name: `${text(c.code)} ${text(c.name)}`.trim() });
     count = noteCount(c.notes);
   } else {
     return;
   }
   const anchor = grid.cellFor(row.key, col) || grid.cellFor(row.key, grid.cursorColKey());
-  const had = count ? ` (${count === 1 ? 'it has 1 note' : `it has ${count} notes`}; the Notes tab shows them)` : '';
   let author = '';
   try {
     const a = JSON.parse(window.localStorage.getItem('method.noteAuthor') || '""');
@@ -261,12 +260,12 @@ export async function editNote() {
   }
   await anchoredDialog({
     anchor,
-    title: 'Add note',
-    message: `${what}${had}`,
-    label: 'Note',
+    title: t('quickentry.add_note'),
+    message: count ? t('quickentry.note_message_had', { what, count }) : what,
+    label: t('quickentry.note'),
     value: '',
     multiline: true,
-    submitText: 'Add',
+    submitText: t('quickentry.add'),
     onSubmit: (note) =>
       note.trim() ? ctx.call('add_note', { owner, text: note, created: new Date().toISOString(), author: author || null }) : Promise.resolve(),
   });

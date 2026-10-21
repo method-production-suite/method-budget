@@ -79,8 +79,8 @@ mod tests {
 
     /// The page's scripts whose words are all in the tables: a new inline
     /// string in one of them fails [`converted_scripts_have_no_inline_words`].
-    /// The rest are converted in later passes (docs/research/accessibility-audit.md,
-    /// "Localization").
+    /// Since the fourth pass that is every script (the last few have no words
+    /// of their own), and a new script has to be added here.
     const CONVERTED: &[&str] = &[
         "i18n.js",
         "shortcuts.js",
@@ -119,6 +119,44 @@ mod tests {
         "tabs.js",
         "pane.js",
         "context.js",
+        "packs.js",
+        "presets.js",
+        "explain.js",
+        "overtime.js",
+        "actuals.js",
+        "actualsimport.js",
+        "diffmerge.js",
+        "importsetup.js",
+        "sheetimport.js",
+        "coaimport.js",
+        "exchangeimport.js",
+        "levels.js",
+        "quickentry.js",
+        "rowformat.js",
+        "rename.js",
+        "renumber.js",
+        "safety.js",
+        "display-settings.js",
+        "convertbanner.js",
+        "clipboard.js",
+        "sharing.js",
+        "comments.js",
+        "scheduledays.js",
+        "ratepick.js",
+        "autocomplete.js",
+        "display.js",
+        "order.js",
+        "panelsize.js",
+        "api.js",
+        "menu.js",
+        "announce.js",
+        "boot.js",
+        "dom.js",
+        "format.js",
+        "grid.js",
+        "host.js",
+        "prefs.js",
+        "sheet.js",
     ];
 
     /// Literals that aren't words in a language (a domain name, a file
@@ -474,6 +512,14 @@ mod tests {
     #[test]
     fn converted_scripts_have_no_inline_words() {
         let all: BTreeSet<String> = scripts().into_iter().map(|(n, _)| n).collect();
+        let unlisted: Vec<&String> = all
+            .iter()
+            .filter(|n| !CONVERTED.contains(&n.as_str()))
+            .collect();
+        assert!(
+            unlisted.is_empty(),
+            "scripts not in CONVERTED: {unlisted:?}"
+        );
         let mut problems = Vec::new();
         for name in CONVERTED {
             assert!(all.contains(*name), "{name} isn't in ui/js");

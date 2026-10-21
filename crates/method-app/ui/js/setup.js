@@ -991,7 +991,7 @@ function renderUnitsCompact(panel) {
     head.append(orderable(nameEl, 'units', name, movable, ik, false), figs, unitDelete(name, ik, neighbor('units', names, i, key('add', 'units'))));
     // Its plural and hours as text; they are edited in Budget Setup.
     const hasHours = u.hours !== undefined && u.hours !== null && u.hours !== '';
-    const facts = [str(u.plural), hasHours ? `${u.hours} ${Number(u.hours) === 1 ? 'hour' : 'hours'}` : ''].filter(Boolean).join(', ');
+    const facts = [str(u.plural), hasHours ? t('setup.unit_hours', { count: Number(u.hours), hours: u.hours }) : ''].filter(Boolean).join(', ');
     if (facts) head.insertBefore(el('span', 'setup-desc setup-unit-facts', facts), figs);
     li.append(head);
     finishItem(li, ik, issuesFor('unit', name), null);
@@ -1403,7 +1403,6 @@ function kit() {
     formatCents,
     centsToText,
     formatDecimal,
-    plural,
     findByData,
     isBusy,
     run,

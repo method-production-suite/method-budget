@@ -21,6 +21,7 @@ import { el } from './dom.js';
 import { invoke } from './api.js';
 import { money } from './format.js';
 import { shortcutText } from './shortcuts.js';
+import { t } from './i18n.js';
 
 const st = {
   host: null,
@@ -171,7 +172,7 @@ async function fetchMore(path, step) {
     st.extra.set(path, data && data.root && Array.isArray(data.root.children) ? data.root.children : []);
   } catch (e) {
     if (seq !== st.seq) return;
-    st.extra.set(path, [{ label: 'Could not explain this', text: errText(e), amount: null, role: 'note', minus: false, jump: null, expand: null, more: false, children: [] }]);
+    st.extra.set(path, [{ label: t('explain.could_not'), text: errText(e), amount: null, role: 'note', minus: false, jump: null, expand: null, more: false, children: [] }]);
   } finally {
     st.pending.delete(path);
   }
@@ -202,7 +203,7 @@ function draw() {
     box.append(
       el('p', {
         class: 'explain-empty',
-        text: `Right-click a total and choose Explain This Number…${key ? `, or put the cursor on it and press ${key}` : ''}. Every step of how it is worked out shows here, and the steps add up to it exactly.`,
+        text: key ? t('explain.empty_with_key', { key }) : t('explain.empty'),
       }),
     );
     host.replaceChildren(box);
@@ -211,7 +212,7 @@ function draw() {
   if (st.error) box.append(el('p', { class: 'setup-error', text: st.error, attrs: { role: 'alert' } }));
   const d = st.data;
   if (!d) {
-    if (st.loading) box.append(el('p', { class: 'explain-empty', text: 'Working it out…' }));
+    if (st.loading) box.append(el('p', { class: 'explain-empty', text: t('explain.working') }));
     host.replaceChildren(box);
     return;
   }
@@ -224,9 +225,9 @@ function draw() {
     ),
   );
   if (d.partial) {
-    box.append(el('p', { class: 'explain-partial', text: 'Some cells have problems; the totals, and this, count them as blank.' }));
+    box.append(el('p', { class: 'explain-partial', text: t('explain.partial') }));
   }
-  const tree = el('ul', { class: 'explain-tree', attrs: { role: 'tree', 'aria-label': `How ${d.title} is worked out` } });
+  const tree = el('ul', { class: 'explain-tree', attrs: { role: 'tree', 'aria-label': t('explain.tree_label', { title: d.title }) } });
   tree.append(item(d.root, '', 1));
   box.append(tree);
   host.replaceChildren(box);
@@ -263,13 +264,13 @@ function item(step, path, level) {
       },
     },
   });
-  const label = `${step.minus ? 'less ' : ''}${step.label}`;
+  const label = step.minus ? t('explain.less', { label: step.label }) : step.label;
   const title = [label, step.text, amountText(step)].filter(Boolean).join(': ');
   const row = el(
     'div',
     {
       class: `explain-row${step.jump ? ' has-jump' : ''}`,
-      title: step.jump ? `${title}\nClick to go there` : title,
+      title: step.jump ? t('explain.jump_title', { title }) : title,
       attrs: { tabindex: '-1' },
       data: { path, key: `explain:${path}` },
       on: {
@@ -290,7 +291,7 @@ function item(step, path, level) {
     const children = kids(step, path);
     const group = el('ul', { class: 'explain-group', attrs: { role: 'group' } });
     if (children === null) {
-      group.append(el('li', { class: 'explain-loading', text: 'Working it out…', attrs: { role: 'none' } }));
+      group.append(el('li', { class: 'explain-loading', text: t('explain.working'), attrs: { role: 'none' } }));
       fetchMore(path, step);
     } else {
       children.forEach((c, i) => group.append(item(c, path === '' ? String(i) : `${path}.${i}`, level + 1)));

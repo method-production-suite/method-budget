@@ -18,6 +18,7 @@
 
 import { decimal, currencyMoney } from './format.js';
 import { readPref, writePref } from './prefs.js';
+import { t } from './i18n.js';
 
 // ---------------------------------------------------------------------------
 // Exact decimal strings
@@ -152,20 +153,20 @@ function shownAs(value, places) {
  */
 export function numberCell(src, ctx = {}) {
   const s = src === null || src === undefined ? '' : String(src);
-  const t = s.trim();
+  const trimmed = s.trim();
   const cell = { edit: s, text: '' };
   if (ctx.issue) cell.error = ctx.issue;
-  if (!t) return cell;
+  if (!trimmed) return cell;
   const prefs = ctx.prefs || {};
   const isRate = ctx.field === 'rate';
-  if (PLAIN.test(t)) {
-    const plain = t.replace(/^\+/, '');
+  if (PLAIN.test(trimmed)) {
+    const plain = trimmed.replace(/^\+/, '');
     cell.text = shownAs(plain, isRate ? ratePlaces(plain, prefs) : null);
     return cell;
   }
   cell.cls = 'formula';
   const info = ctx.info && typeof ctx.info === 'object' ? ctx.info : {};
-  const names = globalsIn(t, ctx.globals);
+  const names = globalsIn(trimmed, ctx.globals);
   const byName = names.some((n) => info[n] && info[n].show_by_name === true);
   const value = ctx.value;
   if (byName || ctx.issue || typeof value !== 'string' || scaled(value) === null) {
@@ -176,7 +177,7 @@ export function numberCell(src, ctx = {}) {
   let places = own === undefined ? null : own;
   if (isRate && (own === undefined || prefs.rate_global_decimals === false)) places = ratePlaces(value, prefs);
   cell.text = shownAs(value, places);
-  cell.title = `Formula: ${s}`;
+  cell.title = t('display.formula_title', { formula: s });
   cell.alt = s;
   return cell;
 }
@@ -191,9 +192,9 @@ export function globalValueText(value, info) {
 // Hidden factors (2.19)
 
 function factorText(src, value) {
-  const t = String(src === null || src === undefined ? '' : src).trim();
-  if (!t) return null;
-  if (PLAIN.test(t)) return t.replace(/^\+/, '');
+  const text = String(src === null || src === undefined ? '' : src).trim();
+  if (!text) return null;
+  if (PLAIN.test(text)) return text.replace(/^\+/, '');
   return typeof value === 'string' ? value : null;
 }
 
@@ -211,19 +212,16 @@ export function hiddenFactors(d, values, shown, base) {
   const kind = d.kind || 'line';
   if (kind !== 'line' && kind !== 'adjustment') return out;
   const v = values && typeof values === 'object' ? values : {};
-  for (const [field, label] of [
-    ['x', 'X'],
-    ['x4', '4X'],
-  ]) {
+  for (const field of ['x', 'x4']) {
     if (shown.has(field)) continue;
     const text = factorText(d[field], v[field]);
     if (text === null) continue;
     const n = scaled(text);
     if (n === null || n === ONE) continue;
-    out.push(`${label} is ${decimal(text)}`);
+    out.push(field === 'x' ? t('display.hidden_x', { value: decimal(text) }) : t('display.hidden_x4', { value: decimal(text) }));
   }
   if (kind === 'line' && !shown.has('currency') && typeof d.currency === 'string' && d.currency !== '' && d.currency !== base) {
-    out.push(`Currency is ${d.currency}`);
+    out.push(t('display.hidden_currency', { code: d.currency }));
   }
   return out;
 }
@@ -305,23 +303,23 @@ export function displayCommands({ grid, render, toast }) {
   const zoom = (z) => {
     const u = setUserDisplay({ zoom: z });
     grid.setZoom(u.zoom);
-    say(`Grid zoom ${Math.round(u.zoom * 100)}%`);
+    say(t('display.zoom', { percent: Math.round(u.zoom * 100) }));
   };
   return {
     'view.formulas': () => {
       const u = setUserDisplay({ formulasInSelection: !user.formulasInSelection });
       grid.setShowFormulas(u.formulasInSelection);
-      say(u.formulasInSelection ? 'Selected cells show their formulas' : 'Selected cells show their values');
+      say(u.formulasInSelection ? t('display.show_formulas') : t('display.show_values'));
     },
     'view.hide_zero': () => {
       const u = setUserDisplay({ hideZero: !user.hideZero });
       render();
-      say(u.hideZero ? 'Categories and accounts that total zero are hidden' : 'Every category and account shows');
+      say(u.hideZero ? t('display.zero_hidden') : t('display.zero_shown'));
     },
     'view.totals_cents': () => {
       const u = setUserDisplay({ totalsPlaces: user.totalsPlaces === 2 ? 0 : 2 });
       render();
-      say(u.totalsPlaces ? 'Totals show cents' : 'Totals show whole amounts');
+      say(u.totalsPlaces ? t('display.cents_shown') : t('display.cents_hidden'));
     },
     'view.zoom_in': () => zoom(user.zoom + 0.1),
     'view.zoom_out': () => zoom(user.zoom - 0.1),

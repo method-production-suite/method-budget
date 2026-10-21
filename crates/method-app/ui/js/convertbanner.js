@@ -10,6 +10,7 @@
 // panes loses it in both.
 
 import { el } from './dom.js';
+import { t } from './i18n.js';
 
 /** Tabs (doc ids) whose banner was closed in this run. */
 const dismissed = new Set();
@@ -44,8 +45,8 @@ export function renderConvertBanner(host, view, onClosed) {
   const close = el('button', {
     class: 'btn btn-quiet convert-banner-close',
     text: '×',
-    title: 'Close',
-    attrs: { type: 'button', 'aria-label': 'Close this notice' },
+    title: t('convertbanner.close'),
+    attrs: { type: 'button', 'aria-label': t('convertbanner.close_label') },
   });
   const dismiss = () => {
     dismissed.add(doc);

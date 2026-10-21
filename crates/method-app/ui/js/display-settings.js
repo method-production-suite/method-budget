@@ -11,6 +11,7 @@
 
 import { MAX_PLACES, budgetDisplay } from './display.js';
 import { anchoredForm } from './modal.js';
+import { t } from './i18n.js';
 
 function checkbox(k, fieldKey, checked, labelText, onChange) {
   const box = k.el('input', 'setup-check');
@@ -51,7 +52,7 @@ function inline(k, labelText, control) {
 /** Options for a decimals select: `none` first (value ''), then 0 to 8. */
 function placesOptions(none) {
   const out = [['', none]];
-  for (let n = 0; n <= MAX_PLACES; n += 1) out.push([String(n), n === 1 ? '1 decimal' : `${n} decimals`]);
+  for (let n = 0; n <= MAX_PLACES; n += 1) out.push([String(n), t('display_settings.decimals_count', { count: n })]);
   return out;
 }
 
@@ -92,21 +93,21 @@ export function displaySettingsGroup(k) {
     fieldKey: cutKey,
     value: now.rate_cutoff === null ? '' : now.rate_cutoff,
     num: true,
-    placeholder: 'None',
+    placeholder: t('display_settings.none'),
     onCommit: (v, old) => save({ rate_cutoff: v.trim() === '' ? null : v.trim() }, [cutKey, old]),
   });
   const belowKey = k.key('settings', 'display', 'below');
   const below = k.selectInput({
     fieldKey: belowKey,
     value: placesValue(now.rate_decimals_below),
-    options: placesOptions('As typed'),
+    options: placesOptions(t('display_settings.as_typed')),
     onCommit: (v, old) => save({ rate_decimals_below: placesArg(v) }, [belowKey, old]),
   });
   const aboveKey = k.key('settings', 'display', 'above');
   const above = k.selectInput({
     fieldKey: aboveKey,
     value: placesValue(now.rate_decimals_above),
-    options: placesOptions('As typed'),
+    options: placesOptions(t('display_settings.as_typed')),
     onCommit: (v, old) => save({ rate_decimals_above: placesArg(v) }, [aboveKey, old]),
   });
   cutoff.classList.add('ts-w-xs');
@@ -116,21 +117,21 @@ export function displaySettingsGroup(k) {
     const fieldKey = k.key('settings', 'display', f);
     return checkbox(k, fieldKey, now[f], label, (on) => save({ [f]: on }, [fieldKey, !on]));
   };
-  const heading = k.el('h3', 'tss-heading', 'Numbers on screen');
-  heading.title = 'How rates and the topsheet show on screen. Only the display changes: every value and total stays exact.';
+  const heading = k.el('h3', 'tss-heading', t('display_settings.numbers_on_screen'));
+  heading.title = t('display_settings.numbers_on_screen_tip');
   group.append(
     heading,
-    settingsRow(k, 'Rate decimals', [
-      inline(k, 'Cutoff', cutoff),
-      inline(k, 'Below', below),
-      inline(k, now.rate_cutoff === null ? 'Rates' : 'At or above', above),
+    settingsRow(k, t('display_settings.rate_decimals'), [
+      inline(k, t('display_settings.cutoff'), cutoff),
+      inline(k, t('display_settings.below'), below),
+      inline(k, now.rate_cutoff === null ? t('display_settings.rates') : t('display_settings.at_or_above'), above),
     ]),
-    settingsRow(k, 'Rates using a global', [flag('rate_global_decimals', 'Show the global’s own decimals')]),
-    settingsRow(k, 'Topsheet shows', [
-      flag('summary_rows', 'Above- and below-the-line totals'),
-      flag('net_total', 'Net total'),
+    settingsRow(k, t('display_settings.rates_using_a_global'), [flag('rate_global_decimals', t('display_settings.show_global_decimals'))]),
+    settingsRow(k, t('display_settings.topsheet_shows'), [
+      flag('summary_rows', t('display_settings.atl_btl_totals')),
+      flag('net_total', t('display_settings.net_total')),
     ]),
-    k.el('p', 'ts-hint ts-row-note', 'Display only: every value and total stays exact.'),
+    k.el('p', 'ts-hint ts-row-note', t('display_settings.display_only_note')),
   );
   if (k.state().errors.has(gk)) group.append(k.errorLine(k.state().errors.get(gk)));
   return group;
@@ -155,9 +156,9 @@ function currentInfo(k, name) {
 function unitOptions(k, current) {
   const units = k.budget().units && typeof k.budget().units === 'object' ? k.budget().units : {};
   const names = Object.keys(units).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const out = [['', 'None'], ...names.map((u) => [u, u])];
+  const out = [['', t('display_settings.none')], ...names.map((u) => [u, u])];
   // A unit the budget no longer has stays listed, so the pick shows it.
-  if (current && !names.includes(current)) out.push([current, `${current} (not in Units)`]);
+  if (current && !names.includes(current)) out.push([current, t('display_settings.not_in_units', { name: current })]);
   return out;
 }
 
@@ -172,9 +173,9 @@ export function globalInfoCell(k, name, itemKey, field) {
   const onCommit = (v, old) =>
     k.run(itemKey, () => ['set_global_info', { name, info: { ...currentInfo(k, name), [field]: v } }], { restore: [fieldKey, old] });
   if (field === 'unit') {
-    return k.selectInput({ fieldKey, value: now.unit, options: unitOptions(k, now.unit), label: `Units of ${name}`, cls: 'sw-cell-input', onCommit });
+    return k.selectInput({ fieldKey, value: now.unit, options: unitOptions(k, now.unit), label: t('display_settings.units_of', { name }), cls: 'sw-cell-input', onCommit });
   }
-  return k.textInput({ fieldKey, value: now.description, label: `Description of ${name}`, cls: 'sw-cell-input', onCommit });
+  return k.textInput({ fieldKey, value: now.description, label: t('display_settings.description_of', { name }), cls: 'sw-cell-input', onCommit });
 }
 
 /**
@@ -187,14 +188,14 @@ export function globalDetails(k, name, anchor) {
   const ctx = k.state().ctx;
   return anchoredForm({
     anchor,
-    title: `Details of ${name}`,
-    message: 'Display only: no value or total changes.',
+    title: t('display_settings.details_of', { name }),
+    message: t('display_settings.details_message'),
     fields: [
-      { key: 'description', label: 'Description', value: now.description },
-      { key: 'unit', label: 'Unit', type: 'select', options: unitOptions(k, now.unit), value: now.unit },
-      { key: 'decimals', label: 'Decimals', type: 'select', options: placesOptions('As calculated'), value: placesValue(now.decimals) },
-      { key: 'folder', label: 'Folder', value: now.folder, placeholder: 'None' },
-      { key: 'show_by_name', label: 'Show by name: cells that use it show their formula', type: 'check', value: now.show_by_name },
+      { key: 'description', label: t('display_settings.description'), value: now.description },
+      { key: 'unit', label: t('display_settings.unit'), type: 'select', options: unitOptions(k, now.unit), value: now.unit },
+      { key: 'decimals', label: t('display_settings.decimals'), type: 'select', options: placesOptions(t('display_settings.as_calculated')), value: placesValue(now.decimals) },
+      { key: 'folder', label: t('display_settings.folder'), value: now.folder, placeholder: t('display_settings.none') },
+      { key: 'show_by_name', label: t('display_settings.show_by_name'), type: 'check', value: now.show_by_name },
     ],
     onSubmit: (v) => {
       const info = {
@@ -205,7 +206,7 @@ export function globalDetails(k, name, anchor) {
         folder: k.str(v.folder),
       };
       if (JSON.stringify(info) === JSON.stringify(currentInfo(k, name))) return Promise.resolve();
-      if (!ctx || typeof ctx.call !== 'function') return Promise.reject('Not connected');
+      if (!ctx || typeof ctx.call !== 'function') return Promise.reject(t('display_settings.not_connected'));
       return ctx.call('set_global_info', { name, info });
     },
   });

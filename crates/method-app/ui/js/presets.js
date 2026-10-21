@@ -25,7 +25,8 @@ import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
 import { anchoredForm } from './modal.js';
 import { review } from './clipboard.js';
-import { obj, str, plural, errText } from './util.js';
+import { obj, str, errText } from './util.js';
+import { t } from './i18n.js';
 
 const st = {
   view: null,
@@ -110,10 +111,17 @@ function shownRows(view) {
 /** Where a block goes from here: { account, beforeRow } or { error }. */
 function insertPlace(sel) {
   if (!sel || sel.level !== 'details' || !sel.account || !sel.account.code) {
-    return { error: 'Open an account to insert a line block.' };
+    return { error: t('presets.open_account_first') };
   }
   return { account: str(sel.account.code), beforeRow: cursorRowId(sel) };
 }
+
+// A set, location or currency with its value, in words.
+const TAG_WORDS = [
+  ['set', (value) => t('presets.tag.set', { value })],
+  ['location', (value) => t('presets.tag.location', { value })],
+  ['currency', (value) => t('presets.tag.currency', { value })],
+];
 
 /** The parts of a tag preset in words: [short, long]. */
 function describeTags(p) {
@@ -123,19 +131,19 @@ function describeTags(p) {
   const gr = list(p.groups).map(str);
   if (fr.length) {
     parts.push(fr.join(', '));
-    long.push(`Fringes: ${fr.join(', ')}`);
+    long.push(t('presets.tag.fringes', { value: fr.join(', ') }));
   }
   if (gr.length) {
     parts.push(gr.join(', '));
-    long.push(`Groups: ${gr.join(', ')}`);
+    long.push(t('presets.tag.groups', { value: gr.join(', ') }));
   }
-  for (const [k, label] of [['set', 'Set'], ['location', 'Location'], ['currency', 'Currency']]) {
+  for (const [k, label] of TAG_WORDS) {
     if (str(p[k])) {
       parts.push(str(p[k]));
-      long.push(`${label}: ${str(p[k])}`);
+      long.push(label(str(p[k])));
     }
   }
-  if (!parts.length) return ['No tags', 'No tags: Replace clears the lines’ tags'];
+  if (!parts.length) return [t('presets.no_tags'), t('presets.no_tags_long')];
   return [parts.join(' · '), long.join('\n')];
 }
 
@@ -171,7 +179,7 @@ function selection() {
 }
 
 function panelCall(cmd, args, opts) {
-  if (!st.ctx || typeof st.ctx.call !== 'function') return Promise.reject('Not connected');
+  if (!st.ctx || typeof st.ctx.call !== 'function') return Promise.reject(t('presets.not_connected'));
   return st.ctx.call(cmd, args, opts);
 }
 
@@ -184,7 +192,7 @@ function panelError(message) {
 export function applyPreset({ call, sel, view, index, mode, onError }) {
   const sc = scopeOf(sel, view);
   if (emptyScope(sc)) {
-    onError('Select lines, an account or a category first.');
+    onError(t('presets.select_first'));
     return Promise.resolve(null);
   }
   return run(call, 'apply_tag_preset', { index, mode, ...sc }, {}, onError);
@@ -208,7 +216,7 @@ export async function insertBlock({ call, sel, index, onError }) {
     return null;
   }
   if (preview && preview.review) {
-    const ok = await review(preview, { action: 'Insert' });
+    const ok = await review(preview, { action: t('presets.insert') });
     if (!ok) return null;
   }
   return run(call, 'insert_line_preset', { index, account: place.account, beforeRow: place.beforeRow }, { focusCreated: true }, onError);
@@ -223,28 +231,36 @@ export function saveTagsForm({ call, sel, view, anchor, onError, onSaved = () =>
   const d = id === null ? null : shownRows(view).find((r) => r.id === id);
   const kind = d ? d.kind || 'line' : '';
   if (!d || (kind !== 'line' && kind !== 'adjustment')) {
-    onError('Put the cursor on a line to save its tags as a preset.');
+    onError(t('presets.cursor_on_line_first'));
     return Promise.resolve(false);
   }
   const line = kind === 'line';
   const value = (k) => (Array.isArray(d[k]) ? d[k].join(', ') : str(d[k]));
-  const part = (key, label, has) => ({
+  // Each tag part with the line's value, or "(none)".
+  const words = {
+    fringes: [(v) => t('presets.tag.fringes', { value: v }), () => t('presets.tag.fringes_none')],
+    groups: [(v) => t('presets.tag.groups', { value: v }), () => t('presets.tag.groups_none')],
+    set: [(v) => t('presets.tag.set', { value: v }), () => t('presets.tag.set_none')],
+    location: [(v) => t('presets.tag.location', { value: v }), () => t('presets.tag.location_none')],
+    currency: [(v) => t('presets.tag.currency', { value: v }), () => t('presets.tag.currency_none')],
+  };
+  const part = (key, has) => ({
     key,
-    label: `${label}${value(key) ? `: ${value(key)}` : ' (none)'}`,
+    label: value(key) ? words[key][0](value(key)) : words[key][1](),
     type: 'check',
     value: has && Boolean(value(key)),
   });
-  const fields = [{ key: 'name', label: 'Preset name', value: str(d.description).trim().slice(0, 80) }];
-  if (line) fields.push(part('fringes', 'Fringes', true));
-  fields.push(part('groups', 'Groups', true), part('set', 'Set', true), part('location', 'Location', true));
-  if (line) fields.push(part('currency', 'Currency', true));
+  const fields = [{ key: 'name', label: t('presets.preset_name'), value: str(d.description).trim().slice(0, 80) }];
+  if (line) fields.push(part('fringes', true));
+  fields.push(part('groups', true), part('set', true), part('location', true));
+  if (line) fields.push(part('currency', true));
   let saved = false;
   return anchoredForm({
     anchor,
-    title: 'Save tags as preset',
-    message: 'Unticked tags are left out. Replace clears the tags a preset leaves out.',
+    title: t('presets.save_tags_title'),
+    message: t('presets.save_tags_message'),
     fields,
-    submitText: 'Save',
+    submitText: t('modal.save'),
     onSubmit: (v) => {
       const parts = {
         fringes: line && Boolean(v.fringes),
@@ -268,7 +284,7 @@ export function saveBlockForm({ call, sel, view, anchor, onError, onSaved = () =
   const keys = sel && sel.level === 'details' && Array.isArray(sel.keys) ? sel.keys : [];
   const ids = keys.filter((k) => /^r\d+$/.test(k)).map((k) => Number(k.slice(1)));
   if (!ids.length) {
-    onError('Select the lines to save as a block first.');
+    onError(t('presets.select_lines_first'));
     return Promise.resolve(false);
   }
   const rows = shownRows(view).filter((r) => ids.includes(r.id));
@@ -276,24 +292,24 @@ export function saveBlockForm({ call, sel, view, anchor, onError, onSaved = () =
   const filled = (r, ks) => ks.some((k) => (Array.isArray(r[k]) ? r[k].length > 0 : str(r[k]).trim() !== '' && r[k] !== null));
   // A field nothing on the lines uses starts unticked, the rest ticked.
   const fields = [
-    { key: 'name', label: 'Block name', value: '' },
-    { key: 'formulas', label: 'Amount, X, rate and 4X', type: 'check', value: has((r) => filled(r, ['amount', 'x', 'rate', 'x4'])) },
-    { key: 'units', label: 'Units', type: 'check', value: has((r) => filled(r, ['unit', 'unit2', 'unit3', 'unit4'])) },
+    { key: 'name', label: t('presets.block_name'), value: '' },
+    { key: 'formulas', label: t('presets.keep.formulas'), type: 'check', value: has((r) => filled(r, ['amount', 'x', 'rate', 'x4'])) },
+    { key: 'units', label: t('presets.keep.units'), type: 'check', value: has((r) => filled(r, ['unit', 'unit2', 'unit3', 'unit4'])) },
     {
       key: 'tags',
-      label: 'Tags (fringes, groups, set, location, currency, fringe ranges)',
+      label: t('presets.keep.tags'),
       type: 'check',
       value: has((r) => filled(r, ['fringes', 'groups', 'set', 'location', 'currency', 'fringe_range'])),
     },
-    { key: 'notes', label: 'Notes', type: 'check', value: has((r) => filled(r, ['notes'])) },
+    { key: 'notes', label: t('presets.keep.notes'), type: 'check', value: has((r) => filled(r, ['notes'])) },
   ];
   let saved = false;
   return anchoredForm({
     anchor,
-    title: `Save ${plural(ids.length, 'line', 'lines')} as a block`,
-    message: 'Descriptions, row kinds and text styles always come along.',
+    title: t('presets.save_block_title', { count: ids.length }),
+    message: t('presets.save_block_message'),
     fields,
-    submitText: 'Save',
+    submitText: t('modal.save'),
     onSubmit: (v) => {
       const keep = { formulas: Boolean(v.formulas), units: Boolean(v.units), tags: Boolean(v.tags), notes: Boolean(v.notes) };
       return call('save_line_preset', { name: v.name, rowIds: ids, keep }).then(() => {
@@ -315,26 +331,26 @@ function editTagPreset(index, anchor) {
   if (!p) return;
   const b = budgetOf(st.view);
   const base = str(b.base_currency);
-  const fields = [{ key: 'name', label: 'Name', value: str(p.name) }];
+  const fields = [{ key: 'name', label: t('presets.name'), value: str(p.name) }];
   // Every defined fringe and group, plus any the preset names that the
   // budget no longer has (untick them to save).
   const checks = (kind, label, defs, chosen) => {
     const names = [...new Set([...Object.keys(obj(defs)), ...chosen])].sort(byteOrder);
     for (const n of names) {
       const missing = !Object.prototype.hasOwnProperty.call(obj(defs), n);
-      fields.push({ key: `${kind}:${n}`, label: `${label} ${n}${missing ? ' (not in this budget)' : ''}`, type: 'check', value: chosen.includes(n) });
+      fields.push({ key: `${kind}:${n}`, label: label(n, missing), type: 'check', value: chosen.includes(n) });
     }
   };
-  checks('f', 'Fringe', b.fringes, list(p.fringes).map(str));
-  checks('g', 'Group', b.groups, list(p.groups).map(str));
+  checks('f', (name, missing) => (missing ? t('presets.edit.fringe_missing', { name }) : t('presets.edit.fringe', { name })), b.fringes, list(p.fringes).map(str));
+  checks('g', (name, missing) => (missing ? t('presets.edit.group_missing', { name }) : t('presets.edit.group', { name })), b.groups, list(p.groups).map(str));
   const pick = (key, label, defs, current, noneLabel) => {
     const names = Object.keys(obj(defs)).sort(byteOrder);
     if (current && !names.includes(current)) names.push(current);
     fields.push({ key, label, type: 'select', options: [['', noneLabel], ...names.map((n) => [n, n])], value: current });
   };
-  pick('set', 'Set', b.sets, str(p.set), 'None');
-  pick('location', 'Location', b.locations, str(p.location), 'None');
-  pick('currency', 'Currency', b.currencies, str(p.currency), `${base || 'Base'} (base currency)`);
+  pick('set', t('presets.edit.set'), b.sets, str(p.set), t('presets.edit.none'));
+  pick('location', t('presets.edit.location'), b.locations, str(p.location), t('presets.edit.none'));
+  pick('currency', t('presets.edit.currency'), b.currencies, str(p.currency), base ? t('presets.edit.base_currency_named', { base }) : t('presets.edit.base_currency'));
   const build = (v) => {
     const chosen = (prefix) =>
       Object.keys(v)
@@ -354,9 +370,9 @@ function editTagPreset(index, anchor) {
   const key = tagKey(index);
   anchoredForm({
     anchor,
-    title: `Tag preset ${str(p.name)}`,
+    title: t('presets.edit.title', { name: str(p.name) }),
     fields,
-    extra: { text: 'Delete…', title: 'Delete this tag preset', run: () => (deleting = true) },
+    extra: { text: t('presets.delete_more'), title: t('presets.delete_tag_preset'), run: () => (deleting = true) },
     onSubmit: (v) => {
       const preset = build(v);
       if (JSON.stringify(preset) === unchanged) return Promise.resolve();
@@ -375,10 +391,10 @@ function renameBlock(index, anchor) {
   let deleting = false;
   anchoredForm({
     anchor,
-    title: `Line block ${str(p.name)}`,
-    message: plural(Number(p.count) || 0, 'row', 'rows'),
-    fields: [{ key: 'name', label: 'Name', value: str(p.name) }],
-    extra: { text: 'Delete…', title: 'Delete this line block', run: () => (deleting = true) },
+    title: t('presets.block_title', { name: str(p.name) }),
+    message: t('presets.rows', { count: Number(p.count) || 0 }),
+    fields: [{ key: 'name', label: t('presets.name'), value: str(p.name) }],
+    extra: { text: t('presets.delete_more'), title: t('presets.delete_line_block'), run: () => (deleting = true) },
     onSubmit: (v) => {
       if (v.name.trim() === str(p.name)) return Promise.resolve();
       return panelCall('rename_tool_preset', { which: 'lines', index, name: v.name });
@@ -398,9 +414,9 @@ function deleteItem(which, index) {
   let done = false;
   anchoredForm({
     anchor: byKey(key),
-    title: `Delete ${which === 'tags' ? 'tag preset' : 'line block'} ${str(p.name)}?`,
-    message: which === 'tags' ? 'Lines keep the tags it put on them.' : 'Lines inserted from it stay.',
-    submitText: 'Delete',
+    title: which === 'tags' ? t('presets.delete_tag_title', { name: str(p.name) }) : t('presets.delete_block_title', { name: str(p.name) }),
+    message: which === 'tags' ? t('presets.delete_tag_message') : t('presets.delete_block_message'),
+    submitText: t('presets.delete'),
     danger: true,
     onSubmit: () =>
       panelCall('delete_tool_preset', { which, index }).then(() => {
@@ -440,8 +456,8 @@ function byKey(key) {
 }
 
 function focusKey(key) {
-  const t = byKey(key);
-  if (t) t.focus({ preventScroll: false });
+  const target = byKey(key);
+  if (target) target.focus({ preventScroll: false });
 }
 
 function redraw() {
@@ -540,13 +556,13 @@ function draw(host) {
   const place = insertPlace(sel);
   const tags = tagPresets(st.view);
   const blocks = lineBlocks(st.view);
-  const moveKeys = `${isMac ? 'Option' : 'Alt'}+Shift+Up or Down`;
+  const moveKeys = isMac ? t('presets.move_keys_mac') : t('presets.move_keys');
   const parts = [];
 
   // Tag presets
-  parts.push(el('h3', { class: 'notes-heading', text: 'Tag presets' }));
-  if (!tags.length) parts.push(el('p', { class: 'setup-empty', text: 'No tag presets yet. Put the cursor on a line and save its tags.' }));
-  const tagList = el('ul', { class: 'apply-items presets-list', attrs: { 'aria-label': 'Tag presets' } });
+  parts.push(el('h3', { class: 'notes-heading', text: t('presets.tag_presets') }));
+  if (!tags.length) parts.push(el('p', { class: 'setup-empty', text: t('presets.no_tag_presets_hint') }));
+  const tagList = el('ul', { class: 'apply-items presets-list', attrs: { 'aria-label': t('presets.tag_presets') } });
   const canApply = !emptyScope(sc);
   tags.forEach((p, i) => {
     const [short, long] = describeTags(p);
@@ -556,7 +572,7 @@ function draw(host) {
       'button',
       {
         class: 'preset-name',
-        title: `${long}\nEnter adds, Shift+Enter replaces, F2 edits, ${moveKeys} moves`,
+        title: `${long}\n${t('presets.tag_keys', { keys: moveKeys })}`,
         attrs: { type: 'button', 'aria-keyshortcuts': 'Enter Shift+Enter F2 Delete Alt+Shift+ArrowUp Alt+Shift+ArrowDown' },
         data: { key: tagKey(i), nobusy: '1' },
       },
@@ -576,36 +592,35 @@ function draw(host) {
         move: (step) => moveItem('tags', i, step),
       }),
     );
-    const why = canApply ? '' : ' (select lines, an account or a category first)';
     tagList.append(
       el(
         'li',
         { class: 'preset-item' },
         name,
-        smallButton('Add', `presets:add:${i}`, add, {
-          label: `Add ${str(p.name)}`,
-          title: `Add these tags to the selected lines${why}`,
+        smallButton(t('presets.add'), `presets:add:${i}`, add, {
+          label: t('presets.add_named', { name: str(p.name) }),
+          title: canApply ? t('presets.add_tip') : t('presets.add_tip_select'),
           enabled: canApply,
         }),
-        smallButton('Replace', `presets:replace:${i}`, replace, {
-          label: `Replace with ${str(p.name)}`,
-          title: `Make the selected lines’ tags exactly these${why}`,
+        smallButton(t('presets.replace'), `presets:replace:${i}`, replace, {
+          label: t('presets.replace_named', { name: str(p.name) }),
+          title: canApply ? t('presets.replace_tip') : t('presets.replace_tip_select'),
           enabled: canApply,
         }),
       ),
     );
   });
   tagList.append(
-    addButton('Save tags as preset…', 'presets:save-tags', 'Save the cursor line’s tags as a new preset', (b) =>
+    addButton(t('presets.save_tags_more'), 'presets:save-tags', t('presets.save_tags_tip'), (b) =>
       saveTagsForm({ call: panelCall, sel: selection(), view: st.view, anchor: b, onError: panelError }),
     ),
   );
   parts.push(tagList);
 
   // Line blocks
-  parts.push(el('h3', { class: 'notes-heading', text: 'Line blocks' }));
-  if (!blocks.length) parts.push(el('p', { class: 'setup-empty', text: 'No line blocks yet. Select lines and save them as a block.' }));
-  const blockList = el('ul', { class: 'apply-items presets-list', attrs: { 'aria-label': 'Line blocks' } });
+  parts.push(el('h3', { class: 'notes-heading', text: t('presets.line_blocks') }));
+  if (!blocks.length) parts.push(el('p', { class: 'setup-empty', text: t('presets.no_line_blocks_hint') }));
+  const blockList = el('ul', { class: 'apply-items presets-list', attrs: { 'aria-label': t('presets.line_blocks') } });
   blocks.forEach((p, i) => {
     const count = Number(p.count) || 0;
     const insert = () => insertBlock({ call: panelCall, sel: selection(), index: i, onError: panelError });
@@ -613,12 +628,12 @@ function draw(host) {
       'button',
       {
         class: 'preset-name',
-        title: `${plural(count, 'row', 'rows')}\nEnter inserts above the cursor line, F2 renames, ${moveKeys} moves`,
+        title: `${t('presets.rows', { count })}\n${t('presets.block_keys', { keys: moveKeys })}`,
         attrs: { type: 'button', 'aria-keyshortcuts': 'Enter F2 Delete Alt+Shift+ArrowUp Alt+Shift+ArrowDown' },
         data: { key: blockKey(i), nobusy: '1' },
       },
       el('span', { class: 'apply-name', text: str(p.name) }),
-      el('span', { class: 'apply-desc', text: plural(count, 'row', 'rows') }),
+      el('span', { class: 'apply-desc', text: t('presets.rows', { count }) }),
     );
     name.addEventListener('dblclick', (e) => {
       e.preventDefault();
@@ -638,16 +653,16 @@ function draw(host) {
         'li',
         { class: 'preset-item preset-block' },
         name,
-        smallButton('Insert', `presets:insert:${i}`, insert, {
-          label: `Insert ${str(p.name)}`,
-          title: place.error || 'Insert copies above the cursor line',
+        smallButton(t('presets.insert'), `presets:insert:${i}`, insert, {
+          label: t('presets.insert_named', { name: str(p.name) }),
+          title: place.error || t('presets.insert_tip'),
           enabled: !place.error,
         }),
       ),
     );
   });
   blockList.append(
-    addButton('Save lines as block…', 'presets:save-block', 'Save the selected lines as a new block', (b) =>
+    addButton(t('presets.save_block_more'), 'presets:save-block', t('presets.save_block_tip'), (b) =>
       saveBlockForm({ call: panelCall, sel: selection(), view: st.view, anchor: b, onError: panelError }),
     ),
   );
@@ -684,21 +699,21 @@ export function presetMenu(c) {
       title: long || short,
       disabled: none,
       items: [
-        { label: 'Add tags', title: 'Add these tags to the selected lines', run: go('add') },
-        { label: 'Replace tags', title: 'Make the selected lines’ tags exactly these', run: go('replace') },
+        { label: t('presets.add_tags'), title: t('presets.add_tip'), run: go('add') },
+        { label: t('presets.replace_tags'), title: t('presets.replace_tip'), run: go('replace') },
       ],
     };
   });
-  if (!items.length) items.push({ label: 'No tag presets yet', disabled: true });
+  if (!items.length) items.push({ label: t('presets.no_tag_presets'), disabled: true });
   items.push({ separator: true });
   if (c.sel && c.sel.level === 'details') {
     items.push({
-      label: 'Save tags as preset…',
+      label: t('presets.save_tags_more'),
       disabled: cursorRowId(c.sel) === null,
       run: () => saveTagsForm({ call: c.call, sel: c.sel, view: c.view, anchor: c.anchor(), onError: c.toast }),
     });
   }
-  items.push({ label: 'Set up presets…', run: c.openTab });
+  items.push({ label: t('presets.set_up_more'), run: c.openTab });
   return items;
 }
 
@@ -706,14 +721,14 @@ export function presetMenu(c) {
 export function blockMenu(c) {
   const items = lineBlocks(c.view).map((p, index) => ({
     label: str(p.name),
-    title: plural(Number(p.count) || 0, 'row', 'rows'),
+    title: t('presets.rows', { count: Number(p.count) || 0 }),
     run: () => insertBlock({ call: c.call, sel: c.sel, index, onError: c.toast }),
   }));
-  if (!items.length) items.push({ label: 'No line blocks yet', disabled: true });
+  if (!items.length) items.push({ label: t('presets.no_line_blocks'), disabled: true });
   items.push(
     { separator: true },
     {
-      label: 'Save lines as block…',
+      label: t('presets.save_block_more'),
       disabled: !scopeOf(c.sel, c.view).rowIds.length,
       run: () => saveBlockForm({ call: c.call, sel: c.sel, view: c.view, anchor: c.anchor(), onError: c.toast }),
     },

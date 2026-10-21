@@ -9,6 +9,8 @@
 // 4.5:1 or better on the grid's backgrounds, selected rows included. A color
 // typed into a file by hand still shows as stored.
 
+import { t } from './i18n.js';
+
 // { grid, view(), level(), act(cmd, args) }
 let ctx = null;
 
@@ -18,14 +20,14 @@ export function initRowFormat(context) {
 
 /** The text colors, in menu order. `id` names the Format > Text Color item. */
 export const PALETTE = [
-  { id: 'red', label: 'Red', light: '#c03530', dark: '#ef8079' },
-  { id: 'orange', label: 'Orange', light: '#a8551c', dark: '#f08a45' },
-  { id: 'gold', label: 'Gold', light: '#836521', dark: '#d39b1f' },
-  { id: 'green', label: 'Green', light: '#1f7a36', dark: '#3fbf62' },
-  { id: 'teal', label: 'Teal', light: '#1e7673', dark: '#2fbfb8' },
-  { id: 'blue', label: 'Blue', light: '#1d63c9', dark: '#6ca0e5' },
-  { id: 'purple', label: 'Purple', light: '#7c3fd1', dark: '#b58de2' },
-  { id: 'pink', label: 'Pink', light: '#b72e78', dark: '#e779b4' },
+  { id: 'red', label: t('rowformat.red'), light: '#c03530', dark: '#ef8079' },
+  { id: 'orange', label: t('rowformat.orange'), light: '#a8551c', dark: '#f08a45' },
+  { id: 'gold', label: t('rowformat.gold'), light: '#836521', dark: '#d39b1f' },
+  { id: 'green', label: t('rowformat.green'), light: '#1f7a36', dark: '#3fbf62' },
+  { id: 'teal', label: t('rowformat.teal'), light: '#1e7673', dark: '#2fbfb8' },
+  { id: 'blue', label: t('rowformat.blue'), light: '#1d63c9', dark: '#6ca0e5' },
+  { id: 'purple', label: t('rowformat.purple'), light: '#7c3fd1', dark: '#b58de2' },
+  { id: 'pink', label: t('rowformat.pink'), light: '#b72e78', dark: '#e779b4' },
 ];
 
 /** The palette entry for a stored color, or null (none, or not one of ours). */

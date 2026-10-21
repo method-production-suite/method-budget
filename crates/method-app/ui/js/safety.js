@@ -7,6 +7,7 @@ import { invoke } from './api.js';
 import { el } from './dom.js';
 import { customDialog, isModalOpen } from './modal.js';
 import { isHelpOpen, closeHelp } from './help.js';
+import { t } from './i18n.js';
 
 /** A time in milliseconds since 1970, in the user's own format. */
 export function formatTime(ms) {
@@ -15,9 +16,9 @@ export function formatTime(ms) {
 }
 
 function sizeText(bytes) {
-  if (bytes < 1024) return `${bytes} bytes`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return t('safety.bytes', { count: bytes });
+  if (bytes < 1024 * 1024) return t('safety.size_kb', { size: Math.round(bytes / 1024) });
+  return t('safety.size_mb', { size: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 function item(lines, ...buttons) {
@@ -46,8 +47,8 @@ export function showRecoveryDialog(entries, { open, discard }) {
       }
       list.replaceChildren(
         ...items.map((e) => {
-          const openBtn = el('button', { class: 'btn btn-primary', text: 'Open Recovered', attrs: { type: 'button' } });
-          const discardBtn = el('button', { class: 'btn', text: 'Discard', attrs: { type: 'button' } });
+          const openBtn = el('button', { class: 'btn btn-primary', text: t('safety.open_recovered'), attrs: { type: 'button' } });
+          const discardBtn = el('button', { class: 'btn', text: t('safety.discard'), attrs: { type: 'button' } });
           openBtn.addEventListener('click', () => {
             close();
             open(e.key);
@@ -56,27 +57,27 @@ export function showRecoveryDialog(entries, { open, discard }) {
           discardBtn.addEventListener('click', async () => {
             if (!discardBtn.classList.contains('btn-danger')) {
               discardBtn.classList.add('btn-danger');
-              discardBtn.textContent = 'Discard for Good';
+              discardBtn.textContent = t('safety.discard_for_good');
               return;
             }
             discardBtn.disabled = true;
             draw(await discard(e.key));
           });
-          const where = e.path ? e.path : 'Untitled (never saved)';
-          return item([e.title || e.name, where, `Autosaved ${formatTime(e.saved_at_ms)}`], openBtn, discardBtn);
+          const where = e.path ? e.path : t('safety.untitled_never_saved');
+          return item([e.title || e.name, where, t('safety.autosaved', { time: formatTime(e.saved_at_ms) })], openBtn, discardBtn);
         }),
       );
     };
     draw(entries);
-    const later = el('button', { class: 'btn', text: 'Later', attrs: { type: 'button', 'data-autofocus': true } });
+    const later = el('button', { class: 'btn', text: t('safety.later'), attrs: { type: 'button', 'data-autofocus': true } });
     later.addEventListener('click', close);
     return el(
       'div',
       { class: 'modal modal-wide', attrs: { role: 'dialog', 'aria-labelledby': 'safety-title' } },
-      el('h2', { class: 'modal-title', text: 'Recovered budgets', attrs: { id: 'safety-title' } }),
+      el('h2', { class: 'modal-title', text: t('safety.recovered_budgets'), attrs: { id: 'safety-title' } }),
       el('p', {
         class: 'modal-message',
-        text: 'Method Budget closed before these changes were saved. Open one to keep working on it, or discard it. Later keeps them for next time.',
+        text: t('safety.recovered_message'),
       }),
       list,
       el('div', { class: 'modal-actions' }, later),
@@ -93,13 +94,13 @@ export function showRecoveryDialog(entries, { open, discard }) {
 export function showBackupsDialog(name, entries, { restore, reveal }) {
   customDialog((close) => {
     const message = entries.length
-      ? `Earlier versions of ${name}, kept each time a save replaced them. Restoring one puts it in place of the budget; Undo brings this version back.`
-      : 'There are no backups of this budget yet. A backup is kept each time a save replaces a budget file.';
+      ? t('safety.backups_message', { name })
+      : t('safety.no_backups');
     const list = el(
       'ul',
       { class: 'safety-list' },
       ...entries.map((b) => {
-        const btn = el('button', { class: 'btn', text: 'Restore', attrs: { type: 'button' } });
+        const btn = el('button', { class: 'btn', text: t('safety.restore'), attrs: { type: 'button' } });
         btn.addEventListener('click', () => {
           close();
           restore(b.id, formatTime(b.saved_at_ms));
@@ -107,14 +108,14 @@ export function showBackupsDialog(name, entries, { restore, reveal }) {
         return item([formatTime(b.saved_at_ms), sizeText(b.bytes)], btn);
       }),
     );
-    const show = el('button', { class: 'btn', text: 'Show Backups Folder', attrs: { type: 'button' } });
+    const show = el('button', { class: 'btn', text: t('safety.show_backups_folder'), attrs: { type: 'button' } });
     show.addEventListener('click', () => reveal());
-    const done = el('button', { class: 'btn btn-primary', text: 'Close', attrs: { type: 'button', 'data-autofocus': true } });
+    const done = el('button', { class: 'btn btn-primary', text: t('safety.close'), attrs: { type: 'button', 'data-autofocus': true } });
     done.addEventListener('click', close);
     return el(
       'div',
       { class: 'modal modal-wide', attrs: { role: 'dialog', 'aria-labelledby': 'safety-title' } },
-      el('h2', { class: 'modal-title', text: 'Revert to Backup', attrs: { id: 'safety-title' } }),
+      el('h2', { class: 'modal-title', text: t('safety.revert_to_backup'), attrs: { id: 'safety-title' } }),
       el('p', { class: 'modal-message', text: message }),
       entries.length ? list : null,
       el('div', { class: 'modal-actions' }, show, done),
@@ -138,23 +139,23 @@ export function showConflictDialog(name, { keep, load, copy }) {
       });
       return b;
     };
-    const later = el('button', { class: 'btn btn-primary', text: 'Decide Later', attrs: { type: 'button', 'data-autofocus': true } });
+    const later = el('button', { class: 'btn btn-primary', text: t('safety.decide_later'), attrs: { type: 'button', 'data-autofocus': true } });
     later.addEventListener('click', close);
     return el(
       'div',
       { class: 'modal modal-wide', attrs: { role: 'dialog', 'aria-labelledby': 'safety-title' } },
-      el('h2', { class: 'modal-title', text: 'This budget was changed outside Method Budget', attrs: { id: 'safety-title' } }),
+      el('h2', { class: 'modal-title', text: t('safety.changed_outside_title'), attrs: { id: 'safety-title' } }),
       el('p', {
         class: 'modal-message',
-        text: `${name} was changed on disk by something else (a sync service, another computer or another app) since you opened or last saved it. Autosave is paused for this budget until you choose.`,
+        text: t('safety.changed_outside_message', { name }),
       }),
       el(
         'ul',
         { class: 'safety-list' },
         // A read-only shared copy has nothing of its own to keep (keep is null).
-        keep ? item(['Keep mine', 'Save this budget over the file. The version on disk is kept in Backups first.'], choice('Keep Mine', keep)) : null,
-        item(['Load theirs', 'Open the version on disk. This budget is kept in Backups first, and Undo brings it back.'], choice('Load Theirs', load)),
-        item(['Save mine as a copy', 'Save this budget as a new file and leave the one on disk as it is.'], choice('Save Mine As…', copy)),
+        keep ? item([t('safety.keep_mine'), t('safety.keep_mine_hint')], choice(t('safety.keep_mine_button'), keep)) : null,
+        item([t('safety.load_theirs'), t('safety.load_theirs_hint')], choice(t('safety.load_theirs_button'), load)),
+        item([t('safety.save_mine_copy'), t('safety.save_mine_copy_hint')], choice(t('safety.save_mine_as'), copy)),
       ),
       el('div', { class: 'modal-actions' }, later),
     );
@@ -185,8 +186,7 @@ export function initSafety(ctx) {
     if (toggle) toggle.checked = Boolean(on);
   };
   if (toggle) {
-    toggle.closest('label').title =
-      'Save into the budget file a few seconds after each change. A budget not saved yet gets a recovery copy instead.';
+    toggle.closest('label').title = t('safety.autosave_tip');
     toggle.addEventListener('change', async () => {
       try {
         setToggle(await invoke('set_autosave', { on: toggle.checked }));
@@ -271,7 +271,7 @@ export function initSafety(ctx) {
       restore: async (id, when) => {
         try {
           await ctx.call('restore_backup', { id });
-          ctx.toast(`Restored the version from ${when}. Undo brings back the one before.`);
+          ctx.toast(t('safety.restored', { when }));
         } catch (e) {
           ctx.toast(e);
         }

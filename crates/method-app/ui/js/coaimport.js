@@ -15,34 +15,34 @@
 
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
-import { plural } from './util.js';
+import { t } from './i18n.js';
 
 /** The fields' names in the dialog, by the key Rust uses. */
 export const COA_FIELD_LABELS = {
-  category_code: 'Category number',
-  category_name: 'Category name',
-  account_code: 'Account number',
-  account_name: 'Account name',
-  level: 'Level (ATL, BTL...)',
+  category_code: t('coaimport.field.category_code'),
+  category_name: t('coaimport.field.category_name'),
+  account_code: t('coaimport.field.account_code'),
+  account_name: t('coaimport.field.account_name'),
+  level: t('coaimport.field.level'),
 };
 
 const FIELD_TITLES = {
-  category_code: 'May be the same column as the account number, for a one-column outline',
-  category_name: 'Not mapped: the text to the right of the number',
-  account_name: 'Not mapped: the text to the right of the number',
-  level: 'Where this changes, a production total goes in',
+  category_code: t('coaimport.field_tip.category_code'),
+  category_name: t('coaimport.field_tip.name_not_mapped'),
+  account_name: t('coaimport.field_tip.name_not_mapped'),
+  level: t('coaimport.field_tip.level'),
 };
 
-/** Separators a pattern may use: [value, label]. */
+/** Separators a pattern may use: [value, label, name in a pattern's words]. */
 export const SEPARATORS = [
-  ['', 'None'],
-  ['-', 'Hyphen (11-01)'],
-  ['.', 'Period (11.01)'],
-  [' ', 'Space (11 01)'],
-  ['/', 'Slash (11/01)'],
-  [':', 'Colon (11:01)'],
-  [';', 'Semicolon (11;01)'],
-  [',', 'Comma (11,01)'],
+  ['', t('coaimport.sep.none'), ''],
+  ['-', t('coaimport.sep.hyphen'), t('coaimport.sep_name.hyphen')],
+  ['.', t('coaimport.sep.period'), t('coaimport.sep_name.period')],
+  [' ', t('coaimport.sep.space'), t('coaimport.sep_name.space')],
+  ['/', t('coaimport.sep.slash'), t('coaimport.sep_name.slash')],
+  [':', t('coaimport.sep.colon'), t('coaimport.sep_name.colon')],
+  [';', t('coaimport.sep.semicolon'), t('coaimport.sep_name.semicolon')],
+  [',', t('coaimport.sep.comma'), t('coaimport.sep_name.comma')],
 ];
 
 /** A pattern in words: "2 + 2, no separator". */
@@ -51,8 +51,8 @@ export function codingText(c) {
   const widths = [c.category, c.account];
   if (c.sub) widths.push(c.sub);
   const sep = SEPARATORS.find(([v]) => v === c.separator);
-  const sepText = !c.separator ? 'no separator' : sep ? sep[1].replace(/ \(.*\)$/, '').toLowerCase() : `"${c.separator}"`;
-  return `${widths.join(' + ')}, ${sepText}`;
+  const sepText = !c.separator ? t('coaimport.no_separator') : sep ? sep[2] : t('coaimport.quoted_separator', { separator: c.separator });
+  return t('coaimport.pattern', { widths: widths.join(' + '), separator: sepText });
 }
 
 /** What Rust gets for the dialog's state (`extra`: detect_header, guess). */
@@ -129,7 +129,7 @@ export function showChartDialog(ctx, picked) {
   const updateButton = () => {
     const p = st.preview;
     ui.ok.disabled = busy || st.failed || !p || p.categories === 0;
-    ui.ok.textContent = st.target === 'current' ? 'Apply Chart' : 'Import Chart';
+    ui.ok.textContent = st.target === 'current' ? t('coaimport.apply_chart') : t('coaimport.import_chart');
   };
 
   const refresh = async (extra = {}) => {
@@ -177,10 +177,10 @@ export function showChartDialog(ctx, picked) {
     const isName = key === 'category_name' || key === 'account_name';
     const select = el('select', {
       class: 'modal-input si-col',
-      attrs: { 'aria-label': `Column for ${COA_FIELD_LABELS[key] || key}` },
+      attrs: { 'aria-label': t('coaimport.column_for', { field: COA_FIELD_LABELS[key] || key }) },
       data: { siKey: `coa-field-${key}` },
     });
-    select.append(el('option', { text: isName ? '(the text after the number)' : '(none)', attrs: { value: '' } }));
+    select.append(el('option', { text: isName ? t('coaimport.text_after_number') : t('coaimport.no_column'), attrs: { value: '' } }));
     for (const c of st.preview ? st.preview.columns : []) {
       select.append(el('option', { text: columnLabel(c), attrs: { value: String(c.index) } }));
     }
@@ -197,33 +197,33 @@ export function showChartDialog(ctx, picked) {
     const p = st.preview;
     const parts = [];
     if (budgetFile) {
-      ui.top.replaceChildren(el('p', { class: 'modal-message', text: 'A budget file: its own categories, accounts and production totals are read, nothing else.' }));
+      ui.top.replaceChildren(el('p', { class: 'modal-message', text: t('coaimport.budget_file') }));
       return;
     }
     if (picked.sheets.length > 1) {
       const sheet = el('select', { class: 'modal-input', data: { siKey: 'coa-sheet' } });
       picked.sheets.forEach((s, i) => {
-        sheet.append(el('option', { text: `${s.name}${s.hidden ? ' (hidden)' : ''}, ${plural(s.rows, 'row', 'rows')}`, attrs: { value: String(i) } }));
+        sheet.append(el('option', { text: s.hidden ? t('coaimport.sheet_option_hidden', { name: s.name, count: s.rows }) : t('coaimport.sheet_option', { name: s.name, count: s.rows }), attrs: { value: String(i) } }));
       });
       sheet.value = String(st.sheet);
       sheet.addEventListener('change', () => {
         st.sheet = Number(sheet.value);
         startSheet();
       });
-      parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: 'Sheet' }), sheet));
+      parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: t('coaimport.sheet') }), sheet));
     }
     const header = el('select', { class: 'modal-input', data: { siKey: 'coa-header' } });
-    header.append(el('option', { text: 'No header row: data from row 1', attrs: { value: '' } }));
+    header.append(el('option', { text: t('coaimport.no_header_row'), attrs: { value: '' } }));
     for (const r of p ? p.raw : []) {
       const cells = r.cells.filter((c) => c.trim() !== '').slice(0, 5).join(' | ');
-      header.append(el('option', { text: `Row ${r.row}: ${cells || '(empty)'}`, attrs: { value: String(r.row - 1) } }));
+      header.append(el('option', { text: t('coaimport.header_option', { row: r.row, cells: cells || t('coaimport.empty_row') }), attrs: { value: String(r.row - 1) } }));
     }
     header.value = st.headerRow === null ? '' : String(st.headerRow);
     header.addEventListener('change', () => {
       st.headerRow = header.value === '' ? null : Number(header.value);
       refresh({ guess: true });
     });
-    parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: 'Header row' }), header));
+    parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: t('coaimport.header_row') }), header));
     ui.top.replaceChildren(...parts);
   };
 
@@ -237,7 +237,7 @@ export function showChartDialog(ctx, picked) {
     ui.mapHead.hidden = false;
     if (p && p.kinded) {
       ui.mapping.replaceChildren(
-        el('p', { class: 'si-note', text: 'This file has kind, code, name and parent columns: each row says whether it is a category, account, sub-account or total, so no column choices are needed.' }),
+        el('p', { class: 'si-note', text: t('coaimport.kinded') }),
       );
       return;
     }
@@ -269,7 +269,7 @@ export function showChartDialog(ctx, picked) {
       });
       return el('label', { class: 'si-inline' }, el('span', { text: label }), input);
     };
-    const sep = el('select', { class: 'modal-input', attrs: { 'aria-label': 'Separator' }, data: { siKey: 'coa-sep' } });
+    const sep = el('select', { class: 'modal-input', attrs: { 'aria-label': t('coaimport.separator') }, data: { siKey: 'coa-sep' } });
     for (const [v, label] of SEPARATORS) sep.append(el('option', { text: label, attrs: { value: v } }));
     sep.value = c.separator || '';
     sep.addEventListener('change', () => {
@@ -277,11 +277,14 @@ export function showChartDialog(ctx, picked) {
       schedule();
     });
     const parts = [
-      el('p', { class: 'modal-message', text: `The numbers in the file follow ${codingText(p.inferred)}.${st.coding ? ` They come in as ${codingText(st.coding)}.` : ''}` }),
-      el('div', { class: 'coa-coding' }, width('category', 'Category', 1), width('account', 'Account', 1), width('sub', 'Sub-account', 0), el('label', { class: 'si-inline' }, el('span', { text: 'Separator' }), sep)),
+      el('p', {
+        class: 'modal-message',
+        text: st.coding ? t('coaimport.pattern_changed', { found: codingText(p.inferred), chosen: codingText(st.coding) }) : t('coaimport.pattern_found', { found: codingText(p.inferred) }),
+      }),
+      el('div', { class: 'coa-coding' }, width('category', t('coaimport.width.category'), 1), width('account', t('coaimport.width.account'), 1), width('sub', t('coaimport.width.sub'), 0), el('label', { class: 'si-inline' }, el('span', { text: t('coaimport.separator') }), sep)),
     ];
     if (st.coding) {
-      const reset = el('button', { class: 'btn btn-quiet', text: 'Use the File’s Pattern', attrs: { type: 'button' } });
+      const reset = el('button', { class: 'btn btn-quiet', text: t('coaimport.use_file_pattern'), attrs: { type: 'button' } });
       reset.addEventListener('click', () => {
         st.coding = null;
         refresh();
@@ -302,7 +305,7 @@ export function showChartDialog(ctx, picked) {
     };
     if (p && p.sub_accounts > 0 && !p.kinded) {
       parts.push(
-        check('coa-subs', st.subAccounts, p.sub_accounts === 1 ? 'Keep the sub-account as an account of its own (otherwise it is left out)' : `Keep the ${p.sub_accounts} sub-accounts as accounts of their own (otherwise they are left out)`, (v) => {
+        check('coa-subs', st.subAccounts, t('coaimport.option.keep_subs', { count: p.sub_accounts }), (v) => {
           st.subAccounts = v;
           schedule();
         }),
@@ -310,7 +313,7 @@ export function showChartDialog(ctx, picked) {
     }
     if (p && !p.levels_from_source) {
       parts.push(
-        check('coa-levels', st.defaultLevels, 'The file names no levels: add our production totals (above the line, production, post, other) by category number', (v) => {
+        check('coa-levels', st.defaultLevels, t('coaimport.option.default_levels'), (v) => {
           st.defaultLevels = v;
           schedule();
         }),
@@ -332,14 +335,14 @@ export function showChartDialog(ctx, picked) {
       el(
         'div',
         { class: 'si-target' },
-        el('span', { text: 'Import into' }),
-        radio('new', 'A new budget tab with this chart and no lines'),
-        radio('current', 'This budget: add the categories and accounts it lacks and rename the ones it has by number (one undo step)'),
+        el('span', { text: t('coaimport.option.import_into') }),
+        radio('new', t('coaimport.option.target_new')),
+        radio('current', t('coaimport.option.target_current')),
       ),
     );
     if (st.target === 'current') {
       parts.push(
-        check('coa-remove', st.removeUnlisted, 'Also remove empty accounts the chart doesn’t list (accounts with lines are always kept)', (v) => {
+        check('coa-remove', st.removeUnlisted, t('coaimport.option.remove_unlisted'), (v) => {
           st.removeUnlisted = v;
           schedule();
         }),
@@ -348,18 +351,19 @@ export function showChartDialog(ctx, picked) {
     ui.options.replaceChildren(...parts);
   };
 
+  // `what`: the heading, with the count in it.
   const noteList = (items, count, what, open = false) => {
     if (!count) return null;
-    const list = el('ul', { class: 'si-notes' }, ...items.map((n) => el('li', { text: n.row ? `Row ${n.row}: ${n.message}` : n.message })));
-    if (count > items.length) list.append(el('li', { class: 'si-more', text: `and ${count - items.length} more` }));
-    return el('details', { class: 'si-details', attrs: open ? { open: true } : {} }, el('summary', { text: `${what} (${count})` }), list);
+    const list = el('ul', { class: 'si-notes' }, ...items.map((n) => el('li', { text: n.row ? t('coaimport.row_note', { row: n.row, message: n.message }) : n.message })));
+    if (count > items.length) list.append(el('li', { class: 'si-more', text: t('coaimport.and_more', { count: count - items.length }) }));
+    return el('details', { class: 'si-details', attrs: open ? { open: true } : {} }, el('summary', { text: what }), list);
   };
 
   const textList = (items, count, what, open = false) => {
     if (!count) return null;
-    const list = el('ul', { class: 'si-notes' }, ...items.map((t) => el('li', { text: t })));
-    if (count > items.length) list.append(el('li', { class: 'si-more', text: `and ${count - items.length} more` }));
-    return el('details', { class: 'si-details', attrs: open ? { open: true } : {} }, el('summary', { text: `${what} (${count})` }), list);
+    const list = el('ul', { class: 'si-notes' }, ...items.map((item) => el('li', { text: item })));
+    if (count > items.length) list.append(el('li', { class: 'si-more', text: t('coaimport.and_more', { count: count - items.length }) }));
+    return el('details', { class: 'si-details', attrs: open ? { open: true } : {} }, el('summary', { text: what }), list);
   };
 
   const renderPreview = () => {
@@ -370,15 +374,22 @@ export function showChartDialog(ctx, picked) {
       ui.details.replaceChildren();
       return;
     }
-    let line = `${plural(p.categories, 'category', 'categories')}, ${plural(p.accounts, 'account', 'accounts')} and ${plural(p.levels, 'production total', 'production totals')}, numbered ${codingText(p.coding)}.`;
-    if (p.skipped_count) line += ` ${plural(p.skipped_count, 'row', 'rows')} skipped.`;
-    if (p.totals_skipped) line += ` ${plural(p.totals_skipped, 'total row', 'total rows')} left out.`;
-    const summary = [el('p', { class: 'si-summary-main', text: line })];
-    if (p.default_levels_added) summary.push(el('p', { class: 'si-note', text: 'Our production totals were added: change them on the topsheet if the chart groups its categories differently.' }));
-    if (p.renumbered_count) summary.push(el('p', { class: 'si-note', text: `${plural(p.renumbered_count, 'account shares its number', 'accounts share their numbers')} with an account of another name in the chart, so ${p.renumbered_count === 1 ? 'it comes' : 'they come'} in under a new number: see Renumbered below.` }));
-    if (p.merged_repeats) summary.push(el('p', { class: 'si-note', text: `${plural(p.merged_repeats, 'account is', 'accounts are')} listed twice with the same number and name: each comes in once.` }));
-    if (p.placeholders) summary.push(el('p', { class: 'si-note', text: `${plural(p.placeholders, 'account', 'accounts')} named “.” (unused slots in the chart) left out.` }));
-    if (p.truncated) summary.push(el('p', { class: 'si-note', text: 'This sheet is larger than the import reads: only what was read is shown and imported.' }));
+    const sentences = [
+      t('coaimport.summary', {
+        categories: t('coaimport.n_categories', { count: p.categories }),
+        accounts: t('coaimport.n_accounts', { count: p.accounts }),
+        levels: t('coaimport.n_levels', { count: p.levels }),
+        pattern: codingText(p.coding),
+      }),
+    ];
+    if (p.skipped_count) sentences.push(t('coaimport.rows_skipped', { count: p.skipped_count }));
+    if (p.totals_skipped) sentences.push(t('coaimport.total_rows_left_out', { count: p.totals_skipped }));
+    const summary = [el('p', { class: 'si-summary-main', text: sentences.join(' ') })];
+    if (p.default_levels_added) summary.push(el('p', { class: 'si-note', text: t('coaimport.levels_added') }));
+    if (p.renumbered_count) summary.push(el('p', { class: 'si-note', text: t('coaimport.renumbered_note', { count: p.renumbered_count }) }));
+    if (p.merged_repeats) summary.push(el('p', { class: 'si-note', text: t('coaimport.merged_note', { count: p.merged_repeats }) }));
+    if (p.placeholders) summary.push(el('p', { class: 'si-note', text: t('coaimport.placeholders_note', { count: p.placeholders }) }));
+    if (p.truncated) summary.push(el('p', { class: 'si-note', text: t('coaimport.truncated') }));
     ui.summary.replaceChildren(...summary);
 
     const body = p.rows.map((r) =>
@@ -389,28 +400,33 @@ export function showChartDialog(ctx, picked) {
         el('td', { class: 'si-desc', text: r.name, title: r.name }),
       ),
     );
-    const table = el('table', { class: 'si-table coa-table' }, el('thead', {}, el('tr', {}, el('th', { text: 'Number' }), el('th', { text: 'Name' }))), el('tbody', {}, ...body));
+    const table = el('table', { class: 'si-table coa-table' }, el('thead', {}, el('tr', {}, el('th', { text: t('coaimport.col.number') }), el('th', { text: t('coaimport.col.name') }))), el('tbody', {}, ...body));
     const total = p.categories + p.accounts + p.levels;
-    const more = total > p.rows.length ? el('p', { class: 'si-more', text: `The first ${p.rows.length} of ${total} rows.` }) : null;
+    const more = total > p.rows.length ? el('p', { class: 'si-more', text: t('coaimport.first_of', { shown: p.rows.length, count: total }) }) : null;
     ui.rows.replaceChildren(...[el('div', { class: 'si-table-wrap' }, table), more].filter(Boolean));
 
     const parts = [
-      textList(p.renumbered, p.renumbered_count, 'Renumbered (repeated numbers)', true),
-      noteList(p.warnings, p.warning_count, 'To check', true),
-      noteList(p.skipped, p.skipped_count, 'Skipped rows'),
+      textList(p.renumbered, p.renumbered_count, t('coaimport.list.renumbered', { count: p.renumbered_count }), true),
+      noteList(p.warnings, p.warning_count, t('coaimport.list.to_check', { count: p.warning_count }), true),
+      noteList(p.skipped, p.skipped_count, t('coaimport.list.skipped', { count: p.skipped_count })),
     ];
     const a = p.apply;
     if (a) {
+      const adding = a.added_category_count + a.added_account_count;
       parts.push(
         textList(
-          [...a.added_categories.map((c) => `Category ${c}`), ...a.added_accounts.map((x) => `Account ${x}`)],
-          a.added_category_count + a.added_account_count,
-          'To add',
+          [...a.added_categories.map((c) => t('coaimport.category_item', { code: c })), ...a.added_accounts.map((x) => t('coaimport.account_item', { code: x }))],
+          adding,
+          t('coaimport.list.to_add', { count: adding }),
         ),
-        textList(a.renamed, a.renamed_count, 'To rename'),
-        textList(a.kept, a.kept_count, 'Not in the chart, kept because they have lines', true),
-        textList(a.unlisted_empty, a.unlisted_empty_count, st.removeUnlisted ? 'Not in the chart and empty: to remove' : 'Not in the chart and empty: kept'),
-        textList(a.not_fitting, a.not_fitting.length, 'Numbers that don’t fit this budget’s numbering: left out', true),
+        textList(a.renamed, a.renamed_count, t('coaimport.list.to_rename', { count: a.renamed_count })),
+        textList(a.kept, a.kept_count, t('coaimport.list.kept', { count: a.kept_count }), true),
+        textList(
+          a.unlisted_empty,
+          a.unlisted_empty_count,
+          st.removeUnlisted ? t('coaimport.list.empty_remove', { count: a.unlisted_empty_count }) : t('coaimport.list.empty_kept', { count: a.unlisted_empty_count }),
+        ),
+        textList(a.not_fitting, a.not_fitting.length, t('coaimport.list.not_fitting', { count: a.not_fitting.length }), true),
       );
     }
     ui.details.replaceChildren(...parts.filter(Boolean));
@@ -420,8 +436,13 @@ export function showChartDialog(ctx, picked) {
         el('p', {
           class: 'modal-message',
           text: n
-            ? `This budget: ${plural(a.added_category_count, 'category', 'categories')} and ${plural(a.added_account_count, 'account', 'accounts')} to add, ${a.renamed_count} to rename, ${a.unchanged_accounts} already as the chart has them.`
-            : 'This budget already has this chart: nothing to add or rename.',
+            ? t('coaimport.apply_summary', {
+                categories: t('coaimport.n_categories', { count: a.added_category_count }),
+                accounts: t('coaimport.n_accounts', { count: a.added_account_count }),
+                renamed: a.renamed_count,
+                unchanged: a.unchanged_accounts,
+              })
+            : t('coaimport.apply_nothing'),
         }),
       );
     }
@@ -444,13 +465,13 @@ export function showChartDialog(ctx, picked) {
 
   customDialog(
     (closeDialog) => {
-      const title = el('h2', { class: 'modal-title', text: `Import chart of accounts: ${picked.file}`, attrs: { id: 'coa-title' } });
+      const title = el('h2', { class: 'modal-title', text: t('coaimport.title', { file: picked.file }), attrs: { id: 'coa-title' } });
       const intro = el('p', {
         class: 'modal-message',
-        text: 'Only category and account numbers, names and production totals are read. Nothing changes until you import.',
+        text: t('coaimport.intro'),
       });
       ui.top = el('div', { class: 'si-top' });
-      ui.mapHead = el('h3', { class: 'si-heading', text: 'Columns' });
+      ui.mapHead = el('h3', { class: 'si-heading', text: t('coaimport.columns') });
       ui.mapping = el('div', { class: 'si-map' });
       ui.coding = el('div', { class: 'coa-coding-wrap' });
       ui.options = el('div', { class: 'si-options' });
@@ -459,8 +480,8 @@ export function showChartDialog(ctx, picked) {
       ui.details = el('div', { class: 'si-detail-list' });
       ui.error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       ui.error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ui.ok = el('button', { class: 'btn btn-primary', text: 'Import Chart', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
+      ui.ok = el('button', { class: 'btn btn-primary', text: t('coaimport.import_chart'), attrs: { type: 'button' } });
       ui.ok.disabled = true;
       cancel.addEventListener('click', () => closeDialog());
       ui.ok.addEventListener('click', async () => {
@@ -485,11 +506,11 @@ export function showChartDialog(ctx, picked) {
         ui.top,
         ui.mapHead,
         ui.mapping,
-        el('h3', { class: 'si-heading', text: 'Account numbers' }),
+        el('h3', { class: 'si-heading', text: t('coaimport.account_numbers') }),
         ui.coding,
-        el('h3', { class: 'si-heading', text: 'Options' }),
+        el('h3', { class: 'si-heading', text: t('coaimport.options') }),
         ui.options,
-        el('h3', { class: 'si-heading', text: 'Preview' }),
+        el('h3', { class: 'si-heading', text: t('coaimport.preview') }),
         ui.summary,
         ui.rows,
         ui.details,

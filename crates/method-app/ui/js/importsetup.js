@@ -15,52 +15,54 @@
 
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
+import { t } from './i18n.js';
+import { chartGroupName } from './startlist.js';
 
 /** The review's groups, in order: [heading, kinds]. */
 const GROUPS = [
-  ['Globals', ['global']],
-  ['Fringes', ['fringe']],
-  ['Groups', ['group']],
-  ['Units', ['unit']],
-  ['Sets', ['set']],
-  ['Locations', ['location']],
-  ['Currencies', ['currency']],
-  ['Charges', ['charge']],
-  ['Credits', ['credit']],
-  ['Tag presets', ['tag_preset']],
-  ['Line blocks', ['line_preset']],
-  ['Report presets', ['report_preset']],
-  ['Overtime patterns', ['ot_pattern']],
-  ['Rate tables', ['rate_table']],
-  ['Budget settings', ['account_coding', 'fringe_posting', 'fringe_row', 'cutoff_factor', 'new_line_defaults']],
+  [t('library.kind.global'), ['global']],
+  [t('library.kind.fringe'), ['fringe']],
+  [t('library.kind.group'), ['group']],
+  [t('library.kind.unit'), ['unit']],
+  [t('library.kind.set'), ['set']],
+  [t('library.kind.location'), ['location']],
+  [t('library.kind.currency'), ['currency']],
+  [t('library.kind.charge'), ['charge']],
+  [t('library.kind.credit'), ['credit']],
+  [t('library.kind.tag_preset'), ['tag_preset']],
+  [t('library.kind.line_preset'), ['line_preset']],
+  [t('library.kind.report_preset'), ['report_preset']],
+  [t('library.kind.ot_pattern'), ['ot_pattern']],
+  [t('library.kind.rate_table'), ['rate_table']],
+  [t('importsetup.group.settings'), ['account_coding', 'fringe_posting', 'fringe_row', 'cutoff_factor', 'new_line_defaults']],
 ];
 
 const KIND_LABELS = {
-  global: 'Global',
-  fringe: 'Fringe',
-  group: 'Group',
-  unit: 'Unit',
-  set: 'Set',
-  location: 'Location',
-  currency: 'Currency',
-  charge: 'Charge',
-  credit: 'Credit',
-  tag_preset: 'Tag preset',
-  line_preset: 'Line block',
-  report_preset: 'Report preset',
-  ot_pattern: 'Overtime pattern',
-  rate_table: 'Rate table',
-  account_coding: 'Account numbering',
-  fringe_posting: 'Fringe posting',
-  fringe_row: 'Fringe row',
-  cutoff_factor: 'Percent fringe cutoff factor',
-  new_line_defaults: 'New line defaults',
+  global: t('importsetup.kind.global'),
+  fringe: t('importsetup.kind.fringe'),
+  group: t('importsetup.kind.group'),
+  unit: t('importsetup.kind.unit'),
+  set: t('importsetup.kind.set'),
+  location: t('importsetup.kind.location'),
+  currency: t('importsetup.kind.currency'),
+  charge: t('importsetup.kind.charge'),
+  credit: t('importsetup.kind.credit'),
+  tag_preset: t('importsetup.kind.tag_preset'),
+  line_preset: t('importsetup.kind.line_preset'),
+  report_preset: t('importsetup.kind.report_preset'),
+  ot_pattern: t('importsetup.kind.ot_pattern'),
+  rate_table: t('importsetup.kind.rate_table'),
+  account_coding: t('importsetup.kind.account_coding'),
+  fringe_posting: t('importsetup.kind.fringe_posting'),
+  fringe_row: t('importsetup.kind.fringe_row'),
+  cutoff_factor: t('importsetup.kind.cutoff_factor'),
+  new_line_defaults: t('importsetup.kind.new_line_defaults'),
 };
 
 const STATUS_TEXT = {
-  new: 'New',
-  same: 'Same here',
-  differs: 'Different here',
+  new: t('importsetup.status_new'),
+  same: t('importsetup.status_same'),
+  differs: t('importsetup.status_differs'),
 };
 
 const keyOf = (kind, name) => `${kind}\u0000${name}`;
@@ -70,9 +72,28 @@ export function itemLabel(it) {
   return it.name ? it.name : KIND_LABELS[it.kind] || it.kind;
 }
 
+/** A named item's kind and name in a sentence, by kind ("fringe FICA"). */
+const REFS = {
+  global: (name) => t('importsetup.ref.global', { name }),
+  fringe: (name) => t('importsetup.ref.fringe', { name }),
+  group: (name) => t('importsetup.ref.group', { name }),
+  unit: (name) => t('importsetup.ref.unit', { name }),
+  set: (name) => t('importsetup.ref.set', { name }),
+  location: (name) => t('importsetup.ref.location', { name }),
+  currency: (name) => t('importsetup.ref.currency', { name }),
+  charge: (name) => t('importsetup.ref.charge', { name }),
+  credit: (name) => t('importsetup.ref.credit', { name }),
+  tag_preset: (name) => t('importsetup.ref.tag_preset', { name }),
+  line_preset: (name) => t('importsetup.ref.line_preset', { name }),
+  report_preset: (name) => t('importsetup.ref.report_preset', { name }),
+  ot_pattern: (name) => t('importsetup.ref.ot_pattern', { name }),
+  rate_table: (name) => t('importsetup.ref.rate_table', { name }),
+};
+
 /** An item's kind and name in a sentence ("fringe FICA", "Fringe posting"). */
 function describeRef(it) {
-  return it.name ? `${(KIND_LABELS[it.kind] || it.kind).toLowerCase()} ${it.name}` : KIND_LABELS[it.kind] || it.kind;
+  if (!it.name) return KIND_LABELS[it.kind] || it.kind;
+  return REFS[it.kind] ? REFS[it.kind](it.name) : `${it.kind} ${it.name}`;
 }
 
 /**
@@ -116,25 +137,28 @@ export function importRequest(items, explicit, choices) {
 
 /** The review's words: Import Setup's, unless a caller (library.js) says otherwise. */
 const REVIEW_TEXT = {
-  title: (p) => `Import setup from ${p.source}`,
-  intro: "Tick what to bring into this budget. What an item needs comes with it. Where this budget has an item of the same name set up differently, it keeps its own version unless you choose otherwise.",
-  okText: 'Import',
-  keepText: "Keep this budget's version",
-  takeText: 'Use the imported version',
-  renameText: (to) => `Add the imported one as ${to}`,
-  choiceTitle: "The imported version replaces this budget's for everything here that uses it; a new name leaves this budget's as it is.",
-  hereLabel: 'Here',
-  otherLabel: 'Imported',
+  title: (p) => t('importsetup.title', { source: p.source }),
+  intro: t('importsetup.intro'),
+  okText: t('importsetup.ok'),
+  keepText: t('importsetup.keep'),
+  takeText: t('importsetup.take'),
+  renameText: (to) => t('importsetup.rename', { to }),
+  choiceTitle: t('importsetup.choice_tip'),
+  hereLabel: t('importsetup.here'),
+  otherLabel: t('importsetup.other'),
   status: STATUS_TEXT,
-  emptyText: 'That budget has no setup items.',
-  doing: 'to import',
-  tickAll: (heading) => `Import every item in ${heading}`,
-  tickOne: (what) => `Import ${what}`,
+  emptyText: t('importsetup.empty'),
+  picked: (count) => t('importsetup.picked', { count }),
+  pickedAlong: (count, along) => t('importsetup.picked_along', { count, along }),
+  tickPrompt: t('importsetup.tick_prompt'),
+  tickAll: (heading) => t('importsetup.tick_all', { heading }),
+  tickOne: (what) => t('importsetup.tick_one', { what }),
 };
 
 function choiceSelect(it, text) {
-  const label = `${KIND_LABELS[it.kind] || it.kind} ${it.name}`.trim();
-  const select = el('select', { class: 'modal-input imp-choice', attrs: { 'aria-label': `What to do with ${label}` } });
+  const kind = KIND_LABELS[it.kind] || it.kind;
+  const label = it.name ? t('importsetup.what_to_do_named', { kind, name: it.name }) : t('importsetup.what_to_do', { kind });
+  const select = el('select', { class: 'modal-input imp-choice', attrs: { 'aria-label': label } });
   const options = [
     ['keep', text.keepText],
     ['imported', text.takeText],
@@ -199,7 +223,7 @@ export function showReview(ctx, p, opts = {}) {
       r.box.checked = included.has(k);
       // Needed by something picked: it comes along while that stays picked.
       r.box.disabled = Boolean(by) && !explicit.has(k);
-      r.comes.textContent = by ? `Comes with ${by.map(describeRef).join(', ')}` : '';
+      r.comes.textContent = by ? t('importsetup.comes_with', { what: by.map(describeRef).join(', ') }) : '';
       r.comes.hidden = !by;
       if (r.select) r.select.disabled = !included.has(k);
     }
@@ -210,9 +234,7 @@ export function showReview(ctx, p, opts = {}) {
     }
     const picked = included.size;
     const along = picked - [...explicit].filter((k) => rows.has(k)).length;
-    summary.textContent = picked
-      ? `${picked} ${picked === 1 ? 'item' : 'items'} ${text.doing}${along > 0 ? `, ${along} of them needed by the others` : ''}.`
-      : `Tick the items ${text.doing}.`;
+    summary.textContent = picked ? (along > 0 ? text.pickedAlong(picked, along) : text.picked(picked)) : text.tickPrompt;
     ok.disabled = picked === 0;
   };
 
@@ -238,7 +260,7 @@ export function showReview(ctx, p, opts = {}) {
         refresh();
       });
       groupBoxes.push([all, keys]);
-      scroll.append(el('label', { class: 'rs-check imp-kind' }, all, el('span', { text: `${heading} (${group.length})` })));
+      scroll.append(el('label', { class: 'rs-check imp-kind' }, all, el('span', { text: t('importsetup.heading_count', { heading, count: group.length }) })));
       const list = el('ul', { class: 'safety-list imp-list' });
       for (const it of group) {
         const k = keyOf(it.kind, it.name);
@@ -252,8 +274,8 @@ export function showReview(ctx, p, opts = {}) {
         const main = el('div', { class: 'safety-item-main' }, el('span', { text: itemLabel(it) }), el('span', { class: `imp-status imp-${it.status}`, text: text.status[it.status] || it.status }));
         body.append(main);
         if (it.status === 'differs') {
-          body.append(el('div', { class: 'safety-item-sub', text: `${text.hereLabel}: ${it.here || ''}`, title: it.here || '' }));
-          body.append(el('div', { class: 'safety-item-sub', text: `${text.otherLabel}: ${it.imported}`, title: it.imported }));
+          body.append(el('div', { class: 'safety-item-sub', text: t('importsetup.side', { side: text.hereLabel, what: it.here || '' }), title: it.here || '' }));
+          body.append(el('div', { class: 'safety-item-sub', text: t('importsetup.side', { side: text.otherLabel, what: it.imported }), title: it.imported }));
         } else if (it.imported) {
           body.append(el('div', { class: 'safety-item-sub', text: it.imported, title: it.imported }));
         }
@@ -280,7 +302,7 @@ export function showReview(ctx, p, opts = {}) {
     error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     parts.push(error);
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
+    const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
     ok = el('button', { class: 'btn btn-primary', text: text.okText, attrs: { type: 'button' } });
     cancel.addEventListener('click', () => closeDialog());
     ok.addEventListener('click', async () => {
@@ -306,6 +328,7 @@ export function showReview(ctx, p, opts = {}) {
 
 /** The groups bundled charts are listed under, in order (src/coa_import.rs). */
 export const CHART_GROUPS = ['Feature', 'Television', 'Commercial', 'Other'];
+
 
 /** Bundled charts grouped for the dialog: [[group, [chart...]]...], empty groups left out. */
 export function groupCharts(charts) {
@@ -334,7 +357,7 @@ function templateDialog({ title, message, submitText, charts }) {
     customDialog(
       (closeDialog) => {
         const keep = el('input', { attrs: { type: 'checkbox', id: 'tpl-keep-lines' } });
-        const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+        const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button' } });
         const ok = el('button', { class: 'btn btn-primary', text: submitText, attrs: { type: 'button', 'data-autofocus': true } });
         cancel.addEventListener('click', () => closeDialog());
         ok.addEventListener('click', () => {
@@ -344,7 +367,7 @@ function templateDialog({ title, message, submitText, charts }) {
         const parts = [
           el('h2', { class: 'modal-title', text: title, attrs: { id: 'tpl-title' } }),
           el('p', { class: 'modal-message', text: message }),
-          el('label', { class: 'rs-check', attrs: { for: 'tpl-keep-lines' } }, keep, el('span', { text: 'Keep the detail lines (without their notes)' })),
+          el('label', { class: 'rs-check', attrs: { for: 'tpl-keep-lines' } }, keep, el('span', { text: t('importsetup.keep_lines') })),
         ];
         const groups = groupCharts(charts);
         if (groups.length) {
@@ -352,7 +375,7 @@ function templateDialog({ title, message, submitText, charts }) {
             el(
               'div',
               { class: 'tpl-chart-group' },
-              el('h4', { class: 'tpl-chart-group-title', text: group }),
+              el('h4', { class: 'tpl-chart-group-title', text: chartGroupName(group) }),
               ...cs.map((c) => {
                 const b = el(
                   'button',
@@ -369,8 +392,8 @@ function templateDialog({ title, message, submitText, charts }) {
             ),
           );
           parts.push(
-            el('h3', { class: 'si-heading', text: 'Charts of accounts' }),
-            el('p', { class: 'modal-message', text: 'Or start from one of these charts: categories, accounts and production totals only, no lines or setup.' }),
+            el('h3', { class: 'si-heading', text: t('importsetup.charts_heading') }),
+            el('p', { class: 'modal-message', text: t('importsetup.charts_intro') }),
             el('div', { class: 'tpl-charts' }, ...sections),
           );
         }
@@ -391,10 +414,9 @@ export async function newFromTemplate(ctx) {
     charts = [];
   }
   const opts = await templateDialog({
-    title: 'New From Template',
-    message:
-      'Starts a new budget, in a new tab, from another budget file: its categories, accounts, setup and settings. Its info, baseline, versions and notes are left out. Any budget file can be a template.',
-    submitText: 'Choose Template…',
+    title: t('importsetup.new_from_template'),
+    message: t('importsetup.new_from_template_intro'),
+    submitText: t('importsetup.choose_template'),
     charts,
   });
   if (!opts) return ctx.focus();
@@ -410,15 +432,14 @@ export async function newFromTemplate(ctx) {
 /** File > Save as Template…: a stripped copy of the budget, in a new file. */
 export async function saveAsTemplate(ctx) {
   const opts = await templateDialog({
-    title: 'Save as Template',
-    message:
-      'Saves a copy of this budget to start others from: its categories, accounts, setup and settings, without its info, baseline, versions or notes. This budget and its file are not changed.',
-    submitText: 'Save Template…',
+    title: t('importsetup.save_as_template'),
+    message: t('importsetup.save_as_template_intro'),
+    submitText: t('importsetup.save_template'),
   });
   if (!opts) return ctx.focus();
   try {
     const r = await ctx.invoke('template_save', { keepLines: opts.keepLines });
-    if (r) ctx.toast(`Saved the template ${r.name}.`);
+    if (r) ctx.toast(t('importsetup.saved_template', { name: r.name }));
   } catch (e) {
     ctx.toast(e);
   }

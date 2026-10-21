@@ -11,6 +11,7 @@
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { errText } from './util.js';
+import { t } from './i18n.js';
 
 /**
  * Opens the picker for line `rowId`. `ctx`: { call(cmd, args), toast(msg),
@@ -25,7 +26,7 @@ export async function openRatePicker(rowId, ctx) {
     return;
   }
   let filter = '';
-  const list = el('ul', { class: 'ratepick-list', attrs: { role: 'listbox', 'aria-label': 'Classifications' } });
+  const list = el('ul', { class: 'ratepick-list', attrs: { role: 'listbox', 'aria-label': t('ratepick.classifications') } });
   const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
   error.hidden = true;
   const current = el('div', { class: 'ratepick-current' });
@@ -40,7 +41,7 @@ export async function openRatePicker(rowId, ctx) {
     try {
       await ctx.call('rate_fill', { row_id: rowId, table: c.table, classification: c.classification, unit: data.unit || null, as_of: c.as_of });
       closeDialog();
-      ctx.toast(`Rate filled from ${c.table}: ${c.classification}, ${c.rate} per ${data.unit || c.table_unit}.`);
+      ctx.toast(t('ratepick.filled', { table: c.table, classification: c.classification, rate: c.rate, unit: data.unit || c.table_unit }));
     } catch (e) {
       fail(e);
     }
@@ -53,12 +54,12 @@ export async function openRatePicker(rowId, ctx) {
     const words = c.words.charAt(0).toUpperCase() + c.words.slice(1);
     current.append(el('p', { class: 'modal-message', text: `${words}.` }));
     if (c.state === 'changed') {
-      const update = el('button', { class: 'btn btn-primary', text: `Update Rate to ${c.now}`, attrs: { type: 'button' } });
+      const update = el('button', { class: 'btn btn-primary', text: t('ratepick.update_to', { rate: c.now }), attrs: { type: 'button' } });
       update.addEventListener('click', async () => {
         try {
           await ctx.call('rate_update', { row_ids: [rowId] });
           closeDialog();
-          ctx.toast(`Rate updated to ${c.now}, as its table says now.`);
+          ctx.toast(t('ratepick.updated', { rate: c.now }));
         } catch (e) {
           fail(e);
         }
@@ -72,12 +73,12 @@ export async function openRatePicker(rowId, ctx) {
     const needle = filter.trim().toLowerCase();
     const shown = data.choices.filter((c) => !needle || `${c.classification} ${c.table}`.toLowerCase().includes(needle));
     if (!shown.length) {
-      list.append(el('li', { class: 'ratepick-empty', text: data.choices.length ? 'Nothing matches the search.' : 'This budget has no rate tables yet.' }));
+      list.append(el('li', { class: 'ratepick-empty', text: data.choices.length ? t('ratepick.no_match') : t('ratepick.no_tables') }));
       return;
     }
     for (const c of shown) {
-      const figure = c.rate !== null && c.rate !== undefined ? `${c.rate} per ${data.unit || c.table_unit}` : 'no rate for this unit';
-      const how = c.converted ? `converted from ${c.table_rate} per ${c.table_unit}` : '';
+      const figure = c.rate !== null && c.rate !== undefined ? t('ratepick.rate_per_unit', { rate: c.rate, unit: data.unit || c.table_unit }) : t('ratepick.no_rate');
+      const how = c.converted ? t('ratepick.converted_from', { rate: c.table_rate, unit: c.table_unit }) : '';
       const b = el(
         'button',
         {
@@ -97,8 +98,8 @@ export async function openRatePicker(rowId, ctx) {
     }
   };
 
-  const units = el('select', { class: 'modal-input', attrs: { 'aria-label': 'Rate per' } });
-  if (!data.unit) units.append(el('option', { text: '(the table’s unit)', attrs: { value: '' } }));
+  const units = el('select', { class: 'modal-input', attrs: { 'aria-label': t('ratepick.rate_per') } });
+  if (!data.unit) units.append(el('option', { text: t('ratepick.table_unit'), attrs: { value: '' } }));
   for (const u of data.units) units.append(el('option', { text: u, attrs: { value: u } }));
   units.value = data.unit || '';
   units.addEventListener('change', async () => {
@@ -109,7 +110,7 @@ export async function openRatePicker(rowId, ctx) {
       fail(e);
     }
   });
-  const search = el('input', { class: 'modal-input', attrs: { type: 'text', placeholder: 'Search', 'aria-label': 'Search classifications', 'data-autofocus': '' } });
+  const search = el('input', { class: 'modal-input', attrs: { type: 'text', placeholder: t('ratepick.search'), 'aria-label': t('ratepick.search_label'), 'data-autofocus': '' } });
   search.addEventListener('input', () => {
     filter = search.value;
     drawList();
@@ -118,9 +119,9 @@ export async function openRatePicker(rowId, ctx) {
   drawCurrent();
   drawList();
   closeDialog = customDialog((close) => {
-    const cancel = el('button', { class: 'btn', text: 'Close', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('ratepick.close'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => close());
-    const setup = el('button', { class: 'btn', text: 'Rate Tables…', title: 'Budget Setup, Rate Tables: keep and edit the tables', attrs: { type: 'button' } });
+    const setup = el('button', { class: 'btn', text: t('ratepick.rate_tables'), title: t('ratepick.rate_tables_title'), attrs: { type: 'button' } });
     setup.addEventListener('click', () => {
       close();
       ctx.openRates();
@@ -128,11 +129,11 @@ export async function openRatePicker(rowId, ctx) {
     return el(
       'div',
       { class: 'modal ratepick', attrs: { 'aria-labelledby': 'ratepick-title' } },
-      el('h2', { class: 'modal-title', text: 'Fill Rate from Table', attrs: { id: 'ratepick-title' } }),
+      el('h2', { class: 'modal-title', text: t('ratepick.title'), attrs: { id: 'ratepick-title' } }),
       current,
-      el('div', { class: 'ratepick-filters' }, el('label', { class: 'modal-field' }, el('span', { text: 'Rate per' }), units), el('label', { class: 'modal-field' }, el('span', { text: 'Search' }), search)),
+      el('div', { class: 'ratepick-filters' }, el('label', { class: 'modal-field' }, el('span', { text: t('ratepick.rate_per') }), units), el('label', { class: 'modal-field' }, el('span', { text: t('ratepick.search') }), search)),
       list,
-      el('p', { class: 'modal-message', text: 'Picking one writes its figure into the line once; the line remembers where it came from. A table changed later never changes the line on its own.' }),
+      el('p', { class: 'modal-message', text: t('ratepick.explain') }),
       error,
       el('div', { class: 'modal-actions' }, setup, cancel),
     );

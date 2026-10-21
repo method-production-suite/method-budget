@@ -70,7 +70,7 @@ import { saveItemToLibrary } from './library.js';
 import { mountFrame, actionStrip, stripButton, searchBox, band, bandField, gridTable, setFooterTotals } from './setupframe.js';
 import { currencyBand } from './setupbands.js';
 import { isWeb } from './host.js';
-import { obj, str, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
+import { obj, str, errText, sourceText, FLAT_BASES, isHourUnit, flatCount } from './util.js';
 import { t } from './i18n.js';
 
 const LISTS = [
@@ -247,7 +247,11 @@ function fringeRate(def) {
   if (def.kind !== 'flat') return `${rateText(def.rate)}%`;
   const base = str(budget().base_currency);
   const unit = str(def.unit);
-  return `${t('apply.flat_rate', { rate: `${rateText(def.rate)}${base ? ` ${base}` : ''}`, unit: unit || t('apply.per_line_unit') })}${flatCountWords(def, budget().units)}`;
+  const { basis, hours } = flatCount(def, budget().units);
+  const params = { rate: `${rateText(def.rate)}${base ? ` ${base}` : ''}`, unit: unit || t('apply.per_line_unit'), hours };
+  if (basis === 'amount_counts') return hours ? t('apply.flat_rate_counts_hours', params) : t('apply.flat_rate_counts', params);
+  if (basis === 'quantity') return hours ? t('apply.flat_rate_quantity_hours', params) : t('apply.flat_rate_quantity', params);
+  return hours ? t('apply.flat_rate_hours', params) : t('apply.flat_rate', params);
 }
 
 function visible() {

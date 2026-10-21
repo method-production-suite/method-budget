@@ -111,13 +111,13 @@ docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, im
 What the slice built, against the list this audit gave:
 
 1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
-   2,550 entries, 67 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   3,850 entries, 172 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
    with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
    language lacks (with a console warning) and the system's language picked, English by
    default. The table loads as one of the page's own scripts under its
    Content-Security-Policy; the browser build carries it.
 2. **Strings moved to the table, by area, with a test that fails on a new inline string**:
-   partly. Converted: the start window and New Budget (`start.js`, `startlist.js`), the Help
+   built, for the page. Converted: the start window and New Budget (`start.js`, `startlist.js`), the Help
    menu's page parts (`help.js`, `licenses.js`, `updates.js`), the shortcut list
    (`shortcuts.js`), Budget Setup's frame and its list, Globals, Units and Rate Tables
    tabs (`setupwin.js`, `setuptabs.js`, `setup.js`, `setuplist.js`, `setuplists.js`,
@@ -132,7 +132,21 @@ What the slice built, against the list this audit gave:
    `library.js`, `review.js`, `compare.js`), the tab strips and split view (`tabs.js`,
    `pane.js`), the grid's right-click menu (`context.js`), `util.js`'s shared phrases and
    the toolbar and fixed words of `ui/index.html` (keyed with `data-i18n` attributes that
-   `fillPage()` fills at boot). The wording is unchanged; plurals written out ("1 row",
+   `fillPage()` fills at boot); and in the fourth pass the rest: setup packs, presets,
+   Explain, Overtime, actuals and their import, comments, Import Setup and the templates
+   dialog, the spreadsheet, chart, budget-export and schedule-day imports, the rate
+   picker, Rename and Renumber, What Changed and Merge, sharing's banners, the grid's
+   levels, quick entry, row colors and autocomplete, backups and recovery, the display
+   settings and announcements, pasting and the small scripts (`packs.js`, `presets.js`,
+   `explain.js`, `overtime.js`, `actuals.js`, `actualsimport.js`, `comments.js`,
+   `importsetup.js`, `sheetimport.js`, `coaimport.js`, `exchangeimport.js`,
+   `scheduledays.js`, `ratepick.js`, `rename.js`, `renumber.js`, `diffmerge.js`,
+   `sharing.js`, `levels.js`, `quickentry.js`, `rowformat.js`, `autocomplete.js`,
+   `safety.js`, `display-settings.js`, `display.js`, `convertbanner.js`, `clipboard.js`,
+   `order.js`, `panelsize.js`, `menu.js`, `api.js`). Every script in `ui/js` is now on the
+   test's list, the ones with no words too, and a script left off it fails the test. The
+   flat fringe's count words and the review's "to add" are whole sentences now, and
+   `util.js`'s `plural()` is gone. The wording is unchanged; plurals written out ("1 row",
    "3 rows") became plural entries. `src/i18n.rs` fails on a new `text:`, `title:`, `label:`, `placeholder:`,
    `message:`, `hint:`, `aria-label` or `toast()` literal with letters in a converted
    script, on a word in `ui/index.html` with no key or English that differs from the
@@ -149,18 +163,22 @@ What the slice built, against the list this audit gave:
 6. **A choice of language**: the system's, picked at start; no override in the
    preferences yet (there is nothing to choose between).
 
-Still English inline, for the next passes:
+Still English, and why:
 
-- **The rest of the page**: the tools panel's other tabs and dialogs (`packs.js`,
-  `presets.js`, `explain.js`, `overtime.js`, `actuals.js`, `actualsimport.js`,
-  `comments.js`, `diffmerge.js`, `importsetup.js`, `sheetimport.js`, `coaimport.js`,
-  `exchangeimport.js`, `scheduledays.js`, `ratepick.js`, `rename.js`, `renumber.js`),
-  sharing's banners (`sharing.js`), the grid's levels and quick entry (`levels.js`,
-  `quickentry.js`, `rowformat.js`'s color names, which the right-click menu shows),
-  `safety.js`, `display-settings.js`, `convertbanner.js`, `clipboard.js` and the rest; the
-  words those scripts pass to `util.js`'s `plural()`; and words that come from Rust as
-  data (a start-window row's kind, the chart groups). The page's `<title>`, the product's
-  name, stays in `ui/index.html`.
+- **Words that come from Rust as data**: the engine's messages (item 3), import problems
+  and warnings, Explain's steps, a diff's conflict text and the native dialogs (item 4).
+  The page shows them as they arrive; a chart group's name and a diff's change kind,
+  which arrive as ids, are worded through the table.
+- **Inline on purpose**: key names in shortcut text (`dom.js`'s "Enter", "Ctrl", as in
+  `shortcuts.js`), the "Untitled" file name that matches Rust's, the page's `<title>`
+  (the product's name, in `ui/index.html`), and the separators that join list items
+  (" · ", ", ").
+- **Pieces a translator may want whole**: the overtime band row's words around its
+  inputs ("then", "hours at"), the schedule-day summary's count phrases joined with
+  commas, a kind's name filled into sentences as `{what}` (Rename's "Enter a {what}
+  name.", the paste review's "{action}"), and a few long tooltips put together as lines,
+  each line an entry. Languages with genders or other word orders may need these split
+  into whole entries when they arrive.
 - **The engine's messages** (item 3) and **the native dialogs** (item 4).
 - **Elsewhere**: the command line, the MCP tools, the website (`site/`), the release
   notes and the README are English and stay so for now.

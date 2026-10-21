@@ -19,6 +19,7 @@
 import { el, $ } from './dom.js';
 import { customDialog, formDialog, isModalOpen } from './modal.js';
 import { localStamp, createdText, versionsOf } from './versions.js';
+import { t } from './i18n.js';
 
 let uid = 0;
 function nextId(prefix) {
@@ -56,24 +57,24 @@ export function saveShareCopy(ctx) {
   customDialog(
     (close) => {
       const what = el('select', { class: 'modal-input', attrs: { id: nextId('share-what') } });
-      what.append(el('option', { text: 'The budget as it is now', attrs: { value: '' } }));
+      what.append(el('option', { text: t('sharing.budget_as_it_is_now'), attrs: { value: '' } }));
       for (const v of versions) {
         const when = createdText(v.created);
-        what.append(el('option', { text: when ? `Version: ${v.name} (${when})` : `Version: ${v.name}`, attrs: { value: String(v.id) } }));
+        what.append(el('option', { text: when ? t('sharing.version_when', { name: v.name, when }) : t('sharing.version', { name: v.name }), attrs: { value: String(v.id) } }));
       }
-      const notes = check('Notes on lines, accounts and categories');
-      const info = check('Budget info fields');
-      const vers = check('Saved versions');
-      const base = check('Original totals (baseline)');
-      const unused = check('Setup items nothing uses');
+      const notes = check(t('sharing.leave_out.notes'));
+      const info = check(t('sharing.leave_out.info'));
+      const vers = check(t('sharing.leave_out.versions'));
+      const base = check(t('sharing.leave_out.baseline'));
+      const unused = check(t('sharing.leave_out.unused_setup'));
       // Only a budget with actuals has them to leave out (the view's cost figures say so).
       const hasActuals = Boolean(view.cost);
-      const acts = check('Actuals (transactions and estimates to complete)');
+      const acts = check(t('sharing.leave_out.actuals'));
       const note = el('textarea', { class: 'modal-input share-note', attrs: { id: nextId('share-note'), rows: '3', maxlength: '10000' } });
       const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-      const ok = el('button', { class: 'btn btn-primary', text: 'Save Copy…', attrs: { type: 'button', 'data-autofocus': true } });
+      const cancel = el('button', { class: 'btn', text: t('sharing.cancel'), attrs: { type: 'button' } });
+      const ok = el('button', { class: 'btn btn-primary', text: t('sharing.save_copy'), attrs: { type: 'button', 'data-autofocus': true } });
       cancel.addEventListener('click', () => close());
       ok.addEventListener('click', async () => {
         ok.disabled = true;
@@ -94,7 +95,7 @@ export function saveShareCopy(ctx) {
           });
           if (r) {
             close();
-            ctx.toast(`Saved the copy ${r.name}. It opens read-only.`);
+            ctx.toast(t('sharing.saved_copy', { name: r.name }));
             ctx.focus();
             return;
           }
@@ -107,20 +108,20 @@ export function saveShareCopy(ctx) {
       return el(
         'div',
         { class: 'modal modal-wide', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'share-title' } },
-        el('h2', { class: 'modal-title', text: 'Save a Copy for Sharing', attrs: { id: 'share-title' } }),
+        el('h2', { class: 'modal-title', text: t('sharing.save_for_sharing_title'), attrs: { id: 'share-title' } }),
         el('p', {
           class: 'modal-message',
-          text: 'Saves a snapshot of this budget to a new file to send to someone. The copy opens read-only and says where it came from. This budget and its file are not changed.',
+          text: t('sharing.save_for_sharing_message'),
         }),
         // With no versions there is nothing to pick, so say what gets shared
         // instead of showing a one-item list.
         versions.length
-          ? el('label', { class: 'modal-field', attrs: { for: what.id } }, el('span', { text: 'Share' }), what)
-          : el('p', { class: 'modal-message', text: 'Shares the budget as it is now. To share an earlier state, save it as a version first and it shows up here.' }),
+          ? el('label', { class: 'modal-field', attrs: { for: what.id } }, el('span', { text: t('sharing.share') }), what)
+          : el('p', { class: 'modal-message', text: t('sharing.shares_as_it_is_now') }),
         el(
           'fieldset',
           { class: 'share-fieldset' },
-          el('legend', { text: 'Leave out' }),
+          el('legend', { text: t('sharing.leave_out') }),
           notes.row,
           info.row,
           ...(versions.length ? [vers.row] : []),
@@ -128,7 +129,7 @@ export function saveShareCopy(ctx) {
           ...(hasActuals ? [acts.row] : []),
           unused.row,
         ),
-        el('label', { class: 'modal-field', attrs: { for: note.id } }, el('span', { text: 'Note for the copy (optional)' }), note),
+        el('label', { class: 'modal-field', attrs: { for: note.id } }, el('span', { text: t('sharing.note_for_copy') }), note),
         error,
         el('div', { class: 'modal-actions' }, cancel, ok),
       );
@@ -146,7 +147,7 @@ const originals = new Map();
 const offered = new Set();
 
 function tabsKey(tabs) {
-  return (tabs || []).map((t) => `${t.id}:${t.title}`).join('|');
+  return (tabs || []).map((tab) => `${tab.id}:${tab.title}`).join('|');
 }
 
 /** The open budget copy `doc` came from: { doc, label } or null (asked once per set of tabs). */
@@ -166,8 +167,11 @@ async function originalOf(ctx, doc, tabs) {
 
 function sourceText(p) {
   const when = createdText(p.saved);
-  const version = p.source_version ? ` (version “${p.source_version}”)` : '';
-  return `“${p.source_title || 'Untitled'}”${version}${when ? `, saved ${when}` : ''}`;
+  const title = p.source_title || t('sharing.untitled');
+  if (p.source_version) {
+    return when ? t('sharing.source.version_saved', { title, version: p.source_version, when }) : t('sharing.source.version', { title, version: p.source_version });
+  }
+  return when ? t('sharing.source.saved', { title, when }) : t('sharing.source.plain', { title });
 }
 
 /**
@@ -185,13 +189,13 @@ export function renderShareBanner(view, ctx) {
     return;
   }
   const doc = view.doc;
-  const make = el('button', { class: 'btn btn-quiet', text: 'Make Editable Copy', attrs: { type: 'button' } });
+  const make = el('button', { class: 'btn btn-quiet', text: t('sharing.make_editable_copy'), attrs: { type: 'button' } });
   make.addEventListener('click', () => makeEditable(ctx, doc));
   const actions = el('span', { class: 'share-banner-actions' }, make);
   host.replaceChildren(
-    el('strong', { text: 'Read-only copy saved for sharing.' }),
-    el('span', { class: 'share-banner-detail', text: `From ${sourceText(p)}.` }),
-    p.note ? el('span', { class: 'share-banner-detail', text: `Note: ${p.note}` }) : null,
+    el('strong', { text: t('sharing.banner_read_only') }),
+    el('span', { class: 'share-banner-detail', text: t('sharing.banner_from', { source: sourceText(p) }) }),
+    p.note ? el('span', { class: 'share-banner-detail', text: t('sharing.banner_note', { note: p.note }) }) : null,
     actions,
   );
   host.hidden = false;
@@ -202,9 +206,9 @@ export function renderShareBanner(view, ctx) {
 }
 
 function originalButtons(ctx, doc, original) {
-  const compare = el('button', { class: 'btn btn-quiet', text: 'Compare With Original', title: `Compare with ${original.label}`, attrs: { type: 'button' } });
+  const compare = el('button', { class: 'btn btn-quiet', text: t('sharing.compare_with_original'), title: t('sharing.compare_with_tip', { name: original.label }), attrs: { type: 'button' } });
   compare.addEventListener('click', () => ctx.compare(original.doc, doc));
-  const store = el('button', { class: 'btn btn-quiet', text: 'Store as a Version of the Original', title: `Store this copy as a version of ${original.label}`, attrs: { type: 'button' } });
+  const store = el('button', { class: 'btn btn-quiet', text: t('sharing.store_as_version_of_original'), title: t('sharing.store_as_version_tip', { name: original.label }), attrs: { type: 'button' } });
   store.addEventListener('click', () => storeAsVersion(ctx, doc, original));
   return [compare, store];
 }
@@ -223,16 +227,16 @@ async function storeAsVersion(ctx, doc, original) {
   const view = ctx.view();
   const p = provenanceOf(view) || {};
   const day = typeof p.saved === 'string' ? p.saved.slice(0, 10) : '';
-  const suggested = p.source_version ? `Returned copy of ${p.source_version}` : `Returned copy${day ? ` ${day}` : ''}`;
+  const suggested = p.source_version ? t('sharing.returned_copy_of', { version: p.source_version }) : day ? t('sharing.returned_copy_day', { day }) : t('sharing.returned_copy');
   await formDialog({
-    title: 'Store as a Version of the Original',
-    message: `Saves this copy inside ${original.label} as a new version, to compare or restore later. ${original.label} itself doesn't change, and Undo there takes it back.`,
-    fields: [{ key: 'name', label: 'Version name', value: suggested }],
-    submitText: 'Store Version',
+    title: t('sharing.store_as_version_of_original'),
+    message: t('sharing.store_message', { name: original.label }),
+    fields: [{ key: 'name', label: t('sharing.version_name'), value: suggested }],
+    submitText: t('sharing.store_version'),
     onSubmit: async (values) => {
       const v = await ctx.invoke('share_copy_store', { doc, original: original.doc, name: values.name, created: localStamp() });
       if (v) ctx.apply(v);
-      ctx.toast(`Stored as the version “${values.name.trim()}” of ${original.label}.`);
+      ctx.toast(t('sharing.stored', { version: values.name.trim(), name: original.label }));
     },
   });
   ctx.focus();
@@ -253,14 +257,14 @@ export function offerReturnedCopy(view, ctx) {
     if (!o || ctx.doc() !== doc || isModalOpen()) return;
     customDialog(
       (close) => {
-        const later = el('button', { class: 'btn', text: 'Not Now', attrs: { type: 'button', 'data-autofocus': true } });
+        const later = el('button', { class: 'btn', text: t('sharing.not_now'), attrs: { type: 'button', 'data-autofocus': true } });
         later.addEventListener('click', () => close());
-        const compare = el('button', { class: 'btn', text: 'Compare With Original', attrs: { type: 'button' } });
+        const compare = el('button', { class: 'btn', text: t('sharing.compare_with_original'), attrs: { type: 'button' } });
         compare.addEventListener('click', () => {
           close();
           ctx.compare(o.doc, doc);
         });
-        const store = el('button', { class: 'btn btn-primary', text: 'Store as a Version…', attrs: { type: 'button' } });
+        const store = el('button', { class: 'btn btn-primary', text: t('sharing.store_as_version'), attrs: { type: 'button' } });
         store.addEventListener('click', () => {
           close();
           storeAsVersion(ctx, doc, o);
@@ -268,8 +272,8 @@ export function offerReturnedCopy(view, ctx) {
         return el(
           'div',
           { class: 'modal', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'share-offer-title' } },
-          el('h2', { class: 'modal-title', text: 'A Copy of an Open Budget', attrs: { id: 'share-offer-title' } }),
-          el('p', { class: 'modal-message', text: `This budget is a copy of ${sourceText(p)}, which is open as ${o.label}. Compare the two, or keep this copy inside ${o.label} as a version?` }),
+          el('h2', { class: 'modal-title', text: t('sharing.offer_title'), attrs: { id: 'share-offer-title' } }),
+          el('p', { class: 'modal-message', text: t('sharing.offer_message', { source: sourceText(p), name: o.label }) }),
           el('div', { class: 'modal-actions' }, later, compare, store),
         );
       },
@@ -289,7 +293,7 @@ function tagGroup(title, values, noneLabel) {
     'fieldset',
     { class: 'share-fieldset' },
     el('legend', { text: title }),
-    values.length ? list : el('p', { class: 'modal-message', text: 'None in this budget.' }),
+    values.length ? list : el('p', { class: 'modal-message', text: t('sharing.none_in_budget') }),
     none.row,
   );
   return {
@@ -331,16 +335,16 @@ export function newSubBudget(ctx) {
         });
         chart.append(el('div', { class: 'sub-cat' }, cb.row, accts));
       }
-      const groups = tagGroup('Groups', names(b.groups), 'Lines with no group');
-      const sets = tagGroup('Sets', names(b.sets), 'Lines with no set');
-      const locations = tagGroup('Locations', names(b.locations), 'Lines with no location');
-      const empty = check('Leave out accounts with no lines left');
-      const fringes = check('Take the fringes off every line (totals change)');
-      const notes = check('Leave out notes');
+      const groups = tagGroup(t('sharing.groups'), names(b.groups), t('sharing.no_group'));
+      const sets = tagGroup(t('sharing.sets'), names(b.sets), t('sharing.no_set'));
+      const locations = tagGroup(t('sharing.locations'), names(b.locations), t('sharing.no_location'));
+      const empty = check(t('sharing.skip_empty_accounts'));
+      const fringes = check(t('sharing.drop_fringes'));
+      const notes = check(t('sharing.drop_notes'));
       const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-      const ok = el('button', { class: 'btn btn-primary', text: 'Create Sub-Budget', attrs: { type: 'button', 'data-autofocus': true } });
+      const cancel = el('button', { class: 'btn', text: t('sharing.cancel'), attrs: { type: 'button' } });
+      const ok = el('button', { class: 'btn btn-primary', text: t('sharing.create_sub_budget'), attrs: { type: 'button', 'data-autofocus': true } });
       cancel.addEventListener('click', () => close());
       ok.addEventListener('click', async () => {
         ok.disabled = true;
@@ -360,7 +364,7 @@ export function newSubBudget(ctx) {
           const v = await ctx.invoke('sub_budget_new', { spec, saved: localStamp() });
           close();
           if (v) ctx.apply(v);
-          ctx.toast('Opened the sub-budget in a new tab. It has no file until you save it.');
+          ctx.toast(t('sharing.sub_budget_opened'));
           return;
         } catch (e) {
           error.textContent = String(e);
@@ -371,14 +375,14 @@ export function newSubBudget(ctx) {
       return el(
         'div',
         { class: 'modal modal-wide sub-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sub-title' } },
-        el('h2', { class: 'modal-title', text: 'New Sub-Budget', attrs: { id: 'sub-title' } }),
+        el('h2', { class: 'modal-title', text: t('sharing.new_sub_budget'), attrs: { id: 'sub-title' } }),
         el('p', {
           class: 'modal-message',
-          text: 'Opens a filtered copy of this budget in a new tab, with no link back to it. Nothing ticked under the chart keeps every category. Lines are kept when they have any ticked value of each kind that has a tick.',
+          text: t('sharing.sub_budget_message'),
         }),
-        el('fieldset', { class: 'share-fieldset' }, el('legend', { text: 'Categories and accounts' }), cats.length ? chart : el('p', { class: 'modal-message', text: 'This budget has no categories.' })),
+        el('fieldset', { class: 'share-fieldset' }, el('legend', { text: t('sharing.categories_and_accounts') }), cats.length ? chart : el('p', { class: 'modal-message', text: t('sharing.no_categories') })),
         el('div', { class: 'sub-tag-row' }, groups.fs, sets.fs, locations.fs),
-        el('fieldset', { class: 'share-fieldset' }, el('legend', { text: 'Options' }), empty.row, fringes.row, notes.row),
+        el('fieldset', { class: 'share-fieldset' }, el('legend', { text: t('sharing.options') }), empty.row, fringes.row, notes.row),
         error,
         el('div', { class: 'modal-actions' }, cancel, ok),
       );

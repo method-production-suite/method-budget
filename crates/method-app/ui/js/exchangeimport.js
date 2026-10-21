@@ -21,28 +21,28 @@
 import { el } from './dom.js';
 import { money } from './format.js';
 import { customDialog } from './modal.js';
-import { plural } from './util.js';
+import { t } from './i18n.js';
 
 /** How each kind of difference reads in the list. */
 const KIND_LABELS = {
-  line: 'Line',
-  account: 'Account',
-  account_fringes: 'Account fringes',
-  fringe_account: 'Fringe account',
-  category: 'Category',
-  category_fringes: 'Category fringes',
-  fringe_row: 'Fringe row',
-  charge: 'Charge',
-  credit: 'Credit',
+  line: t('exchangeimport.kind.line'),
+  account: t('exchangeimport.kind.account'),
+  account_fringes: t('exchangeimport.kind.account_fringes'),
+  fringe_account: t('exchangeimport.kind.fringe_account'),
+  category: t('exchangeimport.kind.category'),
+  category_fringes: t('exchangeimport.kind.category_fringes'),
+  fringe_row: t('exchangeimport.kind.fringe_row'),
+  charge: t('exchangeimport.kind.charge'),
+  credit: t('exchangeimport.kind.credit'),
   grand_total: '',
   net_total: '',
 };
 
-/** The headings the notes are listed under, by kind. */
+/** The headings the notes are listed under (with their count), by kind. */
 const NOTE_GROUPS = [
-  ['check', 'To check: worked out from the export’s figures', true],
-  ['not_imported', 'Not in the export, or not brought over', true],
-  ['info', 'Notes', false],
+  ['check', (count) => t('exchangeimport.notes.check', { count }), true],
+  ['not_imported', (count) => t('exchangeimport.notes.not_imported', { count }), true],
+  ['info', (count) => t('exchangeimport.notes.info', { count }), false],
 ];
 
 /**
@@ -52,32 +52,36 @@ const NOTE_GROUPS = [
 export function reviewWording(p) {
   if (p.convert) {
     return {
-      title: `Convert budget export: ${p.file}`,
-      intro: 'This budget export becomes a new Method Budget tab. Its totals are worked out again and checked against the export’s own, figure by figure. The original file is left as it is. Nothing changes until you convert.',
-      button: 'Convert to Method Budget',
+      title: t('exchangeimport.convert_title', { file: p.file }),
+      intro: t('exchangeimport.convert_intro'),
+      button: t('exchangeimport.convert_button'),
     };
   }
   return {
-    title: `Import budget export: ${p.file}`,
-    intro: 'A whole budget from another program’s export, as a new budget tab. Its totals are worked out again and checked against the export’s own, figure by figure. Nothing changes until you import.',
-    button: 'Import as New Budget',
+    title: t('exchangeimport.import_title', { file: p.file }),
+    intro: t('exchangeimport.import_intro'),
+    button: t('exchangeimport.import_button'),
   };
 }
 
 /** What came over, in one sentence. */
 export function cameOver(p) {
-  let s = `${plural(p.categories, 'category', 'categories')}, ${plural(p.accounts, 'account', 'accounts')} and ${plural(p.lines, 'line', 'lines')}`;
-  if (p.adjustments) s += ` (${plural(p.adjustments, 'adjustment row', 'adjustment rows')})`;
-  const setup = [
-    plural(p.fringes, 'fringe', 'fringes'),
-    plural(p.groups, 'group', 'groups'),
-    plural(p.sets, 'set', 'sets'),
-    plural(p.locations, 'location', 'locations'),
-    plural(p.currencies, 'currency', 'currencies'),
-  ];
-  s += `; ${setup.join(', ')}`;
-  if (p.charges || p.credits) s += `; ${plural(p.charges, 'charge', 'charges')} and ${plural(p.credits, 'credit', 'credits')}`;
-  return `${s}.`;
+  const n = {
+    categories: t('exchangeimport.n.categories', { count: p.categories }),
+    accounts: t('exchangeimport.n.accounts', { count: p.accounts }),
+    lines: t('exchangeimport.n.lines', { count: p.lines }),
+    adjustments: t('exchangeimport.n.adjustments', { count: p.adjustments }),
+    fringes: t('exchangeimport.n.fringes', { count: p.fringes }),
+    groups: t('exchangeimport.n.groups', { count: p.groups }),
+    sets: t('exchangeimport.n.sets', { count: p.sets }),
+    locations: t('exchangeimport.n.locations', { count: p.locations }),
+    currencies: t('exchangeimport.n.currencies', { count: p.currencies }),
+    charges: t('exchangeimport.n.charges', { count: p.charges }),
+    credits: t('exchangeimport.n.credits', { count: p.credits }),
+  };
+  const charges = !!(p.charges || p.credits);
+  if (p.adjustments) return charges ? t('exchangeimport.came_over_adjustments_charges', n) : t('exchangeimport.came_over_adjustments', n);
+  return charges ? t('exchangeimport.came_over_charges', n) : t('exchangeimport.came_over', n);
 }
 
 /**
@@ -141,14 +145,14 @@ export function showExportDialog(ctx, first) {
 
   const renderTop = () => {
     const p = st.review;
-    const select = el('select', { class: 'modal-input', attrs: { 'aria-label': 'Read the file as' } });
+    const select = el('select', { class: 'modal-input', attrs: { 'aria-label': t('exchangeimport.read_file_as') } });
     for (const f of p.formats) select.append(el('option', { text: f.label, attrs: { value: f.key } }));
     select.value = st.format;
     select.addEventListener('change', () => {
       st.format = select.value;
       reread();
     });
-    ui.top.replaceChildren(el('label', { class: 'modal-field si-field' }, el('span', { text: 'Read as' }), select));
+    ui.top.replaceChildren(el('label', { class: 'modal-field si-field' }, el('span', { text: t('exchangeimport.read_as') }), select));
   };
 
   const renderSummary = () => {
@@ -171,28 +175,29 @@ export function showExportDialog(ctx, first) {
     const cur = p.currency;
     const parts = [];
     if (p.calc_error) {
-      parts.push(el('p', { class: 'modal-error', text: `The imported budget’s totals can’t be worked out: ${p.calc_error}` }));
+      parts.push(el('p', { class: 'modal-error', text: t('exchangeimport.calc_error', { error: p.calc_error }) }));
       ui.recon.replaceChildren(...parts);
       return;
     }
-    const compared = p.tallies.reduce((a, t) => a + t.compared, 0);
+    const compared = p.tallies.reduce((a, tally) => a + tally.compared, 0);
     if (p.matches) {
-      parts.push(el('p', { class: 'si-ok', text: `All ${compared} of the export’s figures come out the same (grand total ${money(p.grand)} ${cur}${p.net !== p.grand ? `, net total ${money(p.net)} ${cur}` : ''}).` }));
+      const totals = { count: compared, grand: money(p.grand), net: money(p.net), currency: cur };
+      parts.push(el('p', { class: 'si-ok', text: p.net !== p.grand ? t('exchangeimport.all_same_net', totals) : t('exchangeimport.all_same', totals) }));
     } else {
       parts.push(
         el('p', {
           class: 'si-bad',
-          text: `${p.difference_count} of the export’s ${compared} figures come out differently. Grand total: export ${money(p.export_grand)} ${cur}, imported ${money(p.grand)} ${cur}.`,
+          text: t('exchangeimport.some_differ', { different: p.difference_count, count: compared, exported: money(p.export_grand), imported: money(p.grand), currency: cur }),
         }),
       );
     }
-    const rows = p.tallies.map((t) =>
+    const rows = p.tallies.map((tally) =>
       el(
         'tr',
-        { class: t.different ? 'si-differs' : '' },
-        el('td', { class: 'si-desc', text: t.label }),
-        el('td', { class: 'num', text: String(t.compared) }),
-        el('td', { class: 'num', text: t.different ? String(t.different) : 'none' }),
+        { class: tally.different ? 'si-differs' : '' },
+        el('td', { class: 'si-desc', text: tally.label }),
+        el('td', { class: 'num', text: String(tally.compared) }),
+        el('td', { class: 'num', text: tally.different ? String(tally.different) : t('exchangeimport.none_different') }),
       ),
     );
     parts.push(
@@ -202,7 +207,7 @@ export function showExportDialog(ctx, first) {
         el(
           'table',
           { class: 'si-table' },
-          el('thead', {}, el('tr', {}, el('th', { text: 'Compared' }), el('th', { class: 'num', text: 'Figures' }), el('th', { class: 'num', text: 'Different' }))),
+          el('thead', {}, el('tr', {}, el('th', { text: t('exchangeimport.col.compared') }), el('th', { class: 'num', text: t('exchangeimport.col.figures') }), el('th', { class: 'num', text: t('exchangeimport.col.different') }))),
           el('tbody', {}, ...rows),
         ),
       ),
@@ -213,13 +218,12 @@ export function showExportDialog(ctx, first) {
         { class: 'si-notes' },
         ...p.differences.map((d) => {
           const kind = KIND_LABELS[d.kind] === undefined ? d.kind : KIND_LABELS[d.kind];
-          return el('li', {
-            text: `${kind ? `${kind} ` : ''}${d.what}: export ${money(d.export)}, imported ${money(d.imported)}, difference ${money(d.imported - d.export)}`,
-          });
+          const figures = { kind, what: d.what, exported: money(d.export), imported: money(d.imported), difference: money(d.imported - d.export) };
+          return el('li', { text: kind ? t('exchangeimport.difference_kind', figures) : t('exchangeimport.difference', figures) });
         }),
       );
-      if (p.difference_count > p.differences.length) list.append(el('li', { class: 'si-more', text: `and ${p.difference_count - p.differences.length} more` }));
-      parts.push(el('details', { class: 'si-details', attrs: { open: true } }, el('summary', { text: `Differences (${p.difference_count})` }), list));
+      if (p.difference_count > p.differences.length) list.append(el('li', { class: 'si-more', text: t('exchangeimport.and_more', { count: p.difference_count - p.differences.length }) }));
+      parts.push(el('details', { class: 'si-details', attrs: { open: true } }, el('summary', { text: t('exchangeimport.differences', { count: p.difference_count }) }), list));
     }
     ui.recon.replaceChildren(...parts);
   };
@@ -236,7 +240,7 @@ export function showExportDialog(ctx, first) {
       return el(
         'details',
         { class: 'si-details', attrs: open ? { open: true } : {} },
-        el('summary', { text: `${label} (${items.length})` }),
+        el('summary', { text: label(items.length) }),
         el('ul', { class: 'si-notes' }, ...items.map((n) => el('li', { text: n.text }))),
       );
     });
@@ -262,7 +266,7 @@ export function showExportDialog(ctx, first) {
       ui.notes = el('div', { class: 'si-detail-list' });
       ui.error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       ui.error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
+      const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
       ui.ok = el('button', { class: 'btn btn-primary', text: words.button, attrs: { type: 'button' } });
       cancel.addEventListener('click', () => closeDialog());
       ui.ok.addEventListener('click', async () => {
@@ -284,11 +288,11 @@ export function showExportDialog(ctx, first) {
         'div',
         { class: 'si-scroll' },
         ui.top,
-        el('h3', { class: 'si-heading', text: 'What comes over' }),
+        el('h3', { class: 'si-heading', text: t('exchangeimport.what_comes_over') }),
         ui.summary,
-        el('h3', { class: 'si-heading', text: 'Check against the export’s totals' }),
+        el('h3', { class: 'si-heading', text: t('exchangeimport.check_heading') }),
         ui.recon,
-        el('h3', { class: 'si-heading', text: 'Notes' }),
+        el('h3', { class: 'si-heading', text: t('exchangeimport.notes_heading') }),
         ui.notes,
       );
       ui.root = el(

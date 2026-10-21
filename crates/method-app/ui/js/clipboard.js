@@ -20,6 +20,7 @@ import { invoke } from './api.js';
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { findCategory } from './levels.js';
+import { t } from './i18n.js';
 
 let ctx = null;
 // The text the last row copy put on the system clipboard (normalized), or
@@ -56,15 +57,13 @@ export function normalize(text) {
   return String(text).replace(/\r\n?/g, '\n').replace(/\n+$/, '');
 }
 
-const NOUNS = {
-  rows: ['line', 'lines'],
-  accounts: ['account', 'accounts'],
-  categories: ['category', 'categories'],
-};
-
-function count(n, what) {
-  const [one, many] = NOUNS[what] || ['row', 'rows'];
-  return `${n} ${n === 1 ? one : many}`;
+/** The review's title: "Paste 3 lines", "Insert 1 account from Budget B". */
+function reviewTitle(action, count, what, source) {
+  const params = { action, count, source };
+  if (what === 'rows') return source ? t('clipboard.title.lines_from', params) : t('clipboard.title.lines', params);
+  if (what === 'accounts') return source ? t('clipboard.title.accounts_from', params) : t('clipboard.title.accounts', params);
+  if (what === 'categories') return source ? t('clipboard.title.categories_from', params) : t('clipboard.title.categories', params);
+  return source ? t('clipboard.title.rows_from', params) : t('clipboard.title.rows', params);
 }
 
 function currentCategory() {
@@ -99,9 +98,9 @@ function pickFor(keys) {
 
 function nothingToCopy() {
   const level = ctx.level();
-  if (level === 'details') return 'Select the lines to copy first.';
-  if (level === 'accounts') return 'Select the accounts to copy first.';
-  return 'Select the categories to copy first (production totals are not copied).';
+  if (level === 'details') return t('clipboard.select_lines_first');
+  if (level === 'accounts') return t('clipboard.select_accounts_first');
+  return t('clipboard.select_categories_first');
 }
 
 /** Hands the copied rows to Rust; a cut also deletes them (one undo step). */
@@ -218,7 +217,7 @@ export async function pasteRows() {
     return;
   }
   if (!preview) {
-    ctx.toast('There are no copied rows to paste. Select whole rows and copy them first.');
+    ctx.toast(t('clipboard.nothing_to_paste'));
     return;
   }
   await land(preview);
@@ -230,13 +229,13 @@ function targetFor(what) {
   const keys = ctx.grid.selectedKeys();
   if (what === 'rows') {
     const acct = ctx.acct();
-    if (level !== 'details' || !acct) return { error: 'These are lines: open an account to paste them.' };
+    if (level !== 'details' || !acct) return { error: t('clipboard.open_account_to_paste') };
     const key = keys.find((k) => /^r\d+$/.test(k));
     return { target: { account: acct.code, beforeRow: key ? Number(key.slice(1)) : null }, opts: {} };
   }
   if (what === 'accounts') {
     const entry = currentCategory();
-    if (level !== 'accounts' || !entry) return { error: 'These are accounts: open a category to paste them.' };
+    if (level !== 'accounts' || !entry) return { error: t('clipboard.open_category_to_paste') };
     const accts = entry.cat.accounts || [];
     const key = keys.find((k) => /^a\d+$/.test(k));
     const ai = key ? Number(key.slice(1)) : accts.length;
@@ -246,7 +245,7 @@ function targetFor(what) {
       opts: { focusKey: `a${before ? ai : accts.length}`, focusCol: 'name' },
     };
   }
-  if (level !== 'topsheet') return { error: 'These are categories: go to the topsheet to paste them.' };
+  if (level !== 'topsheet') return { error: t('clipboard.go_to_topsheet_to_paste') };
   const key = keys.find((k) => /^t\d+$/.test(k));
   const at = key ? Number(key.slice(1)) : ctx.ix().topsheet.length;
   return { target: { at }, opts: { focusKey: `t${at}`, focusCol: 'name' } };
@@ -278,14 +277,19 @@ async function land(preview) {
 // The review: what will be added, what is set up differently here
 
 const KIND_LABELS = {
-  fringe: 'Fringe',
-  group: 'Group',
-  global: 'Global',
-  unit: 'Unit',
-  set: 'Set',
-  location: 'Location',
-  currency: 'Currency',
+  fringe: t('clipboard.kind.fringe'),
+  group: t('clipboard.kind.group'),
+  global: t('clipboard.kind.global'),
+  unit: t('clipboard.kind.unit'),
+  set: t('clipboard.kind.set'),
+  location: t('clipboard.kind.location'),
+  currency: t('clipboard.kind.currency'),
 };
+
+/** "Fringe FICA": an item's kind and name. */
+function itemName(item) {
+  return t('clipboard.item_name', { kind: KIND_LABELS[item.kind] || item.kind, name: item.name });
+}
 
 function itemRow(lines, ...actions) {
   const text = el('div', { class: 'safety-item-text' });
@@ -297,16 +301,15 @@ function itemRow(lines, ...actions) {
 }
 
 function choiceSelect(item) {
-  const label = `${KIND_LABELS[item.kind] || item.kind} ${item.name}`;
-  const select = el('select', { class: 'modal-input', attrs: { 'aria-label': `What to do with ${label}` } });
+  const select = el('select', { class: 'modal-input', attrs: { 'aria-label': t('clipboard.what_to_do_with', { name: itemName(item) }) } });
   const options = [
-    ['keep', "Keep this budget's version"],
-    ['copied', 'Use the copied version everywhere here'],
+    ['keep', t('clipboard.keep_this_version')],
+    ['copied', t('clipboard.use_copied_version')],
   ];
-  if (item.rename_to) options.push(['rename', `Add the copied one as ${item.rename_to}`]);
+  if (item.rename_to) options.push(['rename', t('clipboard.add_copied_as', { name: item.rename_to })]);
   for (const [value, text] of options) select.append(el('option', { text, attrs: { value } }));
   select.value = 'keep';
-  select.title = 'The copied version replaces this budget\'s for every line here that uses it; a new name leaves this budget\'s as it is.';
+  select.title = t('clipboard.choice_tip');
   return select;
 }
 
@@ -317,7 +320,7 @@ function choiceSelect(item) {
  * Cancel, Escape or a click outside. `action` names the button and the
  * title ('Insert' for a line block, presets.js).
  */
-export function review(p, { action = 'Paste' } = {}) {
+export function review(p, { action = t('clipboard.paste') } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -331,33 +334,32 @@ export function review(p, { action = 'Paste' } = {}) {
     let box = null;
     customDialog((closeDialog) => {
       const parts = [];
-      const from = p.source ? ` from ${p.source}` : '';
-      parts.push(el('h2', { class: 'modal-title', text: `${action} ${count(p.count, p.what)}${from}`, attrs: { id: 'clip-review-title' } }));
+      parts.push(el('h2', { class: 'modal-title', text: reviewTitle(action, p.count, p.what, p.source), attrs: { id: 'clip-review-title' } }));
       if (differs.length) {
         parts.push(
           el('p', {
             class: 'modal-message',
-            text: 'Set up differently here. This budget keeps its own version unless you choose otherwise, so pasted lines may total differently than where they were copied.',
+            text: t('clipboard.differs_message'),
           }),
         );
         const list = el('ul', { class: 'safety-list' });
         for (const it of differs) {
           const select = choiceSelect(it);
           selects.push([it, select]);
-          list.append(itemRow([`${KIND_LABELS[it.kind] || it.kind} ${it.name}`, `Here: ${it.here || ''}`, `Copied: ${it.copied}`], select));
+          list.append(itemRow([itemName(it), t('clipboard.here', { value: it.here || '' }), t('clipboard.copied', { value: it.copied })], select));
         }
         parts.push(list);
       }
       if (adds.length) {
-        parts.push(el('p', { class: 'modal-message', text: 'Not in this budget yet. These will be added.' }));
+        parts.push(el('p', { class: 'modal-message', text: t('clipboard.adds_message') }));
         const list = el('ul', { class: 'safety-list' });
         for (const it of adds) {
-          list.append(itemRow([`${KIND_LABELS[it.kind] || it.kind} ${it.name}`, it.copied], el('span', { class: 'safety-item-sub', text: 'Will be added' })));
+          list.append(itemRow([itemName(it), it.copied], el('span', { class: 'safety-item-sub', text: t('clipboard.will_be_added') })));
         }
         parts.push(list);
       }
       for (const note of p.notes || []) parts.push(el('p', { class: 'modal-message', text: note }));
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('clipboard.cancel'), attrs: { type: 'button' } });
       const ok = el('button', { class: 'btn btn-primary', text: action, attrs: { type: 'button', 'data-autofocus': true } });
       cancel.addEventListener('click', () => {
         finish(null);

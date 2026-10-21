@@ -22,7 +22,8 @@ import { el, isMac } from './dom.js';
 import { anchoredForm, confirmDialog } from './modal.js';
 import { readPref } from './prefs.js';
 import { isWeb } from './host.js';
-import { obj, str, errText, plural } from './util.js';
+import { obj, str, errText } from './util.js';
+import { t } from './i18n.js';
 
 const st = {
   host: null,
@@ -139,9 +140,9 @@ function modSave(e) {
 export async function confirmCloseReview(r) {
   if (!r || !r.unsaved || !isWeb()) return true;
   return confirmDialog({
-    title: r.mode === 'reviewing' ? 'Stop reviewing without your comments?' : 'Close without saving the review file?',
-    message: `${r.file} has changes not downloaded yet, and closing it here loses them. Cancel, then Download Review File to keep them.`,
-    confirmText: 'Close Without Saving',
+    title: r.mode === 'reviewing' ? t('comments.stop_without_title') : t('comments.close_without_title'),
+    message: t('comments.close_without_message', { file: r.file }),
+    confirmText: t('comments.close_without_saving'),
     danger: true,
   });
 }
@@ -155,11 +156,8 @@ function draw() {
   const r = review();
   if (!r) {
     host.replaceChildren(
-      el('h3', { class: 'notes-heading', text: 'Comments' }),
-      el('p', {
-        class: 'apply-hint',
-        text: 'No review file is open. File > Open for Review… opens a budget to comment on without changing it; File > Open Review Comments… brings a reviewer’s comments into your budget.',
-      }),
+      el('h3', { class: 'notes-heading', text: t('comments.heading') }),
+      el('p', { class: 'apply-hint', text: t('comments.none_open') }),
     );
     return;
   }
@@ -174,37 +172,39 @@ function head(r) {
   const sec = el('section', { class: 'notes-line comments-head' });
   const reviewing = r.mode === 'reviewing';
   sec.append(
-    el('h3', { class: 'notes-heading', text: reviewing ? 'Reviewing' : 'Review comments' }),
+    el('h3', { class: 'notes-heading', text: reviewing ? t('comments.reviewing') : t('comments.review_comments') }),
     el('p', {
       class: 'apply-hint',
       text: reviewing
-        ? `This budget is read-only while you review it. Comments go in ${str(r.file)}${isWeb() ? '; download it to keep them' : ', saved as you write them'}.`
-        : `From ${str(r.file)}: ${plural(r.to_settle, 'comment', 'comments')} to merge or dismiss.`,
+        ? isWeb()
+          ? t('comments.reviewing_hint_web', { file: str(r.file) })
+          : t('comments.reviewing_hint_desktop', { file: str(r.file) })
+        : t('comments.reading_hint', { file: str(r.file), count: r.to_settle }),
     }),
   );
   if (!r.matches && !reviewing) {
-    sec.append(el('p', { class: 'setup-error', text: `This review was written on a budget titled “${str(r.title)}”. Check it is about this budget before merging.` }));
+    sec.append(el('p', { class: 'setup-error', text: t('comments.title_mismatch', { title: str(r.title) }) }));
   }
   if (r.conflict) {
     sec.append(
       el('p', {
         class: 'setup-error',
         attrs: { role: 'alert' },
-        text: `${str(r.file)} changed on disk since it was read, so it isn’t written over. Save Review File As… keeps your comments beside it; Replace the File writes them over it.`,
+        text: t('comments.conflict', { file: str(r.file) }),
       }),
     );
-  } else if (r.unsaved) sec.append(el('p', { class: 'apply-hint', text: 'The review file has changes not written yet.' }));
+  } else if (r.unsaved) sec.append(el('p', { class: 'apply-hint', text: t('comments.unsaved') }));
   const actions = el('div', { class: 'notes-actions' });
   const mergeable = st.list ? st.list.entries.some((e) => e.can_merge && (e.status === 'open' || e.status === 'resolved')) : r.to_settle > 0;
   if (!reviewing && mergeable) {
-    actions.append(button('Merge All', 'setup-btn setup-btn-primary', mergeAll, { title: 'Merge every comment that can become a note, as one undo step' }));
+    actions.append(button(t('comments.merge_all'), 'setup-btn setup-btn-primary', mergeAll, { title: t('comments.merge_all_title') }));
   }
   if (r.conflict && !isWeb()) {
-    actions.append(button('Replace the File', 'setup-btn setup-btn-quiet', () => run('review_save', { force: true }), { title: 'Write your comments over the file that changed on disk' }));
+    actions.append(button(t('comments.replace_file'), 'setup-btn setup-btn-quiet', () => run('review_save', { force: true }), { title: t('comments.replace_file_title') }));
   }
   actions.append(
-    button(isWeb() ? 'Download Review File' : 'Save Review File As…', 'setup-btn setup-btn-quiet', () => run('review_save', { save_as: true })),
-    button(reviewing ? 'Stop Reviewing' : 'Close Review File', 'setup-btn setup-btn-quiet', async () => {
+    button(isWeb() ? t('comments.download_file') : t('comments.save_file_as'), 'setup-btn setup-btn-quiet', () => run('review_save', { save_as: true })),
+    button(reviewing ? t('comments.stop_reviewing') : t('comments.close_file'), 'setup-btn setup-btn-quiet', async () => {
       if (await confirmCloseReview(r)) run('review_close', {});
     }),
   );
@@ -219,8 +219,8 @@ function targets() {
   const out = [];
   const named = (x) => `${str(x.code)} ${str(x.name)}`.trim();
   const key = sel && (typeof sel.cursor === 'string' ? sel.cursor : Array.isArray(sel.keys) ? sel.keys[0] : null);
-  const pushAccount = (a) => a && a.code !== undefined && out.push({ on: { account: str(a.code) }, title: `Account ${named(a)}` });
-  const pushCategory = (c) => c && c.kind !== 'production_total' && c.code !== undefined && out.push({ on: { category: str(c.code) }, title: `Category ${named(c)}` });
+  const pushAccount = (a) => a && a.code !== undefined && out.push({ on: { account: str(a.code) }, title: t('comments.account_title', { name: named(a) }) });
+  const pushCategory = (c) => c && c.kind !== 'production_total' && c.code !== undefined && out.push({ on: { category: str(c.code) }, title: t('comments.category_title', { name: named(c) }) });
   if (sel && sel.level === 'details') {
     const account = obj(st.view.account);
     const details = Array.isArray(account.details) ? account.details : [];
@@ -229,7 +229,7 @@ function targets() {
       const i = details.findIndex((d) => d && d.id === id);
       if (i >= 0) {
         const what = str(details[i].description).trim();
-        out.push({ on: { row: id }, title: `Line ${i + 1}${what ? `: ${what}` : ''}` });
+        out.push({ on: { row: id }, title: what ? t('comments.line_title_with', { num: i + 1, what }) : t('comments.line_title', { num: i + 1 }) });
       }
     }
     const cat = top[account.ti];
@@ -242,16 +242,16 @@ function targets() {
   } else if (sel && sel.level === 'topsheet' && typeof key === 'string' && key.startsWith('t')) {
     pushCategory(top[Number(key.slice(1))]);
   }
-  out.push({ on: 'budget', title: 'The whole budget' });
+  out.push({ on: 'budget', title: t('comments.whole_budget') });
   return out;
 }
 
 function addBox() {
   const choices = targets();
   if (st.target >= choices.length) st.target = 0;
-  const select = el('select', { class: 'setup-input', attrs: { 'aria-label': 'Comment on' } });
-  choices.forEach((t, i) => {
-    const o = el('option', { text: t.title, attrs: { value: String(i) } });
+  const select = el('select', { class: 'setup-input', attrs: { 'aria-label': t('comments.comment_on') } });
+  choices.forEach((c, i) => {
+    const o = el('option', { text: c.title, attrs: { value: String(i) } });
     if (i === st.target) o.selected = true;
     select.append(o);
   });
@@ -260,15 +260,15 @@ function addBox() {
   });
   const area = el('textarea', {
     class: 'setup-input notes-text notes-new',
-    attrs: { rows: '3', spellcheck: 'true', placeholder: 'Add a comment…', 'aria-label': 'New comment' },
+    attrs: { rows: '3', spellcheck: 'true', placeholder: t('comments.add_placeholder'), 'aria-label': t('comments.new_comment') },
   });
   area.value = st.drafts.get('new') || '';
   area.addEventListener('input', () => st.drafts.set('new', area.value));
   const submit = async () => {
     const text = area.value;
     if (!text.trim()) return;
-    const t = choices[st.target] || choices[choices.length - 1];
-    if (await run('review_add', { on: t.on, text, created: now(), author: author() || null })) {
+    const target = choices[st.target] || choices[choices.length - 1];
+    if (await run('review_add', { on: target.on, text, created: now(), author: author() || null })) {
       st.drafts.delete('new');
       draw();
     }
@@ -283,51 +283,51 @@ function addBox() {
   return el(
     'section',
     { class: 'notes-add' },
-    el('label', { class: 'setup-label', text: 'Comment on' }),
+    el('label', { class: 'setup-label', text: t('comments.comment_on') }),
     select,
     area,
     el(
       'div',
       { class: 'notes-actions' },
-      el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter adds it. Signed with your name from the Notes tab.` }),
-      button('Add', 'setup-btn setup-btn-primary', submit),
+      el('span', { class: 'apply-hint', text: t('comments.add_hint', { mod: isMac ? '⌘' : 'Ctrl+' }) }),
+      button(t('comments.add'), 'setup-btn setup-btn-primary', submit),
     ),
   );
 }
 
-const STATUS = { open: 'Open', resolved: 'Resolved', merged: 'In the budget as a note', dismissed: 'Dismissed' };
+const STATUS = { open: t('comments.status.open'), resolved: t('comments.status.resolved'), merged: t('comments.status.merged'), dismissed: t('comments.status.dismissed') };
 
 function listSection(r) {
   const sec = el('section', { class: 'notes-all' });
-  const only = button('To settle only', 'apply-pill', () => {
+  const only = button(t('comments.to_settle_only'), 'apply-pill', () => {
     st.toSettleOnly = !st.toSettleOnly;
     draw();
   });
   only.setAttribute('aria-pressed', String(st.toSettleOnly));
-  sec.append(el('div', { class: 'notes-all-head' }, el('h3', { class: 'notes-heading', text: `All comments (${r.comments})` }), only));
+  sec.append(el('div', { class: 'notes-all-head' }, el('h3', { class: 'notes-heading', text: t('comments.all_comments', { count: r.comments }) }), only));
   if (st.listError) {
     sec.append(el('p', { class: 'setup-error', text: st.listError, attrs: { role: 'alert' } }));
     return sec;
   }
   if (!st.list) {
-    sec.append(el('p', { class: 'apply-hint', text: 'Loading…' }));
+    sec.append(el('p', { class: 'apply-hint', text: t('comments.loading') }));
     return sec;
   }
   const entries = st.list.entries.filter((e) => !st.toSettleOnly || e.status === 'open' || e.status === 'resolved');
   if (!entries.length) {
-    sec.append(el('p', { class: 'setup-empty', text: st.list.entries.length ? 'Nothing left to settle.' : 'No comments yet.' }));
+    sec.append(el('p', { class: 'setup-empty', text: st.list.entries.length ? t('comments.nothing_to_settle') : t('comments.no_comments') }));
     return sec;
   }
-  const ul = el('ul', { class: 'notes-cards', attrs: { 'aria-label': 'Review comments' } });
+  const ul = el('ul', { class: 'notes-cards', attrs: { 'aria-label': t('comments.review_comments') } });
   for (const e of entries) ul.append(el('li', {}, card(r, e)));
   sec.append(ul);
   return sec;
 }
 
 function meta(e) {
-  const parts = [when(e.created) || 'Undated'];
+  const parts = [when(e.created) || t('comments.undated')];
   if (e.author) parts.push(str(e.author));
-  if (e.edited) parts.push(`edited ${when(e.edited)}`);
+  if (e.edited) parts.push(t('comments.edited_at', { when: when(e.edited) }));
   parts.push(STATUS[e.status] || str(e.status));
   return parts.join(' · ');
 }
@@ -351,12 +351,12 @@ function card(r, e) {
   const done = e.status === 'merged' || e.status === 'dismissed';
   const box = el('div', { class: `notes-card${done || e.status === 'resolved' ? ' is-done' : ''}` });
   const place = e.found && e.on !== 'budget'
-    ? button(str(e.place), 'notes-entry', () => goThere(e), { title: `Go to ${str(e.place)}` })
-    : el('p', { class: 'notes-where', text: e.found ? str(e.place) : `Was on ${str(e.place)} (no longer in the budget)` });
+    ? button(str(e.place), 'notes-entry', () => goThere(e), { title: t('comments.go_to', { place: str(e.place) }) })
+    : el('p', { class: 'notes-where', text: e.found ? str(e.place) : t('comments.place_gone', { place: str(e.place) }) });
   box.append(place, el('p', { class: 'notes-meta', text: meta(e) }));
   const ekey = String(e.id);
   if (r.mode === 'reviewing' && st.editing.has(ekey)) {
-    const area = el('textarea', { class: 'setup-input notes-text', attrs: { rows: '4', 'aria-label': 'Edit comment' } });
+    const area = el('textarea', { class: 'setup-input notes-text', attrs: { rows: '4', 'aria-label': t('comments.edit_comment') } });
     area.value = st.drafts.has(ekey) ? st.drafts.get(ekey) : str(e.text);
     area.addEventListener('input', () => st.drafts.set(ekey, area.value));
     const finish = () => {
@@ -380,7 +380,7 @@ function card(r, e) {
     });
     box.append(
       area,
-      el('div', { class: 'notes-actions' }, button('Cancel', 'setup-btn setup-btn-quiet', finish), button('Save', 'setup-btn setup-btn-primary', save)),
+      el('div', { class: 'notes-actions' }, button(t('comments.cancel'), 'setup-btn setup-btn-quiet', finish), button(t('comments.save'), 'setup-btn setup-btn-primary', save)),
     );
     return box;
   }
@@ -389,20 +389,20 @@ function card(r, e) {
   const actions = el('div', { class: 'notes-card-actions' });
   if (r.mode === 'reviewing') {
     actions.append(
-      button('Edit', 'setup-btn setup-btn-quiet notes-mini', () => {
+      button(t('comments.edit'), 'setup-btn setup-btn-quiet notes-mini', () => {
         st.editing.add(ekey);
         draw();
       }),
-      button(e.resolved ? 'Reopen' : 'Resolve', 'setup-btn setup-btn-quiet notes-mini', () => run('review_resolve', { id: e.id, resolved: !e.resolved })),
-      button('Delete', 'setup-btn setup-btn-quiet notes-mini', (b) =>
-        anchoredForm({ anchor: b, title: 'Delete this comment?', message: str(e.text).slice(0, 120), submitText: 'Delete', danger: true, onSubmit: () => st.ctx.call('review_delete', { doc: st.view.doc, id: e.id }) }),
+      button(e.resolved ? t('comments.reopen') : t('comments.resolve'), 'setup-btn setup-btn-quiet notes-mini', () => run('review_resolve', { id: e.id, resolved: !e.resolved })),
+      button(t('comments.delete'), 'setup-btn setup-btn-quiet notes-mini', (b) =>
+        anchoredForm({ anchor: b, title: t('comments.delete_title'), message: str(e.text).slice(0, 120), submitText: t('comments.delete'), danger: true, onSubmit: () => st.ctx.call('review_delete', { doc: st.view.doc, id: e.id }) }),
       ),
     );
   } else if (e.status === 'dismissed') {
-    actions.append(button('Restore', 'setup-btn setup-btn-quiet notes-mini', () => run('review_restore', { id: e.id }), { title: 'Open this comment again' }));
+    actions.append(button(t('comments.restore'), 'setup-btn setup-btn-quiet notes-mini', () => run('review_restore', { id: e.id }), { title: t('comments.restore_title') }));
   } else if (e.status !== 'merged') {
-    if (e.can_merge) actions.append(button('Merge as Note', 'setup-btn setup-btn-quiet notes-mini', () => settle([{ id: e.id, action: 'merge' }])));
-    actions.append(button('Dismiss', 'setup-btn setup-btn-quiet notes-mini', () => settle([{ id: e.id, action: 'dismiss' }])));
+    if (e.can_merge) actions.append(button(t('comments.merge_as_note'), 'setup-btn setup-btn-quiet notes-mini', () => settle([{ id: e.id, action: 'merge' }])));
+    actions.append(button(t('comments.dismiss'), 'setup-btn setup-btn-quiet notes-mini', () => settle([{ id: e.id, action: 'dismiss' }])));
   }
   if (actions.childNodes.length) box.append(actions);
   return box;
@@ -429,7 +429,7 @@ function mergeAll() {
   const entries = st.list ? st.list.entries : [];
   const picks = entries.filter((e) => e.can_merge && (e.status === 'open' || e.status === 'resolved')).map((e) => ({ id: e.id, action: 'merge' }));
   if (!picks.length) {
-    st.error = 'None of these comments can become a note: they are on setup items or the whole budget, or their place is gone. Dismiss them, or keep them in the file.';
+    st.error = t('comments.none_mergeable');
     draw();
     return;
   }

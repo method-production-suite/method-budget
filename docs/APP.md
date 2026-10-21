@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 2,550 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 3,850 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1280,26 +1280,27 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
 - **Kept honest by tests** (`src/i18n.rs`): every key the page or Rust uses is in the
   English table and every entry is used; the table is well formed (one entry per line,
   no key twice, plural entries with an `other` form, no em dashes or exclamation marks);
-  and the converted scripts hold no words of their own: a new `text:`, `title:`,
+  and the page's scripts hold no words of their own: a new `text:`, `title:`,
   `label:`, `placeholder:`, `message:` or `aria-label` literal with letters in it fails
-  the build. The fixed words of `ui/index.html` (the toolbar's buttons, the page's
+  the build, and so does a script the test doesn't list. The fixed words of `ui/index.html` (the toolbar's buttons, the page's
   landmarks) carry their key in `data-i18n`, `data-i18n-aria-label` or `data-i18n-title`,
   and `fillPage()` puts them in at boot; a test fails on a word there with no key, or
   English that differs from the table's. `scripts/web-smoke.mjs` checks the lookup, the plurals, the fallback and the
   choice of language in the browser, and that the shortcut sheet, the start window, New
   Budget and every Budget Setup tab draw their words from the table.
 
-Converted so far: the start window and New Budget, the Help menu and About, the shortcut
-list and sheet, the menu bar, Budget Setup's tabs (the setup lists, Globals, Units,
-Rate Tables, Charges, Credits, Info, Settings and Baseline), Find and Replace, the main
+Converted: the whole page. The start window and New Budget, the Help menu and About, the
+shortcut list and sheet, the menu bar, Budget Setup's tabs, Find and Replace, the main
 window's dialogs, toolbar tips and messages, the status bar, the common dialog buttons,
-sharing and the Activity tab, the printed reports and the report setup, the toolbar,
-the tools panel's frame, Notes, History, Versions, the Library, Review and Compare, the
-tab strips and split view, the grid's right-click menu and the shared phrases of
-`util.js`. The rest of the page (the tools panel's other tabs, the import dialogs, the
-grid's levels and quick entry), the engine's messages
-and the native dialogs are English text still; docs/research/accessibility-audit.md,
-"Localization", lists them.
+sharing, its banners and the Activity tab, the printed reports and the report setup, the
+toolbar, the tools panel and every tab in it (Notes, History, Versions, the Library and
+setup packs, Review, Compare, presets, Explain, Overtime, Actuals, Comments), the tab
+strips and split view, the grid's right-click menu, levels, quick entry and row colors,
+What Changed and Merge, backups and recovery, and the import dialogs (Import Setup and
+templates, spreadsheets, charts of accounts, budget exports, schedule days, actuals).
+Still English: the words that come from Rust as data (the engine's messages, import
+problems, Explain's steps), the native dialogs, key names in shortcut text, and the
+"Untitled" file name; docs/research/accessibility-audit.md, "Localization", lists them.
 
 ### The Help menu
 
@@ -3398,7 +3399,7 @@ shortcuts, and where each tab was left), `tabs.js` (the tab strip: switching, cl
 dragging, scrolling), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
 (turns a View into rows and columns), `footer.js`, `announce.js` (polite words for screen readers),
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
-`dom.js`, `util.js` (small shared helpers: plurals, error text), `panelsize.js` (the
+`dom.js`, `util.js` (small shared helpers: view data, error text, a setup item's source), `panelsize.js` (the
 tools panel resizer and saved window sizes), `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (Budget Setup's
 charges, credits, info, settings and baseline), `report.js` with `print.css` (printable
