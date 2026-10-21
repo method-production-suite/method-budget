@@ -17,17 +17,16 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-20 (evening). Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-21. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.7.0 from main, without signed changes: decided by the owner (2026-10-20)**: "prepare
-  Budget 0.7.0 from main without 3.18". Since 0.6.0 main has a security fix (rustls-webpki
-  0.103.16 and webpki-roots 1.0.10) and new features (3.6 done, 3.9 and 3.13 machinery,
-  3.19 done, 3.22, the first slice of 3.14). The release pull request (#79) has the notes;
-  the version bump, the site, the local check and the rehearsal on main come next, then
-  the tag request. The tag needs the owner's yes.
+- **0.7.0 is out** (published 2026-10-21, from main without 3.18; methodbudget.com follows
+  it). The next release needs the owner's yes as usual. It carries signed changes and the
+  owner's key (3.18, decisions 89 and 95, merged after the tag), so its notes must say
+  plainly that everyone sharing a budget with roles needs it: Method Budget 0.4.0 to 0.7.0
+  refuse a shared folder at log format 3 once its owner's key is in.
 - **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
   cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
   taken out of `deny.toml` go in as one pull request. None of the four applies to the
@@ -53,10 +52,10 @@ this page goes ahead without waiting.
   every change signed, removal by cutoff) use the `ed25519-dalek` crate (3.0.0; pure Rust,
   BSD-3-Clause, already on `deny.toml`'s licence list), with `sha2` held at 0.11.0 for the
   14-day check; both the crate-age check and `cargo deny` pass. Signing raises the change
-  log's format to 3 once the owner's key is in, so Method Budget 0.7.0 and older refuse a
-  signed budget rather than take in unsigned changes. They ship in the release after 0.7.0,
-  whose notes say everyone sharing a budget with roles needs it. Later (the owner): key
-  rotation, and publishing a key from the command line.
+  log's format to 3 once the owner's key is in, so Method Budget 0.4.0 to 0.7.0 refuse a
+  signed budget rather than take in unsigned changes. On main since 2026-10-21; they ship in
+  the release after 0.7.0 (above). Later (the owner): key rotation, and publishing a key
+  from the command line.
 
 - **Which languages first** (3.14; D82, D94): the framework is built and English is
   the only language (docs/APP.md, "Languages"): one string table read by the page and
@@ -251,9 +250,10 @@ this page goes ahead without waiting.
 
 ## Where we are
 
-As of 2026-10-20. Release 0.6.0 is out (2026-10-20): one universal Mac app for Intel and
-Apple silicon again (decision 87), with Intel Macs still on 0.2 offered it, plus Windows
-and Linux builds that are included but not yet tested by hand. The engine covers the v1
+As of 2026-10-21. Release 0.7.0 is out (2026-10-21): incentive programs complete, rate
+tables and bid layouts of your own, the start window finished, on one universal Mac app for
+Intel and Apple silicon (decision 87), plus Windows and Linux builds that are included but
+not yet tested by hand. The engine covers the v1
 calculation model and works figures out as the reference product does by default
 (decisions 55 to 61 and 69; exact decimals are a per-budget setting), property-tested.
 Budgets save as our own documented, diff-friendly `.mthd` JSON. The Mac app has all of
@@ -265,8 +265,9 @@ exports, and a signed, notarized Mac build that updates itself through the suite
 method-update (decision 83). Eighteen of Phase 3's twenty-two items are built, incentive
 modeling (3.6), the start window (3.19) and formulas walked without recursion (3.22) among
 them; localization (3.14) and working together on one budget (3.18) are partway (3.18's
-folder mode, roles and signed changes with removal by cutoff are built, decision 89;
-invites and live sessions are left); rate tables (3.9) and bid layouts (3.13) are partial:
+folder mode, roles, signed changes with removal by cutoff, Start Again and the remembered
+owner key are built, decisions 89 and 95, on main for the next release; invites, muted
+cells, locks and live sessions are left); rate tables (3.9) and bid layouts (3.13) are partial:
 the machinery is built (decisions 90 and 92, tables and bid layouts of your own), and only
 bundled public rate data and a ready-made industry bid form wait on the legal line above. Around the app: the `method-budget` command line, an MCP server for coding
 agents (3.17), a browser build for the website's demo, the Field Station sample opened once
