@@ -22,6 +22,14 @@ license = "MIT OR Apache-2.0"
 # Release builds keep integer overflow checks: a crafted import should fail
 # loudly with a panic, never wrap into a plausible-looking wrong total. The
 # browser build below inherits this.
+# Smaller debug builds (the suite's Disk rule, 2026-10-21): line tables only for
+# our crates, enough for backtraces; none for dependencies.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 overflow-checks = true
 
