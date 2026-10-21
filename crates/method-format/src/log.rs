@@ -1365,6 +1365,35 @@ pub struct Presence {
     pub at: String,
     /// The frontier digest of their log at that moment.
     pub frontier: String,
+    /// What they ask the owner, a co-owner or an admin for, while they ask
+    /// (docs/APP.md, "Asking for access"). Left out of the file when they
+    /// ask for nothing, so a heartbeat without one reads exactly as before;
+    /// an older app ignores the field (the struct reads with defaults and
+    /// never refuses a field it doesn't know).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<AccessRequest>,
+}
+
+/// An access request in a heartbeat: what role a person would like, with
+/// the categories or accounts it is about. Never in the change log: the
+/// role itself, if given, is a signed `grant` by whoever allows it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AccessRequest {
+    /// The role asked for, as `grant` names it ("editor", "department",
+    /// "actuals", "comment").
+    pub role: String,
+    /// Category or account numbers it is about (a department editor's
+    /// scope to add, or where they were when they asked). Left out when
+    /// none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub codes: Vec<String>,
+    /// A short note to whoever decides, as typed. Left out when empty.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub note: String,
+    /// When they asked, ISO 8601 UTC: with the actor, what names the
+    /// request (a decline is remembered against it).
+    pub at: String,
 }
 
 impl LogDir {
@@ -2509,6 +2538,74 @@ mod tests {
         assert!(value_from_json(serde_json::json!({"nope": 1})).is_err());
         assert!(value_from_json(serde_json::json!([1])).is_err());
         assert!(value_from_json(serde_json::json!(1.5)).is_err());
+    }
+
+    #[test]
+    fn a_heartbeat_with_and_without_an_access_request_round_trips() {
+        let dir = std::env::temp_dir().join(format!("method-presence-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let log = LogDir::for_budget(&dir.join("Feature.mthd"));
+        let plain = Presence {
+            name: "Jordan Lee".into(),
+            color: "blue".into(),
+            category: Some("2000".into()),
+            account: Some("2400".into()),
+            at: "2026-10-21T10:00:00Z".into(),
+            frontier: "abc".into(),
+            request: None,
+        };
+        log.write_presence(actor(2), &plain).unwrap();
+        let text = fs::read_to_string(log.actor_dir(actor(2)).join(PRESENCE_FILE)).unwrap();
+        assert!(!text.contains("request"), "no request, no field: {text}");
+        assert_eq!(log.read_presence(actor(2)), Some(plain.clone()));
+
+        let asking = Presence {
+            request: Some(AccessRequest {
+                role: "editor".into(),
+                codes: vec!["2400".into()],
+                note: "For the grip rentals".into(),
+                at: "2026-10-21T10:01:00Z".into(),
+            }),
+            ..plain.clone()
+        };
+        log.write_presence(actor(2), &asking).unwrap();
+        assert_eq!(log.read_presence(actor(2)), Some(asking.clone()));
+        // Codes and a note are left out when there are none.
+        let bare = AccessRequest {
+            role: "editor".into(),
+            at: "t".into(),
+            ..AccessRequest::default()
+        };
+        let j = serde_json::to_string(&bare).unwrap();
+        assert_eq!(j, r#"{"role":"editor","at":"t"}"#);
+
+        // A heartbeat written by an older app (no request field) still reads,
+        // and a field this version doesn't know is passed over, as an older
+        // app passes over `request`.
+        let old = r#"{"name":"Alex Kim","color":"teal","category":null,"account":null,"at":"2026-10-20T09:00:00Z","frontier":"f"}"#;
+        let p: Presence = serde_json::from_str(old).unwrap();
+        assert_eq!(p.name, "Alex Kim");
+        assert_eq!(p.request, None);
+        let newer = r#"{"name":"Alex Kim","color":"teal","at":"t","frontier":"f","something_later":{"x":1}}"#;
+        assert_eq!(
+            serde_json::from_str::<Presence>(newer).unwrap().name,
+            "Alex Kim"
+        );
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct OlderPresence {
+            name: String,
+            color: String,
+            category: Option<String>,
+            account: Option<String>,
+            at: String,
+            frontier: String,
+        }
+        let read_by_older: OlderPresence =
+            serde_json::from_str(&serde_json::to_string(&asking).unwrap()).unwrap();
+        assert_eq!(read_by_older.name, "Jordan Lee");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -4967,3 +4967,76 @@ remembered".
   the moves finished; the first key remembered outside the folder, never a planted one on the
   owner's computer. App: Start Again offered only to the owner, a member refused until they
   reopen, then sharing as before.
+
+## 96. Muted cells for department editors, and access requests through the heartbeat (2026-10-21)
+
+Roadmap 3.18's next slice after signed changes and the owner's key (entries 78, 89, 95): the
+department-role interface and access requests, as docs/research/collaboration.md section 9.7
+draws them. Docs/APP.md, "What a department editor sees" and "Asking for access", says what a
+person sees; docs/FORMAT.md, "The heartbeat", has the file's new field; this records the
+choices.
+
+- **What is muted is worked out in Rust.** The status gains `locked_categories` (a department
+  editor's categories with nothing in their scope) and `locked_accounts` (accounts outside it),
+  from the role the log already holds: the scope's uids mapped to numbers through the
+  projection's binding (`scope_codes`), an account counting as inside when it or its category
+  is in the scope. Empty for every other role, so a read-only or removed person keeps the
+  read-only state they had (the chip, every edit refused in words) rather than a page of
+  muted cells. The page (main.js) marks the rows it draws: muted text (a new token,
+  `--share-locked-text`, 4.5:1 or better on the grid's surface in light and dark), a lock
+  drawn in CSS on topsheet categories and account-list accounts, every line of an account
+  outside the scope muted, and "Read only for you" in the name cell's tooltip. A row spec's
+  new `locked` makes the grid call `onLocked` instead of opening an editor or clearing a
+  cell; paste, cut and fill down check it in main.js. The page draws again when the locks
+  change (a role arriving), since they come with the status, not the view.
+- **A request is a field in the asker's heartbeat, not a change.** `Presence.request`
+  (`AccessRequest {role, codes, note, at}`), left out when there is none, so files without
+  one are unchanged and older apps, whose `Presence` reads with defaults and refuses no
+  unknown field, pass over it (the format test reads the new shape with the old struct and
+  the old shape with the new). Nothing goes into the change log until someone allows it,
+  so asking needs no signature, raises no format and leaves nothing behind once withdrawn.
+  The cost: a request isn't signed, so someone who can write in the folder could put one in
+  another person's name. It gives nothing on its own; Allow is the allower's own signed
+  `grant`, and the panel names who it is for.
+- **What may be asked, and what Allow gives.** A request names a role (editor, department,
+  actuals or comment; never admin or co-owner) and optionally categories or accounts. From
+  a muted cell the page asks to edit, naming that category or account; from the status panel
+  it asks the same, naming where the person is, with an optional note (200 characters, one
+  line). The design's two buttons map onto that: **Allow** gives the role asked (for a
+  department request, the scope asked added to the one they have), **Allow <numbers> only**
+  gives department editing of those numbers added to their current scope, and is offered only
+  when it differs from Allow. Both go through `SharedDoc::set_role`, so they are checked and
+  signed exactly like the Share dialog's Set and refused in the same words.
+- **Who sees a request.** Only someone who could give it: `method_core::log::may_give`
+  (new, the rule `access::check` already applied to a `grant`, now one function both use)
+  for the viewer's role, the asker's current role and what Allow would give. A program's
+  actor never shows as asking; the asker never sees their own as one to decide.
+- **When it goes.** A request shows until its person has what it asks for (the numbers it
+  names covered by their role, or the role or more), then the asker's app takes it out of
+  the heartbeat at the next pass; or until withdrawn, or replaced by asking again. **Decline**
+  is remembered by the computer that declined, beside its sharing id
+  (`declined-requests/<budget id>.json`, never in the shared folder), against the asker and
+  the request's time, so the same request isn't shown there again, a new one is, and the
+  owner's other computers still show it. No log change, as the brief asked: a decline that
+  every computer obeyed would be a change in the log, and signing one buys nothing here.
+- **Asked of the owner by name.** The message and button say "Ask <owner's name> for
+  access", the owner being the one person every member knows; co-owners and admins see the
+  request too.
+- **Words.** Every new word on the page is in ui/i18n/en.js (`share.locked.*`,
+  `share.requests.*`, `share.ask_for_access`), used through `t()` in share.js; main.js's new
+  code takes its words from share.js; grid.js has none. Rust's refusals are sentences like the
+  rest of src/shared.rs.
+- **Not built**: a toast or system notification when a request arrives (the badge and the
+  panel only; design 9.8's notification settings come later), asking for a role from a
+  muted cell other than editing, and a live link (requests ride the folder's heartbeat, read
+  every five seconds).
+- **Tests.** Format: a heartbeat with and without a request round-trips, a field left out
+  when empty, the old shape read by the new struct and the new shape by the old.
+  App (tests/shared.rs): a department editor's locks in the status and nobody else's; a
+  request checked before it is written, written into the heartbeat and not the log, seen by
+  the owner and not by an editor who can't give roles, Allow of the account only granting it
+  through the log so the editor can then change a line there, and the request leaving the
+  heartbeat; a read-only person's request, Decline hiding it on that computer and after the
+  budget is opened again there, another of the owner's computers still seeing it and
+  allowing it; a removed person asking, withdrawing, asking again and being let back in.
+  Shared commands registered in app.rs, build.rs and the capability (the existing tests).

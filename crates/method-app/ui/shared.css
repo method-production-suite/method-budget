@@ -17,6 +17,9 @@
   --share-ok: #3a9d3a;
   --share-warn: #d29a12;
   --share-bad: var(--danger);
+  /* A department editor's cells outside their scope: muted, still 4.5:1 or
+     better on the grid's surface (the lock says it too). */
+  --share-locked-text: #6b737c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,6 +33,7 @@
     --pc-amber: #e3b341;
     --pc-slate: #a4b1be;
     --share-ok: #6fcf6f;
+    --share-locked-text: #868f99;
   }
 }
 
@@ -164,6 +168,14 @@
 
 .share-status[data-tone="bad"] {
   color: var(--danger);
+}
+
+.share-request-count {
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
 }
 
 .share-review-count {
@@ -737,4 +749,59 @@
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* What a department editor may not change (design 9.7): muted cells, and a
+   small lock drawn with borders on the category and account rows. */
+
+.grid tbody tr.share-locked td,
+.grid tbody tr.share-locked td.editable {
+  color: var(--share-locked-text);
+}
+
+.grid tbody tr.share-lock-row td.c-name::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 5px;
+  margin: 0 5px 0 8px;
+  border: 1.5px solid currentColor;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 5px 0 1px currentColor;
+  vertical-align: 4px;
+}
+
+/* Access requests in the status panel. */
+.share-request {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.share-request .share-avatar {
+  margin-right: 6px;
+}
+
+.share-request-note {
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.share-request-input {
+  width: 100%;
+  margin: 4px 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.toast .toast-action {
+  margin-left: 10px;
 }

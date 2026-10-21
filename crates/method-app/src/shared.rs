@@ -43,7 +43,7 @@ use method_core::log::{
     Uid, Value,
 };
 use method_core::{Budget, RowId};
-use method_format::log::{self as flog, LoadReport, Presence, Scan, Shared};
+use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
 use serde::{Deserialize, Serialize};
 
 use crate::safety::{DiskStamp, DiskStampExt};
@@ -366,6 +366,60 @@ pub struct ShareStatus {
     /// This person's changes that weren't shared before the budget was
     /// started again, by label, to make again by hand.
     pub not_in_new: Vec<String>,
+    /// Access requests this person could allow, oldest first, leaving out
+    /// the ones declined on this computer (docs/APP.md, "Asking for
+    /// access").
+    pub requests: Vec<RequestDto>,
+    /// This person's own request, while it is waiting.
+    pub my_request: Option<RequestDto>,
+    /// This person may change less than everything once roles are set, so
+    /// the page offers to ask for access.
+    pub can_ask: bool,
+    /// Who to ask, by name: the owner.
+    pub ask_name: String,
+    /// A department editor's categories with nothing in their scope, by
+    /// number: the topsheet shows a lock beside them. Empty for every other
+    /// role.
+    pub locked_categories: Vec<String>,
+    /// A department editor's accounts outside their scope, by number: their
+    /// rows and lines are muted, with a lock. Empty for every other role.
+    pub locked_accounts: Vec<String>,
+}
+
+/// One access request, as the status panel shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RequestDto {
+    /// Who asks (64 hex characters).
+    pub actor: String,
+    pub name: String,
+    pub color: String,
+    /// The role asked for ("editor", "department", "actuals", "comment").
+    pub role: String,
+    /// What Allow gives, in words: "Edits everything", "Edits 2400 Grip".
+    pub role_text: String,
+    /// The category or account numbers it is about.
+    pub codes: Vec<String>,
+    /// Those, in words: "2400 Grip".
+    pub codes_text: String,
+    /// Allow those categories or accounts only is a choice of its own (it
+    /// gives less than Allow).
+    pub only: bool,
+    pub note: String,
+    /// When they asked (ISO 8601 UTC); with `actor`, what names it.
+    pub at: String,
+}
+
+/// How long a note on an access request may be, in characters.
+pub const REQUEST_NOTE_MAX_CHARS: usize = 200;
+
+/// The roles a person may ask for.
+const ASKABLE: [&str; 4] = ["editor", "department", "actuals", "comment"];
+
+/// A request declined on this computer, as remembered.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+struct Declined {
+    actor: String,
+    at: String,
 }
 
 /// How many refused changes the status lists.
@@ -486,6 +540,14 @@ pub struct SharedDoc {
     /// Where this computer remembers owner keys (`None`: nowhere, so none
     /// is remembered; docs/research/owner-key.md, part 2).
     owner_keys: Option<PathBuf>,
+    /// This person's access request, written into the heartbeat while it
+    /// waits.
+    request: Option<AccessRequest>,
+    /// Where this computer remembers requests it declined (`None`: only
+    /// for as long as the budget is open).
+    declined_dir: Option<PathBuf>,
+    /// Requests declined here, by who and when they asked.
+    declined: BTreeSet<Declined>,
 }
 
 impl std::fmt::Debug for SharedDoc {
@@ -638,6 +700,9 @@ impl SharedDoc {
             signer: None,
             replaced: None,
             owner_keys: None,
+            request: None,
+            declined_dir: None,
+            declined: BTreeSet::new(),
         }
         .with_scan()
     }
@@ -1000,6 +1065,15 @@ impl SharedDoc {
         if self.keeper && self.keep_file(now, budget) {
             out.budget_changed = true;
         }
+        // Given what was asked for: the request goes.
+        if self
+            .request
+            .as_ref()
+            .is_some_and(|r| self.has_asked(self.actor(), r))
+        {
+            self.request = None;
+            self.place_changed = true;
+        }
         self.heartbeat(now, false);
         out
     }
@@ -1190,6 +1264,7 @@ impl SharedDoc {
             account: self.place.1.clone(),
             at: iso_now(),
             frontier: self.shared.log.frontier().digest(),
+            request: self.request.clone(),
         };
         if self.shared.dir.write_presence(self.actor(), &p).is_ok() {
             self.heartbeat_at = Some(now);
@@ -1353,6 +1428,7 @@ impl SharedDoc {
             .map(|a| self.person_dto(*a, now))
             .collect();
         let review = self.review();
+        let (locked_categories, locked_accounts) = self.locked();
         ShareStatus {
             mode: "folder".into(),
             folder: self
@@ -1393,6 +1469,12 @@ impl SharedDoc {
             owner_key_warning: self.owner_key_warning(),
             replaced: self.replaced_text(),
             not_in_new: self.replaced.clone().unwrap_or_default(),
+            requests: self.requests(),
+            my_request: self.request.as_ref().map(|r| self.request_dto(me, r)),
+            can_ask: self.can_ask(),
+            ask_name: self.owner_name(),
+            locked_categories,
+            locked_accounts,
         }
     }
 
@@ -1737,10 +1819,16 @@ impl SharedDoc {
 
     /// "2000 Production and 5000 Post".
     fn scope_words(&self, scope: &std::collections::BTreeSet<Uid>) -> String {
+        self.codes_words(&self.scope_codes(scope))
+    }
+
+    /// Category and account numbers with their names: "2000 Production and
+    /// 2400 Grip".
+    fn codes_words(&self, codes: &[String]) -> String {
         let b = &self.proj.budget;
-        let names: Vec<String> = self
-            .scope_codes(scope)
-            .into_iter()
+        let names: Vec<String> = codes
+            .iter()
+            .cloned()
             .map(|code| {
                 let name = b
                     .categories()
@@ -2042,6 +2130,329 @@ impl SharedDoc {
         self.unwritten_since.get_or_insert(now);
         self.last_change = now;
         Ok(())
+    }
+
+    // Access requests (docs/research/collaboration.md, 9.7; docs/APP.md,
+    // "Asking for access")
+
+    /// The category an account is in, by number.
+    fn category_of_account(&self, account: &str) -> Option<String> {
+        self.proj
+            .budget
+            .categories()
+            .find(|c| c.accounts.iter().any(|a| a.code == account))
+            .map(|c| c.code.clone())
+    }
+
+    /// Whether `role` lets its person change lines in category or account
+    /// `code`.
+    fn covers(&self, role: &Role, code: &str) -> bool {
+        match role {
+            Role::Owner | Role::CoOwner | Role::Admin | Role::Editor => true,
+            Role::Department(scope) => {
+                let codes = self.scope_codes(scope);
+                codes.iter().any(|c| c == code)
+                    || (self.proj.binding.accounts.contains_key(code)
+                        && self
+                            .category_of_account(code)
+                            .is_some_and(|cat| codes.contains(&cat)))
+            }
+            _ => false,
+        }
+    }
+
+    /// A department editor's categories with no part in their scope, and
+    /// accounts outside it; empty for every other role.
+    fn locked(&self) -> (Vec<String>, Vec<String>) {
+        let role = self.role();
+        if !matches!(role, Role::Department(_)) || self.shared.log.removed(self.actor()) {
+            return (Vec::new(), Vec::new());
+        }
+        let mut cats = Vec::new();
+        let mut accounts = Vec::new();
+        for c in self.proj.budget.categories() {
+            let mut any = self.covers(&role, &c.code);
+            for a in &c.accounts {
+                if self.covers(&role, &a.code) {
+                    any = true;
+                } else {
+                    accounts.push(a.code.clone());
+                }
+            }
+            if !any {
+                cats.push(c.code.clone());
+            }
+        }
+        (cats, accounts)
+    }
+
+    /// Whether `actor` already has what `req` asks for: the categories or
+    /// accounts it names, for a department; the role or more, otherwise.
+    fn has_asked(&self, actor: ActorId, req: &AccessRequest) -> bool {
+        if self.shared.log.removed(actor) {
+            return false;
+        }
+        let role = self.shared.log.role_of(actor);
+        let covered = !req.codes.is_empty() && req.codes.iter().all(|c| self.covers(&role, c));
+        let full = matches!(
+            role,
+            Role::Owner | Role::CoOwner | Role::Admin | Role::Editor
+        );
+        match req.role.as_str() {
+            "department" => covered || full,
+            "editor" => full || covered,
+            "actuals" => full || role == Role::Actuals || covered,
+            "comment" => full || matches!(role, Role::Actuals | Role::Comment) || covered,
+            _ => true,
+        }
+    }
+
+    /// What Allow gives for `req` by `actor` (`only`: the categories or
+    /// accounts asked about, as a department editor), as a role key and
+    /// scope for [`SharedDoc::set_role`].
+    fn granted_for(
+        &self,
+        actor: ActorId,
+        req: &AccessRequest,
+        only: bool,
+    ) -> (String, Vec<String>) {
+        if only || req.role == "department" {
+            let mut scope = match self.shared.log.role_of(actor) {
+                Role::Department(s) if !self.shared.log.removed(actor) => self.scope_codes(&s),
+                _ => Vec::new(),
+            };
+            for c in &req.codes {
+                if !scope.contains(c) {
+                    scope.push(c.clone());
+                }
+            }
+            ("department".into(), scope)
+        } else {
+            (req.role.clone(), Vec::new())
+        }
+    }
+
+    /// A scope's numbers as the uids a role holds (unknown numbers left out).
+    fn scope_uids(&self, codes: &[String]) -> BTreeSet<Uid> {
+        codes
+            .iter()
+            .filter_map(|c| {
+                self.proj
+                    .binding
+                    .categories
+                    .get(c)
+                    .or_else(|| self.proj.binding.accounts.get(c))
+                    .copied()
+            })
+            .collect()
+    }
+
+    /// A request as the panel shows it.
+    fn request_dto(&self, actor: ActorId, req: &AccessRequest) -> RequestDto {
+        let (key, scope) = self.granted_for(actor, req, false);
+        let given = Role::parse(&key, self.scope_uids(&scope)).unwrap_or(Role::ReadOnly);
+        RequestDto {
+            actor: actor.hex(),
+            name: self.name_of(actor),
+            color: self.color_of(actor),
+            role: req.role.clone(),
+            role_text: self.role_text(&given),
+            codes: req.codes.clone(),
+            codes_text: self.codes_words(&req.codes),
+            only: !req.codes.is_empty() && req.role != "department",
+            note: req.note.clone(),
+            at: req.at.clone(),
+        }
+    }
+
+    /// Whether this person could allow `req` by `actor` under the rules for
+    /// setting roles.
+    fn may_allow(&self, actor: ActorId, req: &AccessRequest) -> bool {
+        if actor == self.actor() || Some(actor) == self.shared.log.owner() {
+            return false;
+        }
+        let (key, scope) = self.granted_for(actor, req, false);
+        let Some(given) = Role::parse(&key, self.scope_uids(&scope)) else {
+            return false;
+        };
+        method_core::log::may_give(&self.role(), &self.shared.log.role_of(actor), &given)
+    }
+
+    /// The requests waiting that this person could allow, oldest first:
+    /// not declined here, not yet given, from people (never programs).
+    pub fn requests(&self) -> Vec<RequestDto> {
+        if self.replaced.is_some() || !self.role().sets_roles() {
+            return Vec::new();
+        }
+        let mut out: Vec<(String, RequestDto)> = self
+            .people
+            .iter()
+            .filter_map(|(actor, p)| {
+                let req = p.request.as_ref()?;
+                if !ASKABLE.contains(&req.role.as_str())
+                    || self.person_for(*actor).is_some()
+                    || self.declined.contains(&Declined {
+                        actor: actor.hex(),
+                        at: req.at.clone(),
+                    })
+                    || self.has_asked(*actor, req)
+                    || !self.may_allow(*actor, req)
+                {
+                    return None;
+                }
+                Some((req.at.clone(), self.request_dto(*actor, req)))
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out.into_iter().map(|(_, r)| r).collect()
+    }
+
+    /// Whether this person may ask for access: roles are set and theirs is
+    /// less than everything.
+    pub fn can_ask(&self) -> bool {
+        self.replaced.is_none()
+            && self.shared.log.roles_started()
+            && self.shared.log.owner() != Some(self.actor())
+            && matches!(
+                self.role(),
+                Role::Department(_) | Role::Actuals | Role::Comment | Role::ReadOnly
+            )
+    }
+
+    /// Asks the owner, co-owners and admins for `role` ("editor",
+    /// "department", "actuals" or "comment"), about the categories or
+    /// accounts `codes`, with a short `note`: written into this computer's
+    /// heartbeat now, replacing any request before it. Nothing goes into the
+    /// change log and nothing leaves the budget's folder.
+    pub fn request_access(
+        &mut self,
+        role: &str,
+        codes: &[String],
+        note: &str,
+    ) -> Result<(), String> {
+        if !self.shared.log.roles_started() {
+            return Err("Everyone can change everything in this budget until the owner sets what people may change, so there is nothing to ask for.".into());
+        }
+        if !self.can_ask() {
+            return Err("You can already change everything here.".into());
+        }
+        if !ASKABLE.contains(&role) {
+            return Err("That isn\u{2019}t a role you can ask for.".into());
+        }
+        let mut list: Vec<String> = Vec::new();
+        for code in codes {
+            let code = code.trim().to_string();
+            if code.is_empty() || list.contains(&code) {
+                continue;
+            }
+            if !self.proj.binding.categories.contains_key(&code)
+                && !self.proj.binding.accounts.contains_key(&code)
+            {
+                return Err(format!("There is no category or account {code}."));
+            }
+            list.push(code);
+        }
+        if role == "department" && list.is_empty() {
+            return Err("Say which categories or accounts you would like to change.".into());
+        }
+        let note: String = note
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(REQUEST_NOTE_MAX_CHARS)
+            .collect();
+        let req = AccessRequest {
+            role: role.to_string(),
+            codes: list,
+            note,
+            at: iso_now(),
+        };
+        if self.has_asked(self.actor(), &req) {
+            return Err("You can already change that.".into());
+        }
+        self.request = Some(req);
+        self.heartbeat(Instant::now(), true);
+        Ok(())
+    }
+
+    /// Takes this person's request back.
+    pub fn withdraw_request(&mut self) {
+        if self.request.take().is_some() {
+            self.heartbeat(Instant::now(), true);
+        }
+    }
+
+    /// The request by `actor` (64 hex characters) made at `at`, as its
+    /// heartbeat holds it now.
+    fn request_of(&self, actor: &str, at: &str) -> Result<(ActorId, AccessRequest), String> {
+        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        let req = self
+            .people
+            .get(&who)
+            .and_then(|p| p.request.clone())
+            .filter(|r| r.at == at)
+            .ok_or("That request was taken back or replaced.")?;
+        Ok((who, req))
+    }
+
+    /// Allows the request by `actor` made at `at`: gives what it asks for,
+    /// or with `only` the categories or accounts it names as a department
+    /// editor (added to the ones they have), through [`SharedDoc::set_role`],
+    /// so it is checked and signed like any role set in the Share dialog.
+    pub fn allow_request(&mut self, actor: &str, at: &str, only: bool) -> Result<(), String> {
+        let (who, req) = self.request_of(actor, at)?;
+        if only && req.codes.is_empty() {
+            return Err("That request doesn\u{2019}t name categories or accounts.".into());
+        }
+        let (key, scope) = self.granted_for(who, &req, only);
+        self.set_role(actor, &key, &scope)
+    }
+
+    /// Declines the request by `actor` made at `at`: not shown again on
+    /// this computer (remembered beside this computer's sharing id, never in
+    /// the shared folder); nothing is written to the change log. A request
+    /// made again later shows again.
+    pub fn decline_request(&mut self, actor: &str, at: &str) -> Result<(), String> {
+        let (who, req) = self.request_of(actor, at)?;
+        self.declined.insert(Declined {
+            actor: who.hex(),
+            at: req.at,
+        });
+        self.write_declined()
+    }
+
+    /// Where this computer remembers declined requests (the app passes a
+    /// folder beside the sharing id; tests pass their own). Reads what is
+    /// remembered there for this budget.
+    pub fn set_declined_dir(&mut self, dir: Option<PathBuf>) {
+        self.declined_dir = dir;
+        if let Some(path) = self.declined_path() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                if let Ok(list) = serde_json::from_str::<Vec<Declined>>(&text) {
+                    self.declined.extend(list);
+                }
+            }
+        }
+    }
+
+    fn declined_path(&self) -> Option<PathBuf> {
+        let dir = self.declined_dir.as_ref()?;
+        Some(dir.join(format!("{}.json", self.shared.info.budget_id)))
+    }
+
+    fn write_declined(&self) -> Result<(), String> {
+        let Some(path) = self.declined_path() else {
+            return Ok(());
+        };
+        let list: Vec<&Declined> = self.declined.iter().collect();
+        let text = serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)
+                .map_err(|e| format!("Couldn\u{2019}t remember that on this computer: {e}"))?;
+        }
+        std::fs::write(&path, text)
+            .map_err(|e| format!("Couldn\u{2019}t remember that on this computer: {e}"))
     }
 
     /// Writes value `index` of a field's history back as this person's

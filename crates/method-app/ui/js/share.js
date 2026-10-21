@@ -23,6 +23,14 @@
 //   may change; the owner and admins set it there. A chip in the toolbar
 //   says when this person may change less than everything. Rust refuses
 //   an edit beyond the role with a sentence the page shows as a toast.
+// - Muted cells and access requests (design 9.7): a department editor's
+//   categories and accounts outside their scope are muted with a lock
+//   (shareLocks(), used by main.js on the rows it draws); typing in one
+//   says so and offers to ask for access (showLocked()). A request goes
+//   into this computer's heartbeat file in the folder, nothing is sent
+//   anywhere; whoever may give that role sees it in the status panel and
+//   as a toolbar badge, with Allow, Allow those categories only and
+//   Decline.
 //
 // Everything is drawn with el() and textContent; names and labels come
 // from other people's files and are never read as HTML. No inline styles
@@ -41,7 +49,8 @@ function colorClass(color) {
   return PERSON_COLORS.includes(color) ? `pc-${color}` : 'pc-slate';
 }
 
-// { view(), doc(), invoke, apply(view, opts), toast, refresh() -> Promise,
+// { view(), doc(), invoke, apply(view, opts), toast(message, action), refresh() -> Promise,
+//   render() (draws the grid again: the locks changed),
 //   grid(), level(), place() -> { category, account }, focus(), showTab(tab),
 //   rowKeyFor(place) -> { key, col } | null, jumpTo(entry) }
 let ctx = null;
@@ -56,6 +65,7 @@ const st = {
   flashTimers: [],
   reportedDoc: null,
   revSeen: null, // the view rev the status was last asked for
+  locksSeen: new Map(), // doc -> the locked categories and accounts last drawn, as JSON
 };
 
 /** How long a changed cell keeps the editor's color (design 9.4). */
@@ -93,7 +103,11 @@ function current() {
 function statusArrived(p) {
   if (typeof p.doc !== 'number' || !p.status) return;
   st.status.set(p.doc, { status: p.status, at: Date.now() });
+  const locks = JSON.stringify([p.status.locked_categories || [], p.status.locked_accounts || []]);
+  const locksChanged = st.locksSeen.has(p.doc) ? st.locksSeen.get(p.doc) !== locks : locks !== '[[],[]]';
+  st.locksSeen.set(p.doc, locks);
   if (ctx && p.doc === ctx.doc() && ctx.view()) {
+    if (locksChanged && typeof ctx.render === 'function') ctx.render();
     renderBar(ctx.view());
     decorateShare(ctx.view());
     if (st.panel) drawPanel();
@@ -153,11 +167,11 @@ export function renderBar(view) {
   } else {
     text = t('share.shared_through_a_folder');
   }
-  setStatusText(text, tone, s.review_count);
+  setStatusText(text, tone, s.review_count, (s.requests || []).length);
   renderPeople(s);
 }
 
-function setStatusText(text, tone, review = 0) {
+function setStatusText(text, tone, review = 0, requests = 0) {
   const b = $('share-status');
   const label = $('share-status-text');
   if (!b || !label) return;
@@ -173,6 +187,16 @@ function setStatusText(text, tone, review = 0) {
     badge.textContent = t('share.to_review', { count: review });
   } else if (badge) {
     badge.remove();
+  }
+  let asks = b.querySelector('.share-request-count');
+  if (requests > 0) {
+    if (!asks) {
+      asks = el('span', { class: 'share-request-count' });
+      b.append(asks);
+    }
+    asks.textContent = t('share.requests.badge', { count: requests });
+  } else if (asks) {
+    asks.remove();
   }
 }
 
@@ -327,6 +351,8 @@ function drawPanel() {
   people.append(personRow(s.me, s));
   for (const p of s.people) people.append(personRow(p, s));
   rows.push(el('h4', { class: 'share-panel-sub', text: t('share.people') }), people);
+  const asked = requestRows(s);
+  if (asked) rows.push(...asked);
   const refused = refusedList(s);
   if (refused) rows.push(...refused);
   const actions = el('div', { class: 'share-panel-actions' });
@@ -421,6 +447,125 @@ function ownerKeyRows(s) {
 }
 
 const START_AGAIN_NOTE = () => t('share.start_again_note');
+
+// ---------------------------------------------------------------------------
+// Muted cells and access requests (design 9.7; docs/APP.md, "Asking for access")
+
+/**
+ * What this person may not change, for the rows main.js draws: the
+ * categories and accounts outside a department editor's scope, or null
+ * when nothing is locked (every other role; a read-only person keeps the
+ * read-only state). { categories: Set, accounts: Set, tip }
+ */
+export function shareLocks() {
+  const s = current();
+  if (!s || !ctx || !ctx.view() || !ctx.view().shared) return null;
+  const cats = s.locked_categories || [];
+  const accounts = s.locked_accounts || [];
+  if (!cats.length && !accounts.length) return null;
+  return { categories: new Set(cats), accounts: new Set(accounts), tip: t('share.locked.tip') };
+}
+
+/** Typing in a locked cell: says why, and offers to ask for access to it. */
+export function showLocked(locked) {
+  if (!ctx || !locked) return;
+  const s = current();
+  const what = [locked.code, locked.name].filter(Boolean).join(' ');
+  const message = t('share.locked.message', { what });
+  if (!s || !s.can_ask) {
+    ctx.toast(message);
+    return;
+  }
+  const mine = s.my_request;
+  if (mine && (mine.codes || []).includes(locked.code)) {
+    ctx.toast(`${message} ${t('share.locked.asked', { name: s.ask_name })}`);
+    return;
+  }
+  ctx.toast(message, { label: t('share.ask_for_access', { name: s.ask_name }), run: () => askForAccess([locked.code], '') });
+}
+
+/** Writes this person's request into their heartbeat file (Rust checks it). */
+async function askForAccess(codes, note) {
+  const doc = ctx.doc();
+  try {
+    const status = await ctx.invoke('share_request_access', { doc, role: 'editor', codes, note });
+    if (status) statusArrived({ doc, status });
+    ctx.toast(t('share.requests.sent', { name: status ? status.ask_name : '' }));
+  } catch (e) {
+    ctx.toast(String(e));
+  }
+}
+
+/**
+ * The status panel's part about access: requests this person could allow,
+ * with Allow, Allow those only and Decline; or this person's own request,
+ * with Withdraw; or a way to ask.
+ */
+function requestRows(s) {
+  const out = [];
+  const error = el('p', { class: 'share-problem', attrs: { role: 'alert' } });
+  error.hidden = true;
+  const doc = ctx.doc();
+  const run = async (button, cmd, args, done) => {
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      const status = await ctx.invoke(cmd, { doc, ...args });
+      if (status) statusArrived({ doc, status });
+      if (done) ctx.toast(done);
+    } catch (e) {
+      error.textContent = String(e);
+      error.hidden = false;
+      button.disabled = false;
+    }
+  };
+  const list = s.requests || [];
+  if (list.length) {
+    out.push(el('h4', { class: 'share-panel-sub', text: t('share.requests.title', { count: list.length }) }));
+    for (const r of list) {
+      const what = r.codes_text ? t('share.requests.asks_about', { name: r.name, codes: r.codes_text }) : t('share.requests.asks', { name: r.name });
+      const allow = el('button', { class: 'btn btn-primary', text: t('share.requests.allow'), title: t('share.requests.allow_tip', { name: r.name, role: r.role_text }), attrs: { type: 'button' } });
+      allow.addEventListener('click', () => run(allow, 'share_allow_request', { actor: r.actor, at: r.at, only: false }, t('share.role_saved', { name: r.name })));
+      const only = r.only ? el('button', { class: 'btn', text: t('share.requests.allow_only', { codes: r.codes_text }), attrs: { type: 'button' } }) : null;
+      if (only) only.addEventListener('click', () => run(only, 'share_allow_request', { actor: r.actor, at: r.at, only: true }, t('share.role_saved', { name: r.name })));
+      const decline = el('button', { class: 'btn', text: t('share.requests.decline'), title: t('share.requests.decline_tip'), attrs: { type: 'button' } });
+      decline.addEventListener('click', () => run(decline, 'share_decline_request', { actor: r.actor, at: r.at }, null));
+      out.push(el(
+        'div',
+        { class: 'share-request', attrs: { role: 'group', 'aria-label': what } },
+        el('div', {}, el('span', { class: `share-avatar ${colorClass(r.color)}`, text: initialsOf(r.name), attrs: { 'aria-hidden': 'true' } }), el('span', { class: 'share-person-name', text: what })),
+        el('div', { class: 'share-muted', text: t('share.requests.gives', { role: r.role_text, time: localTime(r.at) }) }),
+        r.note ? el('div', { class: 'share-request-note', text: r.note }) : null,
+        el('div', { class: 'share-panel-actions' }, allow, only, decline),
+      ));
+    }
+  }
+  if (s.my_request) {
+    const r = s.my_request;
+    const withdraw = el('button', { class: 'btn', text: t('share.requests.withdraw'), attrs: { type: 'button' } });
+    withdraw.addEventListener('click', () => run(withdraw, 'share_withdraw_request', {}, t('share.requests.withdrawn')));
+    out.push(
+      el('h4', { class: 'share-panel-sub', text: t('share.requests.yours') }),
+      el('p', { class: 'share-muted', text: r.codes_text ? t('share.requests.yours_text_about', { name: s.ask_name, time: localTime(r.at), codes: r.codes_text }) : t('share.requests.yours_text', { name: s.ask_name, time: localTime(r.at) }) }),
+      el('div', { class: 'share-panel-actions' }, withdraw),
+    );
+  } else if (s.can_ask) {
+    const place = (ctx.place && ctx.place()) || {};
+    const code = place.account || place.category || null;
+    const note = el('input', { class: 'share-request-input', attrs: { type: 'text', maxlength: '200', placeholder: t('share.requests.note_placeholder'), 'aria-label': t('share.requests.note_label') } });
+    const ask = el('button', { class: 'btn', text: t('share.ask_for_access', { name: s.ask_name }), attrs: { type: 'button' } });
+    ask.addEventListener('click', () => run(ask, 'share_request_access', { role: 'editor', codes: code ? [code] : [], note: note.value }, t('share.requests.sent', { name: s.ask_name })));
+    out.push(
+      el('h4', { class: 'share-panel-sub', text: t('share.requests.ask_title') }),
+      el('p', { class: 'share-muted', text: t('share.requests.ask_note', { name: s.ask_name }) }),
+      note,
+      el('div', { class: 'share-panel-actions' }, ask),
+    );
+  }
+  if (!out.length) return null;
+  out.push(error);
+  return out;
+}
 
 const TRUST_NOTE = () => t('share.trust_note');
 

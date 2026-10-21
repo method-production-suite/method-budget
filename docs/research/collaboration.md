@@ -8,8 +8,9 @@ undo; `method_format::log`: the folder, segments and heartbeats; `method log` an
 folder, File > Share, the status item, presence from heartbeats, flashes, conflict
 badges, the Review and Activity tabs, Who Changed This, per-person undo. Phase 3 so
 far: roles (decisions.md, entry 78) and key pairs, signed changes and removal by cutoff
-(entry 89; section 7 says where the build differs from this design). Not yet built:
-invites, muted cells, locks and access requests (the rest of phase 3), iroh live sessions
+(entry 89; section 7 says where the build differs from this design), and muted cells,
+locks and access requests through the heartbeat (entry 96). Not yet built: invites (the
+rest of phase 3), iroh live sessions
 (phase 4), the extras (5), and the service-by-service checks of section 5 on real sync
 services.
 Written for the owner's

@@ -83,7 +83,7 @@ import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy, subBudgetFromRow, subBudgetRow } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
 import { announce } from './announce.js';
-import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
+import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown, shareLocks, showLocked } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
@@ -166,6 +166,8 @@ function makeGrid(pane) {
     // Type-ahead in setup-backed cells, and the formula bar (quickentry.js):
     // the target pane's cursor only.
     onEditStart: on((editor) => editAssist(editor)),
+    // A cell this person may not change in a shared budget (share.js).
+    onLocked: on((locked) => showLocked(locked)),
     onCursor: on((at) => {
       if (pane !== target) return;
       showFormula(at);
@@ -366,14 +368,26 @@ function trackChanges(view, opts) {
 }
 
 let toastTimer = null;
-function toast(message) {
+/** A short message at the bottom; `action` ({ label, run }) adds a button, and keeps it longer. */
+function toast(message, action = null) {
   const t = $('toast');
   t.textContent = String(message);
+  if (action && action.label && typeof action.run === 'function') {
+    const b = el('button', { class: 'btn toast-action', text: action.label, attrs: { type: 'button' } });
+    b.addEventListener('click', () => {
+      t.hidden = true;
+      action.run();
+    });
+    t.append(' ', b);
+  }
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    t.hidden = true;
-  }, 6000);
+  toastTimer = setTimeout(
+    () => {
+      t.hidden = true;
+    },
+    action ? 12000 : 6000,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -427,15 +441,15 @@ function render(opts = {}) {
   P().host.dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
-    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), zeroFiltered(topsheetRows(ix, state.columns), opts), opts);
+    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), lockRows(zeroFiltered(topsheetRows(ix, state.columns), opts), entry, ai), opts);
   } else if (state.level === 'accounts') {
     grid.h.enterMovesDown = false;
-    grid.setData(withColumnMenu(accountColumns(ix, state.columns)), zeroFiltered(accountRows(ix, entry), opts), opts);
+    grid.setData(withColumnMenu(accountColumns(ix, state.columns)), lockRows(zeroFiltered(accountRows(ix, entry), opts), entry, ai), opts);
   } else {
     grid.h.enterMovesDown = true;
     const cols = gridDetailColumns();
     // The columns on screen decide which hidden factors get a marker.
-    const rows = detailRows(ix, entry, ai, v.account, new Set(cols.map((c) => c.key)));
+    const rows = lockRows(detailRows(ix, entry, ai, v.account, new Set(cols.map((c) => c.key))), entry, ai);
     if (opts.focusFirst) {
       const first = rows.find((r) => r.selectable !== false);
       opts = { ...opts, focusKey: first ? first.key : null };
@@ -455,6 +469,43 @@ function render(opts = {}) {
 
 // ---------------------------------------------------------------------------
 // Sharing through a folder (share.js; src/shared_app.rs)
+
+/**
+ * A department editor's rows outside their scope (design 9.7): muted, with
+ * a lock on category and account rows, and `locked` so the grid says why
+ * instead of editing. Lines of an account outside the scope are all muted.
+ */
+function lockRows(rows, entry, ai) {
+  const locks = shareLocks();
+  if (!locks) return rows;
+  const tip = (cell) => (cell ? { ...cell, title: cell.title ? `${locks.tip}\n${cell.title}` : locks.tip } : cell);
+  const mark = (r, code, name, lock, nameKey) => ({
+    ...r,
+    cls: `${r.cls || ''} share-locked${lock ? ' share-lock-row' : ''}`,
+    locked: { code, name },
+    cells: { ...r.cells, [nameKey]: tip(r.cells[nameKey]) },
+  });
+  if (state.level === 'details') {
+    const a = entry && entry.cat.accounts ? entry.cat.accounts[ai] : null;
+    if (!a || !locks.accounts.has(a.code)) return rows;
+    return rows.map((r) => mark(r, a.code, a.name, false, 'description'));
+  }
+  if (state.level === 'accounts') {
+    return rows.map((r) => (r.code && locks.accounts.has(r.code) ? mark(r, r.code, r.cells.name ? r.cells.name.text : '', true, 'name') : r));
+  }
+  return rows.map((r) => {
+    const code = r.kind === 'category' && r.cells.code ? r.cells.code.text : null;
+    return code && locks.categories.has(code) ? mark(r, code, r.cells.name ? r.cells.name.text : '', true, 'name') : r;
+  });
+}
+
+/** The cursor's row is one this person may not change: says so and returns true. */
+function lockedHere() {
+  const at = grid.cursorCell();
+  if (!at || !at.row.locked) return false;
+  showLocked(at.row.locked);
+  return true;
+}
 
 /**
  * The grid row (and column) a place from Rust is at on screen, or null when
@@ -531,6 +582,7 @@ initShare({
   apply: (v, opts) => apply(v, opts),
   toast,
   refresh: () => refreshView('share-changed'),
+  render: () => render(),
   grid: () => grid,
   level: () => state.level,
   place: () => ({ category: state.level !== 'topsheet' && state.cat ? state.cat.code : null, account: state.level === 'details' && state.acct ? state.acct.code : null }),
@@ -957,6 +1009,7 @@ function setCells(cells, action = null) {
 }
 
 function clearCells(cells, action = 'clear') {
+  if (lockedHere()) return;
   if (state.level === 'details') {
     setCells(cells.map((c) => ({ ...c, value: '' })), action);
     return;
@@ -968,6 +1021,7 @@ function clearCells(cells, action = 'clear') {
 
 function fillDown() {
   if (state.level !== 'details') return;
+  if (lockedHere()) return;
   const cells = grid.fillDownTargets();
   if (cells.length) setCells(cells, 'fill');
   grid.focus();
@@ -987,6 +1041,7 @@ function pasteValue(colKey, value) {
 
 function pasteText(text) {
   if (!text) return;
+  if (lockedHere()) return;
   const matrix = parseTSV(text);
   if (state.level !== 'details') {
     // Category and account lists take one cell at a time.

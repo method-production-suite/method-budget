@@ -273,6 +273,10 @@ const COMMANDS: &[&str] = &[
     "share_remove_person",
     "share_start_again",
     "share_reopen",
+    "share_request_access",
+    "share_withdraw_request",
+    "share_allow_request",
+    "share_decline_request",
     // The personal setup library (src/library.rs)
     "library_view",
     "library_create",

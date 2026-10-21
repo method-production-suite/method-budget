@@ -1643,6 +1643,7 @@ Feature.mthd-log/
       000001-000140.chg            a sealed segment: changes 1 to 140 of this actor
       000141-000163.chg
       written.json                 hashes of the .mthd files it wrote from the log
+      presence.json                its heartbeat: who, where, and any access request
     <actor>/
       ...
 ```
@@ -1661,6 +1662,41 @@ Feature.mthd-log/
   log, and the one it started sharing from. A `.mthd` whose hash any computer lists is
   merely behind the log, never an outside edit, so it is never taken in (doing so would
   undo the changes it lacks).
+
+### The heartbeat (`presence.json`)
+
+Each computer rewrites its own `presence.json` every twenty seconds while the budget is
+open (and when its person moves, or asks for access), through a temporary file and a
+rename like a segment. It is never part of the log and nothing in it changes the budget.
+
+```json
+{
+  "name": "Jordan Lee",
+  "color": "blue",
+  "category": "2000",
+  "account": "2400",
+  "at": "2026-10-21T10:00:00Z",
+  "frontier": "<digest of the log as this computer had it>",
+  "request": {
+    "role": "editor",
+    "codes": ["2400"],
+    "note": "For the grip rentals",
+    "at": "2026-10-21T10:01:00Z"
+  }
+}
+```
+
+- `category` and `account` are numbers or `null`; `at` is ISO 8601 UTC.
+- **`request`** (optional, decisions.md entry 96) is an access request: the role asked for
+  (`editor`, `department`, `actuals` or `comment`, as `grant` names them), the category or
+  account numbers it is about (`codes`, left out when none), a short note (`note`, at most
+  200 characters, left out when empty) and when it was asked (`at`; with the actor, what
+  names the request). The whole field is left out when the person asks for nothing, so a
+  heartbeat without a request is byte for byte what earlier versions write. Readers take
+  every field with a default and ignore fields they don't know, so earlier versions read a
+  heartbeat holding a request and pass over it (tested with the old shape both ways in
+  method-format). A request is not signed and gives nothing on its own: a role is given
+  only by a signed `grant` from someone allowed to give it.
 
 ### `budget.json`
 
