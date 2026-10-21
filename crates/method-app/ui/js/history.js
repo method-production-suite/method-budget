@@ -21,6 +21,7 @@
 import { el } from './dom.js';
 import { invoke } from './api.js';
 import { formDialog } from './modal.js';
+import { t } from './i18n.js';
 
 // What was fetched last, and for which budget and rev.
 const st = {
@@ -95,20 +96,20 @@ function draw() {
   if (st.error) box.append(el('p', { class: 'history-error', text: st.error, attrs: { role: 'alert' } }));
   const h = st.history;
   if (!h) {
-    box.append(el('p', { class: 'history-empty', text: 'Loading the history…' }));
+    box.append(el('p', { class: 'history-empty', text: t('history.loading') }));
     host.replaceChildren(box);
     return;
   }
   if (!h.steps.length) {
-    box.append(el('p', { class: 'history-empty', text: 'No changes yet. Every change you make is listed here, and you can go back to any of them.' }));
+    box.append(el('p', { class: 'history-empty', text: t('history.no_changes') }));
   }
-  const list = el('ol', { class: 'history-list', attrs: { 'aria-label': 'Undo history, oldest first' } });
+  const list = el('ol', { class: 'history-list', attrs: { 'aria-label': t('history.list_label') } });
   // Position 0 (the start), then each step: position i is just after step i.
   const rows = [
     {
       pos: 0,
-      label: h.trimmed ? 'Start (older changes not kept)' : 'Start',
-      title: h.trimmed ? 'The oldest state still kept' : 'As the budget was opened or created',
+      label: h.trimmed ? t('history.start_trimmed') : t('history.start'),
+      title: h.trimmed ? t('history.start_trimmed_tip') : t('history.start_tip'),
       at: 0,
       done: true,
     },
@@ -140,7 +141,7 @@ function row(r, current) {
     'button',
     {
       class: 'history-jump',
-      title: isCurrent ? `${r.title} (where the budget is now)` : r.pos > current ? `Redo to here: ${r.title}` : `Undo to here: ${r.title}`,
+      title: isCurrent ? t('history.current_tip', { step: r.title }) : r.pos > current ? t('history.redo_to_here', { step: r.title }) : t('history.undo_to_here', { step: r.title }),
       attrs: {
         type: 'button',
         tabindex: isCurrent ? '0' : '-1',
@@ -159,9 +160,9 @@ function row(r, current) {
   );
   const save = el('button', {
     class: 'history-version',
-    text: 'Version…',
-    title: 'Save the budget as it was here as a named version (the budget stays as it is now)',
-    attrs: { type: 'button', tabindex: '-1', 'aria-label': `Save as a version: ${r.label}` },
+    text: t('history.version'),
+    title: t('history.version_tip'),
+    attrs: { type: 'button', tabindex: '-1', 'aria-label': t('history.save_as_version_named', { step: r.label }) },
     data: { key: `history:version:${r.pos}`, pos: r.pos },
     on: {
       click: () => saveVersion(r),
@@ -196,15 +197,15 @@ function stepKey(e, pos, part) {
 /** Asks for a name, then saves the budget as it was at `r` as a version. */
 async function saveVersion(r) {
   if (!st.ctx || typeof st.ctx.historySave !== 'function') return;
-  const name = r.pos === 0 ? 'Start of the history' : r.label;
+  const name = r.pos === 0 ? t('history.start_of_history') : r.label;
   await formDialog({
-    title: 'Save as a version',
-    message: 'The budget as it was at this step becomes a named version. The budget itself stays as it is now.',
-    fields: [{ key: 'name', label: 'Version name', value: name.slice(0, 200) }],
-    submitText: 'Save Version',
+    title: t('history.save_as_version'),
+    message: t('history.save_as_version_message'),
+    fields: [{ key: 'name', label: t('history.version_name'), value: name.slice(0, 200) }],
+    submitText: t('history.save_version'),
     onSubmit: (f) => {
       const n = String(f.name || '').trim();
-      if (!n) return Promise.reject('A version needs a name.');
+      if (!n) return Promise.reject(t('history.needs_a_name'));
       return st.ctx.historySave(r.pos, n);
     },
   });

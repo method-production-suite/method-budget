@@ -25,23 +25,24 @@
 
 import { el } from './dom.js';
 import { withShortcut } from './shortcuts.js';
+import { t } from './i18n.js';
 
 const DRAG_START_PX = 5;
 
 // Every strip on the page, so a drag can land on another one.
 const strips = [];
 
-function ariaLabel(t) {
-  const parts = [t.label];
-  if (t.dirty) parts.push('unsaved changes');
-  if (t.conflict) parts.push('changed outside Method Budget');
+function ariaLabel(tab) {
+  const parts = [tab.label];
+  if (tab.dirty) parts.push(t('tabs.aria_unsaved'));
+  if (tab.conflict) parts.push(t('tabs.aria_changed_outside'));
   return parts.join(', ');
 }
 
-function tooltip(t) {
-  const lines = [t.title && t.title !== t.label ? `${t.label}: ${t.title}` : t.label, t.path || 'Not saved yet'];
-  if (t.dirty) lines.push('Unsaved changes');
-  if (t.conflict) lines.push('Changed outside Method Budget: autosave is paused until you choose which version to keep');
+function tooltip(tab) {
+  const lines = [tab.title && tab.title !== tab.label ? t('tabs.label_title', { label: tab.label, title: tab.title }) : tab.label, tab.path || t('tabs.not_saved_yet')];
+  if (tab.dirty) lines.push(t('tabs.unsaved_changes'));
+  if (tab.conflict) lines.push(t('tabs.changed_outside_tip'));
   return lines.join('\n');
 }
 
@@ -66,25 +67,25 @@ export function createTabStrip(host, handlers) {
 
   const strip = el('div', {
     class: 'tabbar-tabs',
-    attrs: { role: 'tablist', 'aria-label': 'Open budgets', 'aria-orientation': 'horizontal' },
+    attrs: { role: 'tablist', 'aria-label': t('tabs.open_budgets'), 'aria-orientation': 'horizontal' },
   });
   const leftBtn = el('button', {
     class: 'tabbar-scroll tabbar-scroll-left',
-    title: 'Scroll the tabs left',
-    attrs: { type: 'button', tabindex: '-1', 'aria-label': 'Scroll the tabs left' },
+    title: t('tabs.scroll_left'),
+    attrs: { type: 'button', tabindex: '-1', 'aria-label': t('tabs.scroll_left') },
     on: { click: () => scrollByPage(-1) },
   });
   const rightBtn = el('button', {
     class: 'tabbar-scroll tabbar-scroll-right',
-    title: 'Scroll the tabs right',
-    attrs: { type: 'button', tabindex: '-1', 'aria-label': 'Scroll the tabs right' },
+    title: t('tabs.scroll_right'),
+    attrs: { type: 'button', tabindex: '-1', 'aria-label': t('tabs.scroll_right') },
     on: { click: () => scrollByPage(1) },
   });
   const add = el('button', {
     class: 'tabbar-new',
     text: '+',
-    title: withShortcut('New budget in a new tab', 'file.new_tab'),
-    attrs: { type: 'button', 'aria-label': 'New tab' },
+    title: withShortcut(t('tabs.new_budget_tip'), 'file.new_tab'),
+    attrs: { type: 'button', 'aria-label': t('tabs.new_tab') },
     on: { click: () => ctx.add() },
   });
   host.replaceChildren(leftBtn, strip, rightBtn, add);
@@ -113,13 +114,13 @@ export function createTabStrip(host, handlers) {
     drawnSig = sig;
     tabs = list;
     const focused = strip.contains(document.activeElement) ? Number(document.activeElement.dataset.doc) : null;
-    strip.replaceChildren(...list.map((t) => tabEl(t)));
-    const active = list.find((t) => t.active);
+    strip.replaceChildren(...list.map((tab) => tabEl(tab)));
+    const active = list.find((tab) => tab.active);
     if (active && active.id !== shownActive) {
       shownActive = active.id;
       revealTab(active.id);
     }
-    if (focused !== null) focus(list.some((t) => t.id === focused) ? focused : active && active.id);
+    if (focused !== null) focus(list.some((tab) => tab.id === focused) ? focused : active && active.id);
     updateArrows();
   }
 
@@ -141,55 +142,55 @@ export function createTabStrip(host, handlers) {
     if (typeof ctx.menu === 'function') ctx.menu(id, at);
   }
 
-  function tabEl(t) {
+  function tabEl(tab) {
     const btn = el(
       'button',
       {
         class: 'doc-tab-btn',
-        title: tooltip(t),
+        title: tooltip(tab),
         attrs: {
           type: 'button',
           role: 'tab',
-          'aria-selected': String(Boolean(t.active)),
-          'aria-label': ariaLabel(t),
-          tabindex: t.active ? '0' : '-1',
+          'aria-selected': String(Boolean(tab.active)),
+          'aria-label': ariaLabel(tab),
+          tabindex: tab.active ? '0' : '-1',
           'aria-keyshortcuts': 'Alt+Shift+ArrowLeft Alt+Shift+ArrowRight Shift+F10',
         },
-        data: { doc: t.id },
+        data: { doc: tab.id },
       },
-      el('span', { class: 'doc-tab-label', text: t.label }),
-      t.dirty ? el('span', { class: 'doc-tab-dot', attrs: { 'aria-hidden': 'true' } }) : null,
+      el('span', { class: 'doc-tab-label', text: tab.label }),
+      tab.dirty ? el('span', { class: 'doc-tab-dot', attrs: { 'aria-hidden': 'true' } }) : null,
     );
     btn.addEventListener('click', () => {
       if (dragged) {
         dragged = false;
         return;
       }
-      if (!t.active) ctx.switchTo(t.id);
+      if (!tab.active) ctx.switchTo(tab.id);
     });
-    btn.addEventListener('keydown', (e) => tabKey(e, t.id, btn));
-    btn.addEventListener('pointerdown', (e) => startDrag(e, btn, t.id));
+    btn.addEventListener('keydown', (e) => tabKey(e, tab.id, btn));
+    btn.addEventListener('pointerdown', (e) => startDrag(e, btn, tab.id));
 
     // Mouse only: the keyboard closes a tab with Cmd+W, which the shortcut
     // sheet and the tooltip name.
     const close = el('button', {
       class: 'doc-tab-close',
       text: '×',
-      title: withShortcut('Close tab', 'file.close_tab'),
+      title: withShortcut(t('tabs.close_tab'), 'file.close_tab'),
       attrs: { type: 'button', tabindex: '-1', 'aria-hidden': 'true' },
-      data: { doc: t.id },
+      data: { doc: tab.id },
     });
     close.addEventListener('mousedown', (e) => e.preventDefault());
     close.addEventListener('pointerdown', (e) => e.stopPropagation());
     close.addEventListener('click', (e) => {
       e.stopPropagation();
-      ctx.close(t.id);
+      ctx.close(tab.id);
     });
 
     const cls = ['doc-tab'];
-    if (t.active) cls.push('is-active');
-    if (t.dirty) cls.push('is-dirty');
-    const wrap = el('div', { class: cls.join(' '), attrs: { role: 'presentation' }, data: { doc: t.id } }, btn, close);
+    if (tab.active) cls.push('is-active');
+    if (tab.dirty) cls.push('is-dirty');
+    const wrap = el('div', { class: cls.join(' '), attrs: { role: 'presentation' }, data: { doc: tab.id } }, btn, close);
     // Middle-click closes, as in browsers (and keeps Windows from starting
     // its scroll mode).
     wrap.addEventListener('mousedown', (e) => {
@@ -198,18 +199,18 @@ export function createTabStrip(host, handlers) {
     wrap.addEventListener('auxclick', (e) => {
       if (e.button !== 1) return;
       e.preventDefault();
-      ctx.close(t.id);
+      ctx.close(tab.id);
     });
     wrap.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openMenu(t.id, { x: e.clientX, y: e.clientY });
+      openMenu(tab.id, { x: e.clientX, y: e.clientY });
     });
     return wrap;
   }
 
   function tabKey(e, id, btn) {
-    const ids = tabs.map((t) => t.id);
+    const ids = tabs.map((tab) => tab.id);
     const i = ids.indexOf(id);
     if (i < 0) return;
     const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
@@ -349,7 +350,7 @@ export function createTabStrip(host, handlers) {
   function dropTarget(x, id) {
     const hit = overAt(x);
     if (!hit) return null;
-    const ids = tabs.map((t) => t.id);
+    const ids = tabs.map((tab) => tab.id);
     const overId = Number(hit.over.dataset.doc);
     if (overId === id) return null;
     const before = ids.indexOf(overId) + (hit.after ? 1 : 0);
@@ -363,21 +364,21 @@ export function createTabStrip(host, handlers) {
   function dropAt(x) {
     const hit = overAt(x);
     if (!hit) return { to: tabs.length, el: null, side: 'after' };
-    const ids = tabs.map((t) => t.id);
+    const ids = tabs.map((tab) => tab.id);
     return { to: ids.indexOf(Number(hit.over.dataset.doc)) + (hit.after ? 1 : 0), el: hit.over, side: hit.after ? 'after' : 'before' };
   }
 
-  function paint(t) {
+  function paint(target) {
     for (const n of strip.querySelectorAll('.drop-before, .drop-after')) n.classList.remove('drop-before', 'drop-after');
     host.classList.remove('is-drop-target');
-    if (!t) return;
-    if (t.el) t.el.classList.add(`drop-${t.side}`);
+    if (!target) return;
+    if (target.el) target.el.classList.add(`drop-${target.side}`);
     else host.classList.add('is-drop-target');
   }
 
   /** Shows where a drag lands, on whichever strip it is over. */
-  function paintAll(t) {
-    for (const s of strips) s.paint(t && (t.other || self) === s ? t : null);
+  function paintAll(target) {
+    for (const s of strips) s.paint(target && (target.other || self) === s ? target : null);
   }
 
   const self = { host, strip, render, focus, hasFocus, dropAt, paint };

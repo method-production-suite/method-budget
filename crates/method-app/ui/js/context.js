@@ -16,6 +16,7 @@ import { isModalOpen } from './modal.js';
 import { isHelpOpen } from './help.js';
 import { PALETTE, paletteColor, selectedDetails, styleState } from './rowformat.js';
 import { presetMenu, blockMenu } from './presets.js';
+import { t } from './i18n.js';
 
 // { grid, host, view(), level(), run(id), act(cmd, args), toast(message),
 //   explainable(row, colKey), explain(row, colKey) }
@@ -68,8 +69,8 @@ function presetItems(blocks) {
     anchor: () => ctx.grid.cellFor(ctx.grid.cursorKey(), ctx.grid.cursorColKey()) || host(),
     openTab: () => ctx.run('view.tab.presets'),
   };
-  const out = [SEP, { label: 'Apply preset', items: presetMenu(c) }];
-  if (blocks) out.push({ label: 'Insert line block', items: blockMenu(c) });
+  const out = [SEP, { label: t('context.apply_preset'), items: presetMenu(c) }];
+  if (blocks) out.push({ label: t('context.insert_line_block'), items: blockMenu(c) });
   return out;
 }
 
@@ -136,13 +137,13 @@ function show(at, onRow) {
   let label;
   if (level === 'details') {
     items = detailItems(onRow);
-    label = 'Line actions';
+    label = t('context.line_actions');
   } else if (level === 'accounts') {
     items = accountItems(onRow);
-    label = 'Account actions';
+    label = t('context.account_actions');
   } else {
     items = topsheetItems(onRow);
-    label = 'Topsheet actions';
+    label = t('context.topsheet_actions');
   }
   items = [...explainItems(), ...blameItems(), ...items];
   openContextMenu(at, { label, items: tidy(items), returnFocus: () => ctx.grid.focus() });
@@ -181,19 +182,23 @@ function clip(kind) {
   } catch {
     ok = false;
   }
-  if (!ok) ctx.toast(`Use ${shortcutText(`edit.${kind}`)} to ${kind} here.`);
+  if (ok) return;
+  const key = shortcutText(`edit.${kind}`);
+  if (kind === 'cut') ctx.toast(t('context.use_key_to_cut', { key }));
+  else if (kind === 'copy') ctx.toast(t('context.use_key_to_copy', { key }));
+  else ctx.toast(t('context.use_key_to_paste', { key }));
 }
 
 function clipboardItems() {
   return [
-    { label: 'Cut', shortcut: shortcutText('edit.cut'), run: () => clip('cut') },
-    { label: 'Copy', shortcut: shortcutText('edit.copy'), run: () => clip('copy') },
-    { label: 'Paste', shortcut: shortcutText('edit.paste'), run: () => clip('paste') },
+    { label: t('context.cut'), shortcut: shortcutText('edit.cut'), run: () => clip('cut') },
+    { label: t('context.copy'), shortcut: shortcutText('edit.copy'), run: () => clip('copy') },
+    { label: t('context.paste'), shortcut: shortcutText('edit.paste'), run: () => clip('paste') },
     SEP,
     // Whole rows with everything attached (clipboard.js); work across budgets.
-    cmd('edit.cut_rows', 'Cut rows'),
-    cmd('edit.copy_rows', 'Copy rows'),
-    cmd('edit.paste_rows', 'Paste rows'),
+    cmd('edit.cut_rows', t('context.cut_rows')),
+    cmd('edit.copy_rows', t('context.copy_rows')),
+    cmd('edit.paste_rows', t('context.paste_rows')),
   ];
 }
 
@@ -220,22 +225,22 @@ function byteOrder(a, b) {
 
 function formatItems(s) {
   return [
-    cmd('format.bold', 'Bold', { checked: tri(s.bold) }),
-    cmd('format.italic', 'Italic', { checked: tri(s.italic) }),
+    cmd('format.bold', t('context.bold'), { checked: tri(s.bold) }),
+    cmd('format.italic', t('context.italic'), { checked: tri(s.italic) }),
     SEP,
-    cmd('format.indent_more', 'Indent more', { disabled: !s.canIndent }),
-    cmd('format.indent_less', 'Indent less', { disabled: !s.canOutdent }),
+    cmd('format.indent_more', t('context.indent_more'), { disabled: !s.canIndent }),
+    cmd('format.indent_less', t('context.indent_less'), { disabled: !s.canOutdent }),
     SEP,
     {
-      label: 'Text color',
+      label: t('context.text_color'),
       items: [
-        cmd('format.color.none', 'No color', { swatch: 'none', checked: s.color === '', title: 'The line takes its group color, if it has one' }),
+        cmd('format.color.none', t('context.no_color'), { swatch: 'none', checked: s.color === '', title: t('context.no_color_tip') }),
         SEP,
         ...PALETTE.map((c) => cmd(`format.color.${c.id}`, c.label, { swatch: c.id, checked: s.color === c.light })),
       ],
     },
     SEP,
-    cmd('format.clear', 'Clear formatting', { disabled: !s.styled }),
+    cmd('format.clear', t('context.clear_formatting'), { disabled: !s.styled }),
   ];
 }
 
@@ -250,7 +255,6 @@ function tagItems(field, rows) {
   const defs = b[field] && typeof b[field] === 'object' ? b[field] : {};
   // Lines and adjustment rows take fringes and groups (decisions.md, entry 56).
   const takers = rows.filter((d) => kindOf(d) === 'line' || kindOf(d) === 'adjustment');
-  const what = field === 'fringes' ? 'fringes' : 'groups';
   const out = Object.keys(defs)
     .sort(byteOrder)
     .map((name) => {
@@ -267,8 +271,8 @@ function tagItems(field, rows) {
         run: () => ctx.act('apply_to_rows', { rowIds: rows.map((d) => d.id), field, name, on: state !== true }),
       };
     });
-  if (!out.length) out.push({ label: `No ${what} yet`, disabled: true });
-  out.push(SEP, cmd(field === 'fringes' ? 'view.tab.fringes' : 'view.tab.groups', `Set up ${what}…`));
+  if (!out.length) out.push({ label: field === 'fringes' ? t('context.no_fringes_yet') : t('context.no_groups_yet'), disabled: true });
+  out.push(SEP, cmd(field === 'fringes' ? 'view.tab.fringes' : 'view.tab.groups', field === 'fringes' ? t('context.set_up_fringes') : t('context.set_up_groups')));
   return out;
 }
 
@@ -280,8 +284,8 @@ function explainItems() {
   const c = menuCell;
   if (!c || typeof ctx.explainable !== 'function' || !ctx.explainable(c.row, c.colKey)) return [];
   return [
-    cmd('edit.explain', 'Explain This Number…', {
-      title: 'Every step of how this total is worked out, in the Explain tab',
+    cmd('edit.explain', t('context.explain'), {
+      title: t('context.explain_tip'),
       run: () => ctx.explain(c.row, c.colKey),
     }),
     SEP,
@@ -294,8 +298,8 @@ function blameItems() {
   if (!c || typeof ctx.blameable !== 'function' || !ctx.blameable(c.row, c.colKey)) return [];
   return [
     {
-      label: 'Who Changed This…',
-      title: 'Every value this cell has had since the budget was shared, and who typed it',
+      label: t('context.blame'),
+      title: t('context.blame_tip'),
       run: () => ctx.blame(c.row, c.colKey),
     },
     SEP,
@@ -304,15 +308,15 @@ function blameItems() {
 
 /** Move up and Move down: the selected rows one place (src/moverows.rs). */
 function moveItems() {
-  return [SEP, cmd('edit.move_up', 'Move up'), cmd('edit.move_down', 'Move down')];
+  return [SEP, cmd('edit.move_up', t('context.move_up')), cmd('edit.move_down', t('context.move_down'))];
 }
 
 function detailItems(onRow) {
   const inserts = [
-    cmd('insert.line', 'Insert line'),
-    cmd('insert.subtotal', 'Insert subtotal'),
-    cmd('insert.adjustment', 'Insert adjustment'),
-    cmd('insert.separator', 'Insert separator'),
+    cmd('insert.line', t('context.insert_line')),
+    cmd('insert.subtotal', t('context.insert_subtotal')),
+    cmd('insert.adjustment', t('context.insert_adjustment')),
+    cmd('insert.separator', t('context.insert_separator')),
   ];
   if (!onRow) return inserts;
   const rows = selectedDetails();
@@ -321,24 +325,24 @@ function detailItems(onRow) {
     ...clipboardItems(),
     SEP,
     ...inserts,
-    cmd('edit.delete_rows', rows.length > 1 ? `Delete ${rows.length} rows` : 'Delete row'),
+    cmd('edit.delete_rows', rows.length > 1 ? t('context.delete_rows', { count: rows.length }) : t('context.delete_row')),
     ...moveItems(),
     SEP,
-    { label: 'Format', items: formatItems(styleState(rows)) },
-    cmd('edit.note', 'Add note…'),
+    { label: t('context.format'), items: formatItems(styleState(rows)) },
+    cmd('edit.note', t('context.add_note')),
     SEP,
-    cmd('edit.make_range', 'Make fringe range', {
+    cmd('edit.make_range', t('context.make_range'), {
       disabled: costed.length < 2,
-      title: 'Percent fringe cutoffs apply to the selected lines together',
+      title: t('context.make_range_tip'),
     }),
-    cmd('edit.remove_range', 'Remove fringe range', { disabled: !rows.some((d) => typeof d.fringe_range === 'number') }),
-    { label: 'Apply group', items: tagItems('groups', rows) },
-    { label: 'Apply fringe', items: tagItems('fringes', rows) },
+    cmd('edit.remove_range', t('context.remove_range'), { disabled: !rows.some((d) => typeof d.fringe_range === 'number') }),
+    { label: t('context.apply_group'), items: tagItems('groups', rows) },
+    { label: t('context.apply_fringe'), items: tagItems('fringes', rows) },
     ...presetItems(true),
     SEP,
-    cmd('edit.overtime', 'Overtime helper…', {
+    cmd('edit.overtime', t('context.overtime'), {
       disabled: !rows.some((d) => kindOf(d) === 'line'),
-      title: 'Work out the line with overtime and write it in (the Overtime tab)',
+      title: t('context.overtime_tip'),
     }),
     ...rateItems(rows),
   ];
@@ -351,17 +355,17 @@ function detailItems(onRow) {
 function rateItems(rows) {
   const line = rows.length === 1 && kindOf(rows[0]) === 'line' ? rows[0] : null;
   const items = [
-    cmd('edit.fill_rate', 'Fill rate from table…', {
+    cmd('edit.fill_rate', t('context.fill_rate'), {
       disabled: !line,
-      title: 'Pick a classification from one of the budget’s rate tables to fill the line’s rate',
+      title: t('context.fill_rate_tip'),
     }),
   ];
   const view = typeof ctx.view === 'function' ? ctx.view() : null;
   const check = line && view && view.rate_checks ? view.rate_checks[line.id] : null;
   if (check && check.state === 'changed') {
     items.push({
-      label: `Update rate to ${check.now}`,
-      title: 'Take what the line’s rate table says now (one undo step)',
+      label: t('context.update_rate', { rate: check.now }),
+      title: t('context.update_rate_tip'),
       run: () => ctx.act('rate_update', { row_ids: [line.id] }),
     });
   }
@@ -369,33 +373,33 @@ function rateItems(rows) {
 }
 
 function accountItems(onRow) {
-  const insert = cmd('insert.account', 'Insert account…');
+  const insert = cmd('insert.account', t('context.insert_account'));
   if (!onRow) return [insert];
   return [
     ...clipboardItems(),
     SEP,
-    cmd('go.down', 'Open account'),
+    cmd('go.down', t('context.open_account')),
     SEP,
     insert,
-    { label: 'Rename account', run: rename },
-    cmd('edit.note', 'Add note…'),
-    cmd('edit.delete_rows', 'Delete account'),
+    { label: t('context.rename_account'), run: rename },
+    cmd('edit.note', t('context.add_note')),
+    cmd('edit.delete_rows', t('context.delete_account')),
     ...moveItems(),
     SEP,
-    cmd('file.sub_budget_from_row', 'New Sub-Budget from This Account', {
-      title: 'This account, its lines and the setup they use, as a separate budget',
+    cmd('file.sub_budget_from_row', t('context.sub_budget_account'), {
+      title: t('context.sub_budget_account_tip'),
     }),
     ...presetItems(false),
   ];
 }
 
 function topsheetItems(onRow) {
-  const inserts = [cmd('insert.category', 'Insert category…'), cmd('insert.production_total', 'Insert production total…')];
+  const inserts = [cmd('insert.category', t('context.insert_category')), cmd('insert.production_total', t('context.insert_production_total'))];
   const setup = [
-    cmd('budget.create_charge', 'Create charge…', { title: 'Open Budget Setup on charges with a new charge ready to name' }),
-    cmd('budget.create_credit', 'Create credit…', { title: 'Open Budget Setup on credits with a new credit ready to name' }),
-    cmd('view.tab.charges', 'Add or apply a charge…', { title: 'Open Budget Setup on charges: add a charge, or turn one on or off' }),
-    cmd('view.tab.credits', 'Add or apply a credit…', { title: 'Open Budget Setup on credits: add a credit, or turn one on or off' }),
+    cmd('budget.create_charge', t('context.create_charge'), { title: t('context.create_charge_tip') }),
+    cmd('budget.create_credit', t('context.create_credit'), { title: t('context.create_credit_tip') }),
+    cmd('view.tab.charges', t('context.apply_charge'), { title: t('context.apply_charge_tip') }),
+    cmd('view.tab.credits', t('context.apply_credit'), { title: t('context.apply_credit_tip') }),
   ];
   const row = onRow ? ctx.grid.cursorRow() : null;
   if (!row) return [...inserts, SEP, ...setup];
@@ -403,17 +407,17 @@ function topsheetItems(onRow) {
   return [
     ...clipboardItems(),
     SEP,
-    category ? cmd('go.down', 'Open category') : null,
+    category ? cmd('go.down', t('context.open_category')) : null,
     SEP,
     ...inserts,
-    { label: category ? 'Rename category' : 'Rename production total', run: rename },
-    category ? cmd('edit.note', 'Add note…') : null,
-    cmd('edit.delete_rows', category ? 'Delete category…' : 'Delete production total'),
+    { label: category ? t('context.rename_category') : t('context.rename_production_total'), run: rename },
+    category ? cmd('edit.note', t('context.add_note')) : null,
+    cmd('edit.delete_rows', category ? t('context.delete_category') : t('context.delete_production_total')),
     ...moveItems(),
     SEP,
     category
-      ? cmd('file.sub_budget_from_row', 'New Sub-Budget from This Category', {
-          title: 'This category, its accounts and lines and the setup they use, as a separate budget',
+      ? cmd('file.sub_budget_from_row', t('context.sub_budget_category'), {
+          title: t('context.sub_budget_category_tip'),
         })
       : null,
     ...setup,

@@ -32,17 +32,18 @@ import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { readPref, writePref } from './prefs.js';
 import { createdText, versionsOf } from './versions.js';
+import { t } from './i18n.js';
 
 /** Most budgets compared with this one at once (src/compare.rs MAX_OTHERS). */
 export const MAX_OTHERS = 15;
 
 /** The optional columns, as the header's check boxes list them. */
 export const COLUMN_CHOICES = [
-  { key: 'diff', label: 'Differences', title: 'Each budget minus this one, and that as a percent of this one', on: true },
-  { key: 'sum', label: 'Sum', title: 'The other budgets added together', on: false },
-  { key: 'average', label: 'Average', title: 'The other budgets’ sum divided by how many there are', on: false },
-  { key: 'variance', label: 'Variance', title: 'The other budgets’ sum minus this one', on: false },
-  { key: 'percent', label: 'Variance %', title: 'The variance as a percent of the average', on: false },
+  { key: 'diff', label: t('compare.col.diff'), title: t('compare.col.diff_tip'), on: true },
+  { key: 'sum', label: t('compare.col.sum'), title: t('compare.col.sum_tip'), on: false },
+  { key: 'average', label: t('compare.col.average'), title: t('compare.col.average_tip'), on: false },
+  { key: 'variance', label: t('compare.col.variance'), title: t('compare.col.variance_tip'), on: false },
+  { key: 'percent', label: t('compare.col.percent'), title: t('compare.col.percent_tip'), on: false },
 ];
 
 /** Column choices saved per user, with defaults for the rest. */
@@ -134,7 +135,7 @@ export function cellText(line, col) {
 export function missingFrom(line) {
   const out = [];
   line.values.forEach((v, i) => {
-    if (v === null || v === undefined) out.push(i === 0 ? 'this budget' : letter(i));
+    if (v === null || v === undefined) out.push(i === 0 ? t('compare.this_budget_lower') : letter(i));
   });
   return out;
 }
@@ -159,7 +160,7 @@ export function showCompare(ctx, opts = {}) {
     m.open = new Set();
   }
   // Drop what has gone since: closed tabs, deleted versions.
-  const tabIds = new Set((ctx.tabs() || []).map((t) => t.id));
+  const tabIds = new Set((ctx.tabs() || []).map((tab) => tab.id));
   const versionIds = new Set(versionsOf(view).map((v) => v.id));
   m.sources = m.sources.filter((s) => (s.kind === 'tab' ? tabIds.has(s.doc) && s.doc !== base : s.kind === 'version' ? versionIds.has(s.id) : true));
 
@@ -170,7 +171,7 @@ export function showCompare(ctx, opts = {}) {
   let seq = 0;
   const details = new Map(); // account key -> DetailDto | { loading } | { error }
 
-  const sidebar = el('div', { class: 'cmp-side', attrs: { role: 'group', 'aria-label': 'Budgets to compare with' } });
+  const sidebar = el('div', { class: 'cmp-side', attrs: { role: 'group', 'aria-label': t('compare.budgets_to_compare_with') } });
   const tableHost = el('div', { class: 'cmp-table-host', attrs: { tabindex: '-1' } });
   const status = el('p', { class: 'cmp-status', attrs: { role: 'status' } });
 
@@ -198,7 +199,7 @@ export function showCompare(ctx, opts = {}) {
 
   function candidate(src, label, sub, title) {
     const at = selected(src);
-    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': `Compare with ${label}` } });
+    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': t('compare.compare_with', { name: label }) } });
     box.checked = at >= 0;
     box.disabled = at < 0 && m.sources.length >= MAX_OTHERS;
     box.addEventListener('change', () => toggle(src, box.checked));
@@ -217,7 +218,7 @@ export function showCompare(ctx, opts = {}) {
       'section',
       { class: 'cmp-side-section' },
       el('h3', { class: 'cmp-side-head', text: title }),
-      items.length ? el('div', { class: 'cmp-side-list' }, ...items) : el('p', { class: 'cmp-side-empty', text: 'None' }),
+      items.length ? el('div', { class: 'cmp-side-list' }, ...items) : el('p', { class: 'cmp-side-empty', text: t('compare.none') }),
       extra,
     );
   }
@@ -246,27 +247,27 @@ export function showCompare(ctx, opts = {}) {
   }
 
   function drawSide() {
-    const tabs = (ctx.tabs() || []).filter((t) => t.id !== base);
+    const tabs = (ctx.tabs() || []).filter((tab) => tab.id !== base);
     const versions = versionsOf(view);
-    const addBtn = el('button', { class: 'btn cmp-add-files', text: 'Add Files…', attrs: { type: 'button' } });
+    const addBtn = el('button', { class: 'btn cmp-add-files', text: t('compare.add_files'), attrs: { type: 'button' } });
     addBtn.disabled = m.sources.length >= MAX_OTHERS;
     addBtn.addEventListener('click', addFiles);
     const count = m.sources.length;
     sidebar.replaceChildren(
       el('p', {
         class: 'cmp-side-count',
-        text: count ? `Comparing with ${count} of up to ${MAX_OTHERS}` : `Tick up to ${MAX_OTHERS} budgets to compare with this one.`,
+        text: count ? t('compare.comparing_with', { count, max: MAX_OTHERS }) : t('compare.tick_up_to', { max: MAX_OTHERS }),
       }),
       section(
-        'Open budgets',
-        tabs.map((t) => candidate({ kind: 'tab', doc: t.id }, t.label, t.dirty ? 'Unsaved changes' : '', t.path || t.title)),
+        t('compare.open_budgets'),
+        tabs.map((tab) => candidate({ kind: 'tab', doc: tab.id }, tab.label, tab.dirty ? t('compare.unsaved_changes') : '', tab.path || tab.title)),
       ),
       section(
-        'Versions of this budget',
+        t('compare.versions_of_this_budget'),
         versions.map((v) => candidate({ kind: 'version', id: v.id }, v.name, createdText(v.created), v.note || v.name)),
       ),
       section(
-        'Files',
+        t('compare.files'),
         m.files.map((f) => candidate({ kind: 'file', token: f.token }, f.label, '', f.path)),
         addBtn,
       ),
@@ -344,27 +345,27 @@ export function showCompare(ctx, opts = {}) {
     const th = (top, name, cls, title) =>
       el('th', { class: cls, title: title || undefined, attrs: { scope: 'col' } }, el('span', { class: 'cmp-h-top', text: top }), el('span', { class: 'cmp-h-name', text: name }));
     const n = sources.length;
-    const others = n > 2 ? `A to ${letter(n - 1)}` : 'A';
-    const cells = [th('Acct #', '', 'cmp-code'), th('Description', '', 'cmp-name')];
+    const others = n > 2 ? t('compare.others_range', { last: letter(n - 1) }) : 'A';
+    const cells = [th(t('compare.acct_no'), '', 'cmp-code'), th(t('compare.description'), '', 'cmp-name')];
     for (const c of plan) {
       const s = sources[c.i];
-      const partial = s && s.partial ? ' (some cells with problems count as blank)' : '';
       if (c.kind === 'value') {
-        const top = c.i === 0 ? 'This budget' : letter(c.i);
-        const kind = s.kind === 'version' ? `Version saved ${createdText(s.detail)}` : s.detail || s.label;
-        cells.push(th(top, s.label, s.partial ? 'num cmp-val is-partial' : 'num cmp-val', `${s.label}\n${kind}${partial}`));
+        const top = c.i === 0 ? t('compare.this_budget') : letter(c.i);
+        const kind = s.kind === 'version' ? t('compare.version_saved', { when: createdText(s.detail) }) : s.detail || s.label;
+        const tip = s.partial ? t('compare.value_tip_partial', { name: s.label, kind }) : t('compare.value_tip', { name: s.label, kind });
+        cells.push(th(top, s.label, s.partial ? 'num cmp-val is-partial' : 'num cmp-val', tip));
       } else if (c.kind === 'diff') {
-        cells.push(th(`${letter(c.i)} − this`, 'Difference', 'num cmp-diff', `${s.label} minus this budget`));
+        cells.push(th(t('compare.diff_top', { letter: letter(c.i) }), t('compare.difference'), 'num cmp-diff', t('compare.diff_tip', { name: s.label })));
       } else if (c.kind === 'pct') {
-        cells.push(th(`${letter(c.i)} %`, 'of this', 'num cmp-pct', `${s.label}’s difference as a percent of this budget`));
+        cells.push(th(`${letter(c.i)} %`, t('compare.of_this'), 'num cmp-pct', t('compare.pct_tip', { name: s.label })));
       } else if (c.kind === 'sum') {
-        cells.push(th('Sum', others, 'num cmp-agg', `${others} added together`));
+        cells.push(th(t('compare.col.sum'), others, 'num cmp-agg', t('compare.sum_head_tip', { others })));
       } else if (c.kind === 'average') {
-        cells.push(th('Average', others, 'num cmp-agg', `${others} added together, divided by ${n - 1}`));
+        cells.push(th(t('compare.col.average'), others, 'num cmp-agg', t('compare.average_head_tip', { others, count: n - 1 })));
       } else if (c.kind === 'variance') {
-        cells.push(th('Variance', 'Sum − this', 'num cmp-agg', 'The sum of the other budgets minus this budget'));
+        cells.push(th(t('compare.col.variance'), t('compare.sum_minus_this'), 'num cmp-agg', t('compare.variance_head_tip')));
       } else if (c.kind === 'percent') {
-        cells.push(th('Variance %', 'of average', 'num cmp-agg', 'The variance as a percent of the average'));
+        cells.push(th(t('compare.col.percent'), t('compare.of_average'), 'num cmp-agg', t('compare.col.percent_tip')));
       }
     }
     return cells;
@@ -380,18 +381,18 @@ export function showCompare(ctx, opts = {}) {
     if (missing.length) tr.classList.add('unmatched');
     const codeTd = el('td', { class: 'cmp-code' });
     if (spec.toggle) {
-      const t = el('button', {
+      const btn = el('button', {
         class: 'cmp-toggle',
         text: spec.toggle.open ? '▾' : '▸',
         title: spec.toggle.label,
         attrs: { type: 'button', 'aria-expanded': String(spec.toggle.open), 'aria-label': spec.toggle.label },
       });
-      t.dataset.key = spec.toggle.key;
-      t.addEventListener('click', (e) => {
+      btn.dataset.key = spec.toggle.key;
+      btn.addEventListener('click', (e) => {
         e.stopPropagation();
         spec.toggle.onClick();
       });
-      codeTd.append(t);
+      codeTd.append(btn);
     }
     if (spec.code) codeTd.append(el('span', { class: 'cmp-code-text', text: spec.code }));
     tr.append(codeTd);
@@ -403,7 +404,7 @@ export function showCompare(ctx, opts = {}) {
       const b = el('button', {
         class: 'cmp-go',
         text: spec.name || spec.code || '',
-        title: `Show in ${where === 0 ? 'this budget' : sources[where].label}`,
+        title: t('compare.show_in', { name: where === 0 ? t('compare.this_budget_lower') : sources[where].label }),
         attrs: { type: 'button' },
       });
       b.addEventListener('click', () => go(target));
@@ -412,7 +413,7 @@ export function showCompare(ctx, opts = {}) {
       nameTd.append(el('span', { text: spec.name || '', title: spec.title || undefined }));
     }
     if (missing.length) {
-      nameTd.append(el('span', { class: 'cmp-missing', text: `not in ${missing.join(', ')}` }));
+      nameTd.append(el('span', { class: 'cmp-missing', text: t('compare.not_in', { list: missing.join(', ') }) }));
     }
     tr.append(nameTd);
 
@@ -421,8 +422,8 @@ export function showCompare(ctx, opts = {}) {
       const td = el('td', { class: `num cmp-${c.kind === 'value' ? 'val' : c.kind === 'diff' || c.kind === 'pct' ? c.kind : 'agg'}` });
       if (c.kind === 'value' && spec.line && (spec.line.values[c.i] === null || spec.line.values[c.i] === undefined)) {
         td.classList.add('none');
-        td.textContent = 'none';
-        td.title = 'Not in this budget';
+        td.textContent = t('compare.none_cell');
+        td.title = t('compare.not_in_this_budget');
       } else {
         td.textContent = text;
       }
@@ -430,7 +431,7 @@ export function showCompare(ctx, opts = {}) {
         const p = placeFor(sources, c.i, spec.place);
         if (p) {
           td.classList.add('go');
-          td.title = `Show in ${c.i === 0 ? 'this budget' : sources[c.i].label}`;
+          td.title = t('compare.show_in', { name: c.i === 0 ? t('compare.this_budget_lower') : sources[c.i].label });
           td.addEventListener('click', () => go(p));
         }
       }
@@ -447,17 +448,17 @@ export function showCompare(ctx, opts = {}) {
       td.colSpan = width;
       return el('tr', { class: 'cmp-detail-note' }, td);
     };
-    if (!d || d.loading) return [note('Comparing lines…')];
+    if (!d || d.loading) return [note(t('compare.comparing_lines'))];
     if (d.error) return [note(d.error, 'cmp-note is-error')];
-    if (!d.rows.length) out.push(note('No lines in any of these budgets.'));
-    const how = d.matched_by === 'id' ? 'Lines matched as the same line across versions.' : 'Lines matched by description.';
+    if (!d.rows.length) out.push(note(t('compare.no_lines')));
+    const how = d.matched_by === 'id' ? t('compare.matched_by_id') : t('compare.matched_by_description');
     out.push(note(how));
     for (const r of d.rows) {
       out.push(
         row(sources, plan, {
           cls: `cmp-line kind-${r.kind}`,
           code: '',
-          name: r.description || (r.kind === 'adjustment' ? 'Adjustment' : '(no description)'),
+          name: r.description || (r.kind === 'adjustment' ? t('compare.adjustment') : t('compare.no_description')),
           line: r.line,
           place: (i, doc) => {
             const at = d.at[i];
@@ -467,12 +468,12 @@ export function showCompare(ctx, opts = {}) {
         }),
       );
     }
-    out.push(row(sources, plan, { cls: 'cmp-line-total', code: '', name: 'Total lines', line: d.details_total }));
+    out.push(row(sources, plan, { cls: 'cmp-line-total', code: '', name: t('compare.total_lines'), line: d.details_total }));
     return out;
   }
 
   function drawTable() {
-    status.textContent = loading ? 'Comparing…' : '';
+    status.textContent = loading ? t('compare.comparing') : '';
     const nothing = !result || !m.sources.length || Boolean(problem);
     printBtn.disabled = nothing;
     pdfBtn.disabled = nothing;
@@ -481,7 +482,7 @@ export function showCompare(ctx, opts = {}) {
       return;
     }
     if (!m.sources.length) {
-      tableHost.replaceChildren(el('p', { class: 'cmp-empty', text: 'Tick a budget on the left to compare it with this one.' }));
+      tableHost.replaceChildren(el('p', { class: 'cmp-empty', text: t('compare.tick_a_budget') }));
       return;
     }
     if (!result) {
@@ -504,7 +505,7 @@ export function showCompare(ctx, opts = {}) {
           toggle: {
             key: ckey,
             open: copen,
-            label: copen ? `Hide the accounts in ${cat.code}` : `Show the accounts in ${cat.code}`,
+            label: copen ? t('compare.hide_accounts', { code: cat.code }) : t('compare.show_accounts', { code: cat.code }),
             onClick: () => {
               if (copen) m.open.delete(ckey);
               else m.open.add(ckey);
@@ -522,14 +523,14 @@ export function showCompare(ctx, opts = {}) {
           row(sources, plan, {
             cls: a.fringe_account ? 'cmp-acct cmp-fringe-acct' : 'cmp-acct',
             code: a.code,
-            name: a.fringe_account ? 'Fringes' : a.name,
+            name: a.fringe_account ? t('compare.fringes') : a.name,
             line: a.line,
             toggle: a.fringe_account
               ? null
               : {
                   key: akey,
                   open: aopen,
-                  label: aopen ? `Hide the lines in ${a.code}` : `Compare the lines in ${a.code}`,
+                  label: aopen ? t('compare.hide_lines', { code: a.code }) : t('compare.compare_lines', { code: a.code }),
                   onClick: () => {
                     if (aopen) {
                       m.open.delete(akey);
@@ -557,20 +558,20 @@ export function showCompare(ctx, opts = {}) {
       }
     }
     const summary = (cls, name, line, title) => row(sources, plan, { cls: `cmp-sum ${cls}`, code: '', name, line, title });
-    result.levels.forEach((l, i) => body.append(summary(i === 0 ? 'cmp-level first' : 'cmp-level', l.name, l.line, 'A production total')));
-    const t = result.totals;
-    body.append(summary(result.levels.length ? '' : 'first', 'Total above-the-line', t.total_atl));
-    body.append(summary('', 'Total below-the-line', t.total_btl));
-    body.append(summary('cmp-info', 'Fringes (all)', t.fringes, 'Every fringe dollar, wherever it posts; already inside the totals above'));
+    result.levels.forEach((l, i) => body.append(summary(i === 0 ? 'cmp-level first' : 'cmp-level', l.name, l.line, t('compare.a_production_total'))));
+    const totals = result.totals;
+    body.append(summary(result.levels.length ? '' : 'first', t('compare.total_atl'), totals.total_atl));
+    body.append(summary('', t('compare.total_btl'), totals.total_btl));
+    body.append(summary('cmp-info', t('compare.fringes_all'), totals.fringes, t('compare.fringes_all_tip')));
     // Each charge and credit under its total, matched by name; one only some
     // budgets have says which.
-    const items = (list, what) => (Array.isArray(list) ? list : []).forEach((x) => body.append(summary('cmp-item', x.name || `(unnamed ${what})`, x.line, `One ${what}, matched by name`)));
-    body.append(summary('', 'Charges', t.charges, 'Contractual charges, added to the grand total'));
-    items(result.charges, 'charge');
-    body.append(summary('grand', 'Grand total', t.grand_total));
-    body.append(summary('', 'Credits', t.credits, 'Taken off the grand total'));
-    items(result.credits, 'credit');
-    body.append(summary('grand', 'Net total', t.net_total));
+    const items = (list, unnamed, tip) => (Array.isArray(list) ? list : []).forEach((x) => body.append(summary('cmp-item', x.name || unnamed, x.line, tip)));
+    body.append(summary('', t('compare.charges'), totals.charges, t('compare.charges_tip')));
+    items(result.charges, t('compare.unnamed_charge'), t('compare.one_charge_tip'));
+    body.append(summary('grand', t('compare.grand_total'), totals.grand_total));
+    body.append(summary('', t('compare.credits'), totals.credits, t('compare.credits_tip')));
+    items(result.credits, t('compare.unnamed_credit'), t('compare.one_credit_tip'));
+    body.append(summary('grand', t('compare.net_total'), totals.net_total));
 
     const table = el('table', { class: 'cmp-table' }, el('thead', {}, el('tr', {}, ...headCells(sources, plan))), body);
     const keep = { top: tableHost.scrollTop, left: tableHost.scrollLeft };
@@ -594,12 +595,12 @@ export function showCompare(ctx, opts = {}) {
   function printable() {
     const shown = tableHost.querySelector('table.cmp-table');
     if (!shown || !result) return null;
-    const t = shown.cloneNode(true);
-    t.className = 'cmp-print';
-    for (const b of t.querySelectorAll('.cmp-toggle')) b.remove();
-    for (const b of t.querySelectorAll('button')) b.replaceWith(document.createTextNode(b.textContent));
-    for (const td of t.querySelectorAll('td.go')) td.classList.remove('go');
-    return t;
+    const copy = shown.cloneNode(true);
+    copy.className = 'cmp-print';
+    for (const b of copy.querySelectorAll('.cmp-toggle')) b.remove();
+    for (const b of copy.querySelectorAll('button')) b.replaceWith(document.createTextNode(b.textContent));
+    for (const td of copy.querySelectorAll('td.go')) td.classList.remove('go');
+    return copy;
   }
 
   function legend() {
@@ -609,15 +610,20 @@ export function showCompare(ctx, opts = {}) {
       { class: 'cmp-legend' },
       ...sources.map((s, i) => {
         const what =
-          s.kind === 'version' ? `version saved ${createdText(s.detail)}` : s.kind === 'file' ? s.detail : s.detail || (i === 0 ? 'not saved yet' : 'open, not saved yet');
-        return el('div', {}, `${i === 0 ? 'This budget' : letter(i)}: ${s.label}${what ? ` (${what})` : ''}`);
+          s.kind === 'version'
+            ? t('compare.legend_version', { when: createdText(s.detail) })
+            : s.kind === 'file'
+              ? s.detail
+              : s.detail || (i === 0 ? t('compare.legend_not_saved') : t('compare.legend_open_not_saved'));
+        const which = i === 0 ? t('compare.this_budget') : letter(i);
+        return el('div', {}, what ? t('compare.legend_entry_what', { which, name: s.label, what }) : t('compare.legend_entry', { which, name: s.label }));
       }),
     );
   }
 
   async function output(pdf) {
-    const t = printable();
-    if (!t) return;
+    const table = printable();
+    if (!table) return;
     let report;
     try {
       report = await import('./report.js');
@@ -625,29 +631,29 @@ export function showCompare(ctx, opts = {}) {
       report = null;
     }
     if (!report || typeof report.printHtml !== 'function') {
-      status.textContent = 'Printing the comparison is not available in this version.';
+      status.textContent = t('compare.print_unavailable');
       return;
     }
     const title = view && view.budget && view.budget.title ? view.budget.title : '';
-    status.textContent = pdf ? 'Saving the PDF…' : 'Printing…';
+    status.textContent = pdf ? t('compare.saving_pdf') : t('compare.printing');
     try {
-      const r = await report.printHtml(t, {
+      const r = await report.printHtml(table, {
         title,
-        section: 'Budget comparison',
+        section: t('compare.budget_comparison'),
         file: view && view.file ? view.file.name : '',
         landscape: true,
         intro: legend(),
         pdf,
       });
-      status.textContent = pdf && r && r.done ? (r.file ? `Saved ${r.file}.` : 'Saved.') : '';
+      status.textContent = pdf && r && r.done ? (r.file ? t('compare.saved_file', { file: r.file }) : t('compare.saved')) : '';
     } catch (e) {
       status.textContent = String(e);
     }
   }
 
-  const printBtn = el('button', { class: 'btn', text: 'Print…', attrs: { type: 'button' } });
+  const printBtn = el('button', { class: 'btn', text: t('compare.print'), attrs: { type: 'button' } });
   printBtn.addEventListener('click', () => output(false));
-  const pdfBtn = el('button', { class: 'btn', text: 'Save as PDF…', attrs: { type: 'button' } });
+  const pdfBtn = el('button', { class: 'btn', text: t('compare.save_pdf'), attrs: { type: 'button' } });
   pdfBtn.addEventListener('click', () => output(true));
 
   // -------------------------------------------------------------------------
@@ -655,8 +661,8 @@ export function showCompare(ctx, opts = {}) {
 
   const toggles = el(
     'div',
-    { class: 'cmp-cols', attrs: { role: 'group', 'aria-label': 'Columns' } },
-    el('span', { class: 'cmp-cols-label', text: 'Columns:' }),
+    { class: 'cmp-cols', attrs: { role: 'group', 'aria-label': t('compare.columns') } },
+    el('span', { class: 'cmp-cols-label', text: t('compare.columns_label') }),
     ...COLUMN_CHOICES.map((c) => {
       const box = el('input', { attrs: { type: 'checkbox' } });
       box.checked = cols[c.key];
@@ -674,16 +680,16 @@ export function showCompare(ctx, opts = {}) {
   refresh();
 
   closeFn = customDialog((close) => {
-    const done = el('button', { class: 'btn', text: 'Close', attrs: { type: 'button' } });
+    const done = el('button', { class: 'btn', text: t('compare.close'), attrs: { type: 'button' } });
     done.addEventListener('click', close);
-    const title = view && view.budget && view.budget.title ? view.budget.title : 'this budget';
+    const title = view && view.budget && view.budget.title ? view.budget.title : t('compare.this_budget_lower');
     return el(
       'div',
       { class: 'modal compare-dialog', attrs: { role: 'dialog', 'aria-labelledby': 'compare-title' } },
       el(
         'header',
         { class: 'cmp-head' },
-        el('h2', { class: 'modal-title', text: `Compare ${title}`, attrs: { id: 'compare-title' } }),
+        el('h2', { class: 'modal-title', text: t('compare.title', { title }), attrs: { id: 'compare-title' } }),
         status,
         el('span', { class: 'spacer' }),
         toggles,
