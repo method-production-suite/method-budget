@@ -111,7 +111,7 @@ docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, im
 What the slice built, against the list this audit gave:
 
 1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
-   1,200 entries, 41 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   2,100 entries, 65 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
    with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
    language lacks (with a console warning) and the system's language picked, English by
    default. The table loads as one of the page's own scripts under its
@@ -123,8 +123,10 @@ What the slice built, against the list this audit gave:
    tabs (`setupwin.js`, `setuptabs.js`, `setup.js`, `setuplist.js`, `setuplists.js`,
    `setupbands.js`, `setupframe.js`, `apply.js`, `rates.js`), Find and Replace
    (`find.js`), the main window's dialogs, toolbar tips, banners and messages
-   (`main.js`), the common dialog buttons (`modal.js`) and the status bar (`footer.js`).
-   The wording is unchanged; plurals written out ("1 row", "3 rows") became plural
+   (`main.js`), the common dialog buttons (`modal.js`) and the status bar (`footer.js`);
+   in the second pass, sharing (`share.js`), the Activity tab (`activity.js`), Budget
+   Setup's Charges, Credits, Info, Settings and Baseline tabs (`topsheet-setup.js`), the
+   printed reports (`report.js`) and the report setup (`reportsetup.js`). The wording is unchanged; plurals written out ("1 row", "3 rows") became plural
    entries. `src/i18n.rs` fails on a new `text:`, `title:`, `label:`, `placeholder:`,
    `message:`, `hint:`, `aria-label` or `toast()` literal with letters in a converted
    script, on a key missing from the table and on an entry nothing uses.
@@ -142,9 +144,6 @@ What the slice built, against the list this audit gave:
 
 Still English inline, for the next passes:
 
-- **Scripts kept out of this slice** while other work on them is open: `share.js`,
-  `activity.js`, `topsheet-setup.js` (Budget Setup's Charges, Credits, Info, Settings and
-  Baseline tabs), `report.js` and `reportsetup.js`.
 - **The rest of the page**: the tools panel's other tabs and dialogs (`library.js`,
   `packs.js`, `notes.js`, `history.js`, `presets.js`, `explain.js`, `overtime.js`,
   `actuals.js`, `actualsimport.js`, `comments.js`, `review.js`, `compare.js`,

@@ -17,6 +17,7 @@ import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { invoke } from './api.js';
 import { money } from './format.js';
+import { t } from './i18n.js';
 import {
   SECTIONS,
   REPORT_COLUMNS,
@@ -34,9 +35,9 @@ import {
 } from './report.js';
 
 const SLOTS = [
-  ['left', 'Left'],
-  ['center', 'Center'],
-  ['right', 'Right'],
+  ['left', t('reportsetup.slot.left'), t('reportsetup.slot.left_lower')],
+  ['center', t('reportsetup.slot.center'), t('reportsetup.slot.center_lower')],
+  ['right', t('reportsetup.slot.right'), t('reportsetup.slot.right_lower')],
 ];
 
 let uid = 0;
@@ -90,26 +91,26 @@ export async function showReportSetup(ctx) {
 
   let close = null;
   const left = el('div', { class: 'rs-settings' });
-  const pages = el('div', { class: 'rs-pages rpt-preview', attrs: { tabindex: '0', 'aria-label': 'Report preview' } });
+  const pages = el('div', { class: 'rs-pages rpt-preview', attrs: { tabindex: '0', 'aria-label': t('reportsetup.report_preview') } });
   const pageCount = el('span', { class: 'rs-count', attrs: { 'aria-live': 'polite' } });
-  const jump = el('select', { class: 'rs-jump', attrs: { 'aria-label': 'Go to a section of the preview' } });
+  const jump = el('select', { class: 'rs-jump', attrs: { 'aria-label': t('reportsetup.go_to_section_of_preview') } });
   // Page navigation: first, previous, the page shown (type a number), next, last.
   const navBtn = (text, label) => el('button', { class: 'btn btn-quiet rs-nav', text, title: label, attrs: { type: 'button', 'aria-label': label } });
-  const firstBtn = navBtn('«', 'First page');
-  const prevBtn = navBtn('‹', 'Previous page');
-  const nextBtn = navBtn('›', 'Next page');
-  const lastBtn = navBtn('»', 'Last page');
-  const pageInput = el('input', { class: 'modal-input rs-page-input', attrs: { type: 'text', inputmode: 'numeric', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Page shown', size: '3' } });
+  const firstBtn = navBtn('«', t('reportsetup.first_page'));
+  const prevBtn = navBtn('‹', t('reportsetup.previous_page'));
+  const nextBtn = navBtn('›', t('reportsetup.next_page'));
+  const lastBtn = navBtn('»', t('reportsetup.last_page'));
+  const pageInput = el('input', { class: 'modal-input rs-page-input', attrs: { type: 'text', inputmode: 'numeric', autocomplete: 'off', spellcheck: 'false', 'aria-label': t('reportsetup.page_shown'), size: '3' } });
   const status = el('p', { class: 'rs-status', attrs: { role: 'status' } });
-  const presetSelect = el('select', { class: 'rs-preset', attrs: { 'aria-label': 'Report preset' } });
-  const nameInput = el('input', { class: 'modal-input rs-name', attrs: { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'Preset name', 'aria-label': 'Preset name', maxlength: '80' } });
+  const presetSelect = el('select', { class: 'rs-preset', attrs: { 'aria-label': t('reportsetup.report_preset') } });
+  const nameInput = el('input', { class: 'modal-input rs-name', attrs: { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: t('reportsetup.preset_name'), 'aria-label': t('reportsetup.preset_name'), maxlength: '80' } });
   const defaultBox = el('input', { attrs: { type: 'checkbox', id: 'rs-default' } });
-  const saveBtn = el('button', { class: 'btn', text: 'Save Preset', attrs: { type: 'button' } });
-  const saveNewBtn = el('button', { class: 'btn', text: 'Save as New', attrs: { type: 'button' } });
-  const deleteBtn = el('button', { class: 'btn btn-quiet btn-danger-text', text: 'Delete', attrs: { type: 'button' } });
-  const printBtn = el('button', { class: 'btn btn-primary', text: 'Print…', attrs: { type: 'button', 'data-autofocus': '' } });
-  const pdfBtn = el('button', { class: 'btn', text: 'Save as PDF…', attrs: { type: 'button' } });
-  const closeBtn = el('button', { class: 'btn', text: 'Close', attrs: { type: 'button' } });
+  const saveBtn = el('button', { class: 'btn', text: t('reportsetup.save_preset'), attrs: { type: 'button' } });
+  const saveNewBtn = el('button', { class: 'btn', text: t('reportsetup.save_as_new'), attrs: { type: 'button' } });
+  const deleteBtn = el('button', { class: 'btn btn-quiet btn-danger-text', text: t('reportsetup.delete'), attrs: { type: 'button' } });
+  const printBtn = el('button', { class: 'btn btn-primary', text: t('reportsetup.print_dots'), attrs: { type: 'button', 'data-autofocus': '' } });
+  const pdfBtn = el('button', { class: 'btn', text: t('reportsetup.save_as_pdf'), attrs: { type: 'button' } });
+  const closeBtn = el('button', { class: 'btn', text: t('reportsetup.close'), attrs: { type: 'button' } });
 
   const say = (text, bad = false) => {
     status.textContent = text || '';
@@ -193,8 +194,8 @@ export async function showReportSetup(ctx) {
     scalePreview(pages, width, spec.landscape);
     sections = out.sections;
     pageTotal = out.pages;
-    pageCount.textContent = `of ${out.pages}`;
-    jump.replaceChildren(el('option', { text: 'Go to section', attrs: { value: '' } }), ...sections.map((s, i) => el('option', { text: `${s.name} (page ${s.page})`, attrs: { value: String(i) } })));
+    pageCount.textContent = t('reportsetup.page_of', { total: out.pages });
+    jump.replaceChildren(el('option', { text: t('reportsetup.go_to_section'), attrs: { value: '' } }), ...sections.map((s, i) => el('option', { text: t('reportsetup.section_on_page', { name: s.name, page: s.page }), attrs: { value: String(i) } })));
     pages.scrollTop = top;
     shown = Math.min(pageInView(), Math.max(1, pageTotal));
     drawNav();
@@ -254,8 +255,8 @@ export async function showReportSetup(ctx) {
           [next[i], next[j]] = [next[j], next[i]];
           spec.sections = next;
         });
-      const up = el('button', { class: 'btn btn-quiet rs-move', text: '↑', title: `Print ${s.label} earlier`, attrs: { type: 'button', id: `rs-up-${key}`, 'aria-label': `Move ${s.label} up` } });
-      const down = el('button', { class: 'btn btn-quiet rs-move', text: '↓', title: `Print ${s.label} later`, attrs: { type: 'button', id: `rs-down-${key}`, 'aria-label': `Move ${s.label} down` } });
+      const up = el('button', { class: 'btn btn-quiet rs-move', text: '↑', title: t('reportsetup.print_earlier', { name: s.label }), attrs: { type: 'button', id: `rs-up-${key}`, 'aria-label': t('reportsetup.move_up', { name: s.label }) } });
+      const down = el('button', { class: 'btn btn-quiet rs-move', text: '↓', title: t('reportsetup.print_later', { name: s.label }), attrs: { type: 'button', id: `rs-down-${key}`, 'aria-label': t('reportsetup.move_down', { name: s.label }) } });
       up.disabled = i <= 0;
       down.disabled = i < 0 || i >= on.length - 1;
       up.addEventListener('click', () => move(-1));
@@ -263,7 +264,7 @@ export async function showReportSetup(ctx) {
       item.append(el('span', { class: 'rs-moves' }, up, down));
       list.append(item);
     });
-    return group('Sections, in print order', list);
+    return group(t('reportsetup.sections_in_print_order'), list);
   }
 
   function treeGroup() {
@@ -271,7 +272,7 @@ export async function showReportSetup(ctx) {
     const exA = new Set(spec.excluded_accounts);
     const tree = el('ul', { class: 'rs-tree' });
     const allIn = categories.every((c) => !exC.has(c.code || '') && (c.accounts || []).every((a) => !exA.has(a.code || '')));
-    const all = check('All categories and accounts', allIn, (v) =>
+    const all = check(t('reportsetup.all_categories_and_accounts'), allIn, (v) =>
       change(() => {
         spec.excluded_categories = v ? [] : categories.map((c) => c.code || '');
         spec.excluded_accounts = [];
@@ -287,7 +288,7 @@ export async function showReportSetup(ctx) {
       const toggle = el('button', {
         class: 'btn btn-quiet rs-twisty',
         text: openCats.has(code) ? '▾' : '▸',
-        attrs: { type: 'button', id: `rs-open-${ci}`, 'aria-expanded': String(openCats.has(code)), 'aria-label': `Accounts in ${code} ${c.name || ''}`.trim() },
+        attrs: { type: 'button', id: `rs-open-${ci}`, 'aria-expanded': String(openCats.has(code)), 'aria-label': t('reportsetup.accounts_in', { code, name: c.name || '' }).trim() },
       });
       toggle.disabled = accounts.length === 0;
       toggle.addEventListener('click', () => {
@@ -338,18 +339,18 @@ export async function showReportSetup(ctx) {
       }
       tree.append(row);
     });
-    if (!categories.length) tree.append(el('li', { class: 'rs-hint', text: 'This budget has no categories yet.' }));
-    return group('Categories and accounts', el('p', { class: 'rs-hint', text: 'For the account and detail levels and the notes list. The topsheet always lists every category.' }), all, tree);
+    if (!categories.length) tree.append(el('li', { class: 'rs-hint', text: t('reportsetup.no_categories_yet') }));
+    return group(t('reportsetup.categories_and_accounts'), el('p', { class: 'rs-hint', text: t('reportsetup.categories_hint') }), all, tree);
   }
 
   function leaveOutGroup() {
     const flag = (key, label) => check(label, spec[key], (v) => change(() => (spec[key] = v)), { key });
     const parts = [
-      flag('skip_empty_accounts', 'Accounts with no lines'),
-      flag('skip_zero_accounts', 'Accounts that total zero'),
-      flag('skip_suppressed_lines', 'Lines not in the budget total'),
-      flag('skip_notes', 'Notes under detail lines'),
-      flag('skip_done_notes', 'Notes ticked off as reviewed'),
+      flag('skip_empty_accounts', t('reportsetup.skip.empty_accounts')),
+      flag('skip_zero_accounts', t('reportsetup.skip.zero_accounts')),
+      flag('skip_suppressed_lines', t('reportsetup.skip.suppressed_lines')),
+      flag('skip_notes', t('reportsetup.skip.notes')),
+      flag('skip_done_notes', t('reportsetup.skip.done_notes')),
     ];
     if (groupNames.length) {
       const only = new Set(spec.only_groups);
@@ -367,9 +368,9 @@ export async function showReportSetup(ctx) {
           ),
         );
       });
-      parts.push(el('p', { class: 'rs-sub', text: 'Detail pages print only lines in these groups (none checked: every line)' }), list);
+      parts.push(el('p', { class: 'rs-sub', text: t('reportsetup.only_groups_hint') }), list);
     }
-    return group('Leave out', ...parts, el('p', { class: 'rs-hint', text: 'Totals stay the budget’s own; a note says when rows are left out.' }));
+    return group(t('reportsetup.leave_out'), ...parts, el('p', { class: 'rs-hint', text: t('reportsetup.leave_out_hint') }));
   }
 
   function columnsGroup() {
@@ -388,26 +389,26 @@ export async function showReportSetup(ctx) {
               else cur.delete(c.key);
               spec.columns = REPORT_COLUMNS.map((x) => x.key).filter((k) => cur.has(k));
             }),
-          { key: `col-${c.key}`, disabled: base && !hasBaseline, title: base && !hasBaseline ? 'Lock a baseline (Budget tab) to compare against' : '' },
+          { key: `col-${c.key}`, disabled: base && !hasBaseline, title: base && !hasBaseline ? t('reportsetup.lock_baseline_tip') : '' },
         ),
       );
     }
-    const reset = el('button', { class: 'btn btn-quiet rs-reset', text: 'Standard columns', attrs: { type: 'button', id: 'rs-std-cols' } });
+    const reset = el('button', { class: 'btn btn-quiet rs-reset', text: t('reportsetup.standard_columns'), attrs: { type: 'button', id: 'rs-std-cols' } });
     reset.disabled = !spec.columns;
     reset.addEventListener('click', () => change(() => (spec.columns = null)));
     return group(
-      'Detail columns',
-      el('p', { class: 'rs-hint', text: '#, description and total always print. Original and variance print on the topsheet and account level too.' }),
+      t('reportsetup.detail_columns'),
+      el('p', { class: 'rs-hint', text: t('reportsetup.detail_columns_hint') }),
       box,
       reset,
     );
   }
 
   function layoutGroup() {
-    const orient = el('div', { class: 'rs-radios', attrs: { role: 'radiogroup', 'aria-label': 'Orientation' } });
+    const orient = el('div', { class: 'rs-radios', attrs: { role: 'radiogroup', 'aria-label': t('reportsetup.orientation') } });
     for (const [v, label] of [
-      [false, 'Portrait'],
-      [true, 'Landscape'],
+      [false, t('reportsetup.portrait')],
+      [true, t('reportsetup.landscape')],
     ]) {
       const id = `rs-orient-${v ? 'l' : 'p'}`;
       const r = el('input', { attrs: { id, type: 'radio', name: 'rs-orient' } });
@@ -415,11 +416,11 @@ export async function showReportSetup(ctx) {
       r.addEventListener('change', () => change(() => (spec.landscape = v)));
       orient.append(el('label', { class: 'rs-check', attrs: { for: id } }, r, el('span', { text: label })));
     }
-    const size = el('select', { class: 'modal-input rs-select', attrs: { id: 'rs-size', 'aria-label': 'Type size' } });
+    const size = el('select', { class: 'modal-input rs-select', attrs: { id: 'rs-size', 'aria-label': t('reportsetup.type_size') } });
     for (const [v, label] of [
-      ['small', 'Small'],
-      ['medium', 'Medium'],
-      ['large', 'Large'],
+      ['small', t('reportsetup.size.small')],
+      ['medium', t('reportsetup.size.medium')],
+      ['large', t('reportsetup.size.large')],
     ]) {
       const o = el('option', { text: label });
       o.value = v;
@@ -428,15 +429,15 @@ export async function showReportSetup(ctx) {
     size.value = spec.font_size;
     size.addEventListener('change', () => change(() => (spec.font_size = size.value)));
     return group(
-      'Layout',
+      t('reportsetup.layout'),
       orient,
-      el('label', { class: 'rs-inline' }, el('span', { text: 'Type size' }), size),
-      check('Shading on alternate lines and totals', spec.shading, (v) => change(() => (spec.shading = v)), { key: 'shading' }),
-      check('Lines in their group colors', spec.group_colors, (v) => change(() => (spec.group_colors = v)), { key: 'colors' }),
-      check('Lines between columns', spec.vertical_rules, (v) => change(() => (spec.vertical_rules = v)), { key: 'rules' }),
-      check('Detail level: one line per account', spec.collapse_details, (v) => change(() => (spec.collapse_details = v)), {
+      el('label', { class: 'rs-inline' }, el('span', { text: t('reportsetup.type_size') }), size),
+      check(t('reportsetup.shading'), spec.shading, (v) => change(() => (spec.shading = v)), { key: 'shading' }),
+      check(t('reportsetup.group_colors'), spec.group_colors, (v) => change(() => (spec.group_colors = v)), { key: 'colors' }),
+      check(t('reportsetup.vertical_rules'), spec.vertical_rules, (v) => change(() => (spec.vertical_rules = v)), { key: 'rules' }),
+      check(t('reportsetup.collapse_details'), spec.collapse_details, (v) => change(() => (spec.collapse_details = v)), {
         key: 'collapse',
-        title: 'Each account prints as one line with its total instead of its lines',
+        title: t('reportsetup.collapse_details_tip'),
       }),
     );
   }
@@ -444,44 +445,49 @@ export async function showReportSetup(ctx) {
   function topsheetGroup() {
     const noDetail = !spec.sections.includes('detail');
     return group(
-      'Topsheet columns',
-      check('Fringes', spec.topsheet_fringes, (v) => change(() => (spec.topsheet_fringes = v)), { key: 'ts-fringes', title: 'What each category’s lines earn in fringes, wherever they post' }),
-      check('Page its detail starts on', spec.topsheet_pages, (v) => change(() => (spec.topsheet_pages = v)), {
+      t('reportsetup.topsheet_columns'),
+      check(t('reportsetup.topsheet_fringes'), spec.topsheet_fringes, (v) => change(() => (spec.topsheet_fringes = v)), { key: 'ts-fringes', title: t('reportsetup.topsheet_fringes_tip') }),
+      check(t('reportsetup.topsheet_pages'), spec.topsheet_pages, (v) => change(() => (spec.topsheet_pages = v)), {
         key: 'ts-pages',
-        title: noDetail ? 'Prints blank until the detail level is in the report' : 'The page of this printout where each category’s detail begins',
+        title: noDetail ? t('reportsetup.topsheet_pages_blank_tip') : t('reportsetup.topsheet_pages_tip'),
       }),
-      noDetail && spec.topsheet_pages ? el('p', { class: 'rs-hint', text: 'Add the detail level to fill in the page numbers.' }) : null,
+      noDetail && spec.topsheet_pages ? el('p', { class: 'rs-hint', text: t('reportsetup.topsheet_pages_hint') }) : null,
     );
   }
 
   function fieldSelect(band, slot, which) {
     const f = band[slot] || null;
-    const sel = el('select', { class: 'modal-input rs-select', attrs: { id: `rs-${which}-${slot}`, 'aria-label': `${which} ${slot}` } });
+    const slotWord = SLOTS.find((s) => s[0] === slot)[2];
+    const isHeader = which === 'Header';
+    const sel = el('select', {
+      class: 'modal-input rs-select',
+      attrs: { id: `rs-${which}-${slot}`, 'aria-label': isHeader ? t('reportsetup.header_slot', { slot: slotWord }) : t('reportsetup.footer_slot', { slot: slotWord }) },
+    });
     const opts = [
-      ['', 'Nothing'],
-      ['title', 'Budget title'],
-      ['section', 'Section'],
-      ['printed', 'Date and time printed'],
-      ['date', 'Date printed'],
-      ['time', 'Time printed'],
-      ['file', 'File name'],
-      ['page', 'Page X of Y'],
+      ['', t('reportsetup.field.nothing')],
+      ['title', t('reportsetup.field.title')],
+      ['section', t('reportsetup.field.section')],
+      ['printed', t('reportsetup.field.printed')],
+      ['date', t('reportsetup.field.date')],
+      ['time', t('reportsetup.field.time')],
+      ['file', t('reportsetup.field.file')],
+      ['page', t('reportsetup.field.page')],
       ...infoLabels.map((l) => [`info:${l}`, l]),
-      ...globalNames.map((g) => [`global:${g}`, `Global: ${g}`]),
-      ['text', 'Text…'],
+      ...globalNames.map((g) => [`global:${g}`, t('reportsetup.field.global', { name: g })]),
+      ['text', t('reportsetup.field.text')],
     ];
     if (f && f.kind === 'info' && !infoLabels.includes(f.label)) opts.splice(opts.length - 1, 0, [`info:${f.label}`, f.label]);
-    if (f && f.kind === 'global' && !globalNames.includes(f.name)) opts.splice(opts.length - 1, 0, [`global:${f.name}`, `Global: ${f.name} (not in this budget)`]);
+    if (f && f.kind === 'global' && !globalNames.includes(f.name)) opts.splice(opts.length - 1, 0, [`global:${f.name}`, t('reportsetup.field.global_missing', { name: f.name })]);
     for (const [v, label] of opts) {
       const o = el('option', { text: label });
       o.value = v;
       sel.append(o);
     }
     sel.value = !f ? '' : f.kind === 'info' ? `info:${f.label}` : f.kind === 'global' ? `global:${f.name}` : f.kind;
-    const text = el('input', { class: 'modal-input rs-text', attrs: { type: 'text', maxlength: '200', 'aria-label': `${which} ${slot} text`, placeholder: 'Text' } });
+    const text = el('input', { class: 'modal-input rs-text', attrs: { type: 'text', maxlength: '200', 'aria-label': isHeader ? t('reportsetup.header_slot_text', { slot: slotWord }) : t('reportsetup.footer_slot_text', { slot: slotWord }), placeholder: t('reportsetup.text') } });
     text.value = f && f.kind === 'text' ? f.text : '';
     text.hidden = !(f && f.kind === 'text');
-    const key = which === 'Header' ? 'header' : 'footer';
+    const key = isHeader ? 'header' : 'footer';
     const set = (field) => {
       const next = { ...(spec[key] || (key === 'header' ? STANDARD_HEADER : STANDARD_FOOTER)) };
       if (field) next[slot] = field;
@@ -510,7 +516,7 @@ export async function showReportSetup(ctx) {
   function bandsGroup() {
     const header = spec.header || STANDARD_HEADER;
     const footer = spec.footer || STANDARD_FOOTER;
-    const reset = el('button', { class: 'btn btn-quiet rs-reset', text: 'Standard header and footer', attrs: { type: 'button', id: 'rs-std-bands' } });
+    const reset = el('button', { class: 'btn btn-quiet rs-reset', text: t('reportsetup.standard_bands'), attrs: { type: 'button', id: 'rs-std-bands' } });
     reset.disabled = !spec.header && !spec.footer;
     reset.addEventListener('click', () =>
       change(() => {
@@ -529,13 +535,13 @@ export async function showReportSetup(ctx) {
         { key: `${key}-first` },
       );
     return group(
-      'Header and footer',
-      el('p', { class: 'rs-sub', text: 'Header' }),
+      t('reportsetup.header_and_footer'),
+      el('p', { class: 'rs-sub', text: t('reportsetup.header') }),
       ...SLOTS.map(([s]) => fieldSelect(header, s, 'Header')),
-      firstOnly('header', 'Header on the first page only'),
-      el('p', { class: 'rs-sub', text: 'Footer' }),
+      firstOnly('header', t('reportsetup.header_first_only')),
+      el('p', { class: 'rs-sub', text: t('reportsetup.footer') }),
       ...SLOTS.map(([s]) => fieldSelect(footer, s, 'Footer')),
-      firstOnly('footer', 'Footer on the first page only'),
+      firstOnly('footer', t('reportsetup.footer_first_only')),
       reset,
     );
   }
@@ -549,10 +555,10 @@ export async function showReportSetup(ctx) {
     if (view && view.bid_error) notes.push(view.bid_error);
     if (sheet) {
       const n = Array.isArray(sheet.unassigned) ? sheet.unassigned.length : 0;
-      if (n) notes.push(`${n} ${n === 1 ? 'account is' : 'accounts are'} in no section; the bid lists ${n === 1 ? 'it' : 'them'} under Unassigned.`);
+      if (n) notes.push(t('reportsetup.unassigned_note', { count: n }));
       for (const w of sheet.warnings || []) notes.push(`${w.charAt(0).toUpperCase()}${w.slice(1)}.`);
     }
-    bidNotes.replaceChildren(...notes.map((t) => el('p', { class: 'rs-hint', text: t })));
+    bidNotes.replaceChildren(...notes.map((note) => el('p', { class: 'rs-hint', text: note })));
   }
 
   /** Starts the layout from the example the engine has (bid_sheet with no layout). */
@@ -626,31 +632,31 @@ export async function showReportSetup(ctx) {
     if (!spec.sections.includes('bid')) return null;
     const bid = spec.bid;
     if (!bid) {
-      const start = el('button', { class: 'btn', text: 'Edit a Bid Layout', attrs: { type: 'button', id: 'rs-bid-start' } });
+      const start = el('button', { class: 'btn', text: t('reportsetup.edit_bid_layout'), attrs: { type: 'button', id: 'rs-bid-start' } });
       start.addEventListener('click', startBid);
-      return group('Bid layout', el('p', { class: 'rs-hint', text: 'This setup prints the example layout. Edit a layout of your own: its header fields, its sections and which accounts each takes, subtotals and markups.' }), start, bidNotes);
+      return group(t('reportsetup.bid_layout'), el('p', { class: 'rs-hint', text: t('reportsetup.bid_example_hint') }), start, bidNotes);
     }
     const parts = [];
     parts.push(
-      check('List each section’s accounts', bid.show_accounts, (v) => change(() => (bid.show_accounts = v)), { key: 'bid-accounts' }),
-      el('p', { class: 'rs-sub', text: 'Header fields' }),
+      check(t('reportsetup.list_section_accounts'), bid.show_accounts, (v) => change(() => (bid.show_accounts = v)), { key: 'bid-accounts' }),
+      el('p', { class: 'rs-sub', text: t('reportsetup.header_fields') }),
     );
     bid.fields.forEach((f, i) => {
       parts.push(
         el(
           'div',
           { class: 'rs-slot rs-bid-field' },
-          bidInput(`rs-bid-f${i}-label`, `Header field ${i + 1} label`, f.label, (v) => (f.label = v), { placeholder: 'Label' }),
-          bidInput(`rs-bid-f${i}-value`, `Header field ${i + 1} value`, f.value, (v) => (f.value = v), { placeholder: 'Value', maxlength: '200' }),
-          bidButton(`rs-bid-f${i}-del`, '×', `Remove header field ${f.label || i + 1}`, () => change(() => bid.fields.splice(i, 1))),
+          bidInput(`rs-bid-f${i}-label`, t('reportsetup.header_field_label', { n: i + 1 }), f.label, (v) => (f.label = v), { placeholder: t('reportsetup.label') }),
+          bidInput(`rs-bid-f${i}-value`, t('reportsetup.header_field_value', { n: i + 1 }), f.value, (v) => (f.value = v), { placeholder: t('reportsetup.value'), maxlength: '200' }),
+          bidButton(`rs-bid-f${i}-del`, '×', t('reportsetup.remove_header_field', { name: f.label || i + 1 }), () => change(() => bid.fields.splice(i, 1))),
         ),
       );
     });
-    const addField = el('button', { class: 'btn btn-quiet rs-reset', text: 'Add Header Field', attrs: { type: 'button', id: 'rs-bid-add-field' } });
-    addField.addEventListener('click', () => change(() => bid.fields.push({ label: 'Field', value: '' })));
-    parts.push(addField, el('p', { class: 'rs-sub', text: 'Lines, in print order' }));
+    const addField = el('button', { class: 'btn btn-quiet rs-reset', text: t('reportsetup.add_header_field'), attrs: { type: 'button', id: 'rs-bid-add-field' } });
+    addField.addEventListener('click', () => change(() => bid.fields.push({ label: t('reportsetup.default.field'), value: '' })));
+    parts.push(addField, el('p', { class: 'rs-sub', text: t('reportsetup.lines_in_print_order') }));
     const sectionNames = bid.lines.filter((l) => l.kind === 'section').map((l) => l.name);
-    const KIND = { section: 'Section', subtotal: 'Subtotal', percent: 'Markup (%)', flat: 'Flat amount' };
+    const KIND = { section: t('reportsetup.kind.section'), subtotal: t('reportsetup.kind.subtotal'), percent: t('reportsetup.kind.percent'), flat: t('reportsetup.kind.flat') };
     bid.lines.forEach((l, i) => {
       const id = `rs-bid-l${i}`;
       const box = el('div', { class: 'rs-bid-line' });
@@ -658,19 +664,19 @@ export async function showReportSetup(ctx) {
         'div',
         { class: 'rs-slot' },
         el('span', { class: 'rs-slot-label', text: KIND[l.kind] }),
-        bidInput(`${id}-name`, `${KIND[l.kind]} ${i + 1} name`, l.name, (v) => {
+        bidInput(`${id}-name`, t('reportsetup.line_name', { kind: KIND[l.kind], n: i + 1 }), l.name, (v) => {
           // Markups on a section follow its new name.
           if (l.kind === 'section') {
             for (const x of bid.lines) if (x.kind === 'percent') x.of = x.of.map((n) => (sameName(n, l.name) ? v : n));
           }
           l.name = v;
-        }, { placeholder: 'Name' }),
+        }, { placeholder: t('reportsetup.name') }),
         el(
           'span',
           { class: 'rs-moves' },
-          bidButton(`${id}-up`, '↑', `Move ${l.name || 'line'} up`, () => change(() => ([bid.lines[i - 1], bid.lines[i]] = [bid.lines[i], bid.lines[i - 1]])), i === 0),
-          bidButton(`${id}-down`, '↓', `Move ${l.name || 'line'} down`, () => change(() => ([bid.lines[i + 1], bid.lines[i]] = [bid.lines[i], bid.lines[i + 1]])), i === bid.lines.length - 1),
-          bidButton(`${id}-del`, '×', `Remove ${l.name || 'line'}`, () => change(() => bid.lines.splice(i, 1))),
+          bidButton(`${id}-up`, '↑', t('reportsetup.move_up', { name: l.name || t('reportsetup.line') }), () => change(() => ([bid.lines[i - 1], bid.lines[i]] = [bid.lines[i], bid.lines[i - 1]])), i === 0),
+          bidButton(`${id}-down`, '↓', t('reportsetup.move_down', { name: l.name || t('reportsetup.line') }), () => change(() => ([bid.lines[i + 1], bid.lines[i]] = [bid.lines[i], bid.lines[i + 1]])), i === bid.lines.length - 1),
+          bidButton(`${id}-del`, '×', t('reportsetup.remove', { name: l.name || t('reportsetup.line') }), () => change(() => bid.lines.splice(i, 1))),
         ),
       );
       box.append(head);
@@ -679,26 +685,26 @@ export async function showReportSetup(ctx) {
         let cats = catText;
         let accts = acctText;
         box.append(
-          el('label', { class: 'rs-inline' }, el('span', { text: 'Categories' }), bidInput(`${id}-cats`, `Categories ${l.name} takes`, catText, (v) => ((cats = v), (l.picks = picksOf(cats, accts))), { placeholder: 'Category codes', maxlength: '2000' })),
-          el('label', { class: 'rs-inline' }, el('span', { text: 'Accounts' }), bidInput(`${id}-accts`, `Accounts ${l.name} takes`, acctText, (v) => ((accts = v), (l.picks = picksOf(cats, accts))), { placeholder: 'Numbers or ranges', maxlength: '2000' })),
+          el('label', { class: 'rs-inline' }, el('span', { text: t('reportsetup.categories') }), bidInput(`${id}-cats`, t('reportsetup.categories_takes', { name: l.name }), catText, (v) => ((cats = v), (l.picks = picksOf(cats, accts))), { placeholder: t('reportsetup.category_codes'), maxlength: '2000' })),
+          el('label', { class: 'rs-inline' }, el('span', { text: t('reportsetup.accounts') }), bidInput(`${id}-accts`, t('reportsetup.accounts_takes', { name: l.name }), acctText, (v) => ((accts = v), (l.picks = picksOf(cats, accts))), { placeholder: t('reportsetup.numbers_or_ranges'), maxlength: '2000' })),
         );
       } else if (l.kind === 'percent') {
         box.append(
           el(
             'label',
             { class: 'rs-inline' },
-            el('span', { text: 'Percent' }),
-            bidInput(`${id}-pct`, `${l.name} percent`, l.percent, (v) => {
+            el('span', { text: t('reportsetup.percent') }),
+            bidInput(`${id}-pct`, t('reportsetup.line_percent', { name: l.name }), l.percent, (v) => {
               if (!PERCENT.test(v.trim())) return false;
               l.percent = v.trim();
               return true;
-            }, { placeholder: 'Percent', maxlength: '20' }),
+            }, { placeholder: t('reportsetup.percent'), maxlength: '20' }),
           ),
         );
         const of = el('div', { class: 'rs-groups' });
         sectionNames.forEach((n, k) => {
           of.append(
-            check(n || '(no name)', l.of.some((x) => sameName(x, n)), (v) =>
+            check(n || t('reportsetup.no_name'), l.of.some((x) => sameName(x, n)), (v) =>
               change(() => {
                 l.of = v ? [...l.of, n] : l.of.filter((x) => !sameName(x, n));
               }),
@@ -706,19 +712,19 @@ export async function showReportSetup(ctx) {
             ),
           );
         });
-        box.append(el('p', { class: 'rs-hint', text: 'Of these sections (none ticked: every section and Unassigned)' }), of);
+        box.append(el('p', { class: 'rs-hint', text: t('reportsetup.of_sections_hint') }), of);
       } else if (l.kind === 'flat') {
         box.append(
           el(
             'label',
             { class: 'rs-inline' },
-            el('span', { text: 'Amount' }),
-            bidInput(`${id}-amt`, `${l.name} amount`, money(l.amount).replace(/^\((.*)\)$/, '-$1'), (v) => {
+            el('span', { text: t('reportsetup.amount') }),
+            bidInput(`${id}-amt`, t('reportsetup.line_amount', { name: l.name }), money(l.amount).replace(/^\((.*)\)$/, '-$1'), (v) => {
               const c = cents(v);
               if (c === null) return false;
               l.amount = c;
               return true;
-            }, { placeholder: 'Amount', maxlength: '24' }),
+            }, { placeholder: t('reportsetup.amount'), maxlength: '24' }),
           ),
         );
       }
@@ -729,24 +735,24 @@ export async function showReportSetup(ctx) {
       b2.addEventListener('click', () => change(() => bid.lines.push(line())));
       return b2;
     };
-    const fresh = (base) => {
+    const fresh = () => {
       let n = 1;
-      while (bid.lines.some((x) => sameName(x.name, `${base} ${n}`))) n += 1;
-      return `${base} ${n}`;
+      while (bid.lines.some((x) => sameName(x.name, t('reportsetup.default.section_n', { n })))) n += 1;
+      return t('reportsetup.default.section_n', { n });
     };
     parts.push(
       el(
         'div',
         { class: 'rs-bid-adds' },
-        add('section', 'Add Section', () => ({ kind: 'section', name: fresh('Section'), picks: [] })),
-        add('subtotal', 'Add Subtotal', () => ({ kind: 'subtotal', name: 'Subtotal' })),
-        add('percent', 'Add Markup', () => ({ kind: 'percent', name: 'Markup', percent: '10', of: [] })),
-        add('flat', 'Add Flat Amount', () => ({ kind: 'flat', name: 'Fee', amount: 0 })),
+        add('section', t('reportsetup.add_section'), () => ({ kind: 'section', name: fresh(), picks: [] })),
+        add('subtotal', t('reportsetup.add_subtotal'), () => ({ kind: 'subtotal', name: t('reportsetup.default.subtotal') })),
+        add('percent', t('reportsetup.add_markup'), () => ({ kind: 'percent', name: t('reportsetup.default.markup'), percent: '10', of: [] })),
+        add('flat', t('reportsetup.add_flat'), () => ({ kind: 'flat', name: t('reportsetup.default.fee'), amount: 0 })),
       ),
-      el('p', { class: 'rs-hint', text: 'Accounts: numbers, or ranges such as 4000 to 4999. An account counts in the first section that takes it. Below the lines the bid adds the budget’s own charges and credits, so the bid total is the budget’s net total plus these markups.' }),
+      el('p', { class: 'rs-hint', text: t('reportsetup.bid_accounts_hint') }),
       bidNotes,
     );
-    return group('Bid layout', ...parts);
+    return group(t('reportsetup.bid_layout'), ...parts);
   }
 
   function drawSettings() {
@@ -769,7 +775,7 @@ export async function showReportSetup(ctx) {
   // --- Presets ---------------------------------------------------------
 
   function drawPresets() {
-    presetSelect.replaceChildren(el('option', { text: 'New setup (not saved)', attrs: { value: '' } }), ...presets.map((p, i) => el('option', { text: p.default ? `${p.name} (default)` : p.name, attrs: { value: String(i) } })));
+    presetSelect.replaceChildren(el('option', { text: t('reportsetup.new_setup'), attrs: { value: '' } }), ...presets.map((p, i) => el('option', { text: p.default ? t('reportsetup.preset_default', { name: p.name }) : p.name, attrs: { value: String(i) } })));
     presetSelect.value = current === null ? '' : String(current);
     nameInput.value = name;
     defaultBox.checked = isDefault;
@@ -799,7 +805,7 @@ export async function showReportSetup(ctx) {
   const save = async (index) => {
     const n = nameInput.value.trim();
     if (!n) {
-      say('Give the preset a name first.', true);
+      say(t('reportsetup.name_first'), true);
       nameInput.focus();
       return;
     }
@@ -811,7 +817,7 @@ export async function showReportSetup(ctx) {
       name = presets[current].name;
       isDefault = presets[current].default === true;
       drawPresets();
-      say(index === null ? `Saved “${name}” in the budget.` : `Updated “${name}”.`);
+      say(index === null ? t('reportsetup.saved_preset', { name }) : t('reportsetup.updated_preset', { name }));
     } catch (e) {
       say(String(e), true);
     }
@@ -819,7 +825,7 @@ export async function showReportSetup(ctx) {
   saveBtn.addEventListener('click', () => save(current));
   saveNewBtn.addEventListener('click', () => {
     if (current !== null && nameInput.value.trim().toLowerCase() === presets[current].name.trim().toLowerCase()) {
-      say('Type a new name for the copy first.', true);
+      say(t('reportsetup.new_name_first'), true);
       nameInput.focus();
       nameInput.select();
       return;
@@ -836,7 +842,7 @@ export async function showReportSetup(ctx) {
       name = '';
       isDefault = false;
       drawPresets();
-      say(`Deleted “${gone}”. Edit > Undo brings it back.`);
+      say(t('reportsetup.deleted_preset', { name: gone }));
     } catch (e) {
       say(String(e), true);
     }
@@ -849,10 +855,10 @@ export async function showReportSetup(ctx) {
   };
   const output = async (pdf) => {
     busy(true);
-    say(pdf ? 'Saving the PDF…' : 'Printing…');
+    say(pdf ? t('reportsetup.saving_pdf') : t('reportsetup.printing'));
     try {
       const r = await printReport(full, spec, { pdf, name: current === null ? '' : presets[current].name });
-      if (pdf && !r.system) say(r.done && r.file ? `Saved ${r.file}.` : '');
+      if (pdf && !r.system) say(r.done && r.file ? t('reportsetup.saved_file', { file: r.file }) : '');
       else say('');
     } catch (e) {
       say(String(e), true);
@@ -872,9 +878,9 @@ export async function showReportSetup(ctx) {
       const presetBar = el(
         'div',
         { class: 'rs-presetbar' },
-        el('label', { class: 'rs-inline' }, el('span', { text: 'Preset' }), presetSelect),
+        el('label', { class: 'rs-inline' }, el('span', { text: t('reportsetup.preset') }), presetSelect),
         nameInput,
-        el('label', { class: 'rs-check', attrs: { for: 'rs-default' } }, defaultBox, el('span', { text: 'Default' })),
+        el('label', { class: 'rs-check', attrs: { for: 'rs-default' } }, defaultBox, el('span', { text: t('reportsetup.default') })),
         saveBtn,
         saveNewBtn,
         deleteBtn,
@@ -882,13 +888,13 @@ export async function showReportSetup(ctx) {
       const toolbar = el(
         'div',
         { class: 'rs-previewbar' },
-        el('div', { class: 'rs-nav-group', attrs: { role: 'group', 'aria-label': 'Pages' } }, firstBtn, prevBtn, el('span', { class: 'rs-page-label', text: 'Page' }), pageInput, pageCount, nextBtn, lastBtn),
+        el('div', { class: 'rs-nav-group', attrs: { role: 'group', 'aria-label': t('reportsetup.pages') } }, firstBtn, prevBtn, el('span', { class: 'rs-page-label', text: t('reportsetup.page') }), pageInput, pageCount, nextBtn, lastBtn),
         jump,
       );
       const box = el(
         'div',
         { class: 'modal rs-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rs-title' } },
-        el('div', { class: 'rs-head' }, el('h2', { class: 'modal-title', text: 'Print', attrs: { id: 'rs-title' } }), presetBar),
+        el('div', { class: 'rs-head' }, el('h2', { class: 'modal-title', text: t('reportsetup.print'), attrs: { id: 'rs-title' } }), presetBar),
         el('div', { class: 'rs-main' }, left, el('div', { class: 'rs-preview-pane' }, toolbar, pages)),
         el('div', { class: 'rs-foot' }, status, el('div', { class: 'modal-actions' }, closeBtn, pdfBtn, printBtn)),
       );

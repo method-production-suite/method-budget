@@ -7,6 +7,7 @@
 import { el } from './dom.js';
 import { invoke } from './api.js';
 import { jumpEntry } from './review.js';
+import { t } from './i18n.js';
 
 const st = {
   doc: null,
@@ -76,10 +77,10 @@ function initials(name) {
 /** "Today 2 PM", "Oct 3, 4 PM": the hour a change falls in. */
 function hourLabel(iso) {
   const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return 'Some time';
+  if (!Number.isFinite(d.getTime())) return t('activity.some_time');
   const now = new Date();
   const hour = d.toLocaleTimeString([], { hour: 'numeric' });
-  if (d.toDateString() === now.toDateString()) return `Today ${hour}`;
+  if (d.toDateString() === now.toDateString()) return t('activity.today_hour', { hour });
   return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${hour}`;
 }
 
@@ -94,14 +95,14 @@ function draw() {
   if (!host) return;
   const box = el('div', { class: 'activity' });
   if (!st.shared) {
-    box.append(el('p', { class: 'history-empty', text: 'When a budget is shared through a folder, everyone’s changes are listed here with who made them and when.' }));
+    box.append(el('p', { class: 'history-empty', text: t('activity.not_shared') }));
     host.replaceChildren(box);
     return;
   }
   if (st.error) box.append(el('p', { class: 'history-error', text: st.error, attrs: { role: 'alert' } }));
   const items = st.items;
   if (!items) {
-    box.append(el('p', { class: 'history-empty', text: 'Looking…' }));
+    box.append(el('p', { class: 'history-empty', text: t('activity.looking') }));
     host.replaceChildren(box);
     return;
   }
@@ -109,9 +110,9 @@ function draw() {
   const people = new Map();
   for (const it of items) if (!people.has(it.actor)) people.set(it.actor, it);
   if (people.size > 1) {
-    const sel = el('select', { class: 'activity-filter', attrs: { 'aria-label': 'Show changes by' } });
-    sel.append(el('option', { text: 'Everyone', attrs: { value: '' } }));
-    for (const [actor, it] of people) sel.append(el('option', { text: it.me ? `${it.name} (you)` : it.name, attrs: { value: actor } }));
+    const sel = el('select', { class: 'activity-filter', attrs: { 'aria-label': t('activity.show_changes_by') } });
+    sel.append(el('option', { text: t('activity.everyone'), attrs: { value: '' } }));
+    for (const [actor, it] of people) sel.append(el('option', { text: it.me ? t('activity.name_you', { name: it.name }) : it.name, attrs: { value: actor } }));
     sel.value = st.person;
     sel.addEventListener('change', () => {
       st.person = sel.value;
@@ -121,7 +122,7 @@ function draw() {
   }
   const shown = st.person ? items.filter((it) => it.actor === st.person) : items;
   if (!shown.length) {
-    box.append(el('p', { class: 'history-empty', text: 'No changes yet.' }));
+    box.append(el('p', { class: 'history-empty', text: t('activity.no_changes') }));
     host.replaceChildren(box);
     return;
   }
@@ -146,14 +147,14 @@ function row(it) {
     'div',
     { class: 'activity-main' },
     el('span', { class: `share-avatar share-avatar-sm ${colorClass(it.color)}`, text: initials(it.name), title: it.name }),
-    el('span', { class: 'activity-text' }, el('span', { class: 'activity-who', text: it.me ? 'You' : it.name }), ' ', el('span', { class: 'activity-label', text: it.label, title: it.label })),
-    el('span', { class: 'activity-time', text: it.signed ? `${timeText(it.time)} · signed` : timeText(it.time), title: it.signed ? 'Signed with this person’s key' : '' }),
+    el('span', { class: 'activity-text' }, el('span', { class: 'activity-who', text: it.me ? t('activity.you') : it.name }), ' ', el('span', { class: 'activity-label', text: it.label, title: it.label })),
+    el('span', { class: 'activity-time', text: it.signed ? t('activity.time_signed', { time: timeText(it.time) }) : timeText(it.time), title: it.signed ? t('activity.signed_tip') : '' }),
   );
   const li = el('li', { class: `activity-item ${it.me ? 'is-me' : ''}` }, main);
   if (it.place && it.place.text) {
     const where = el('div', { class: 'activity-where' }, el('span', { text: it.place.text }));
     if (entry && st.ctx && typeof st.ctx.jumpTo === 'function') {
-      where.append(el('button', { class: 'btn btn-quiet activity-go', text: 'Go there', attrs: { type: 'button' }, on: { click: () => st.ctx.jumpTo(entry) } }));
+      where.append(el('button', { class: 'btn btn-quiet activity-go', text: t('activity.go_there'), attrs: { type: 'button' }, on: { click: () => st.ctx.jumpTo(entry) } }));
     }
     li.append(where);
   }

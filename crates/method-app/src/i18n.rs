@@ -102,6 +102,11 @@ mod tests {
         "main.js",
         "modal.js",
         "footer.js",
+        "share.js",
+        "activity.js",
+        "topsheet-setup.js",
+        "report.js",
+        "reportsetup.js",
     ];
 
     /// Literals that aren't words in a language (a domain name, a file

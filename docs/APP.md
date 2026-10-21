@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 1,200 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 2,100 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1287,9 +1287,10 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   Budget and every Budget Setup tab draw their words from the table.
 
 Converted so far: the start window and New Budget, the Help menu and About, the shortcut
-list and sheet, the menu bar, Budget Setup's tabs (the setup lists, Globals, Units and
-Rate Tables), Find and Replace, the main window's dialogs, toolbar tips and messages, the
-status bar, and the common dialog buttons. The rest of the page, the engine's messages
+list and sheet, the menu bar, Budget Setup's tabs (the setup lists, Globals, Units,
+Rate Tables, Charges, Credits, Info, Settings and Baseline), Find and Replace, the main
+window's dialogs, toolbar tips and messages, the status bar, the common dialog buttons,
+sharing and the Activity tab, the printed reports and the report setup. The rest of the page, the engine's messages
 and the native dialogs are English text still; docs/research/accessibility-audit.md,
 "Localization", lists them.
 
