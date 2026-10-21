@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 2,100 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 2,550 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1282,7 +1282,10 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   no key twice, plural entries with an `other` form, no em dashes or exclamation marks);
   and the converted scripts hold no words of their own: a new `text:`, `title:`,
   `label:`, `placeholder:`, `message:` or `aria-label` literal with letters in it fails
-  the build. `scripts/web-smoke.mjs` checks the lookup, the plurals, the fallback and the
+  the build. The fixed words of `ui/index.html` (the toolbar's buttons, the page's
+  landmarks) carry their key in `data-i18n`, `data-i18n-aria-label` or `data-i18n-title`,
+  and `fillPage()` puts them in at boot; a test fails on a word there with no key, or
+  English that differs from the table's. `scripts/web-smoke.mjs` checks the lookup, the plurals, the fallback and the
   choice of language in the browser, and that the shortcut sheet, the start window, New
   Budget and every Budget Setup tab draw their words from the table.
 
@@ -1290,7 +1293,11 @@ Converted so far: the start window and New Budget, the Help menu and About, the 
 list and sheet, the menu bar, Budget Setup's tabs (the setup lists, Globals, Units,
 Rate Tables, Charges, Credits, Info, Settings and Baseline), Find and Replace, the main
 window's dialogs, toolbar tips and messages, the status bar, the common dialog buttons,
-sharing and the Activity tab, the printed reports and the report setup. The rest of the page, the engine's messages
+sharing and the Activity tab, the printed reports and the report setup, the toolbar,
+the tools panel's frame, Notes, History, Versions, the Library, Review and Compare, the
+tab strips and split view, the grid's right-click menu and the shared phrases of
+`util.js`. The rest of the page (the tools panel's other tabs, the import dialogs, the
+grid's levels and quick entry), the engine's messages
 and the native dialogs are English text still; docs/research/accessibility-audit.md,
 "Localization", lists them.
 

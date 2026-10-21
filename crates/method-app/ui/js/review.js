@@ -12,6 +12,7 @@
 
 import { el } from './dom.js';
 import { invoke } from './api.js';
+import { t } from './i18n.js';
 
 const st = {
   doc: null,
@@ -94,23 +95,23 @@ function draw() {
   if (!host) return;
   const box = el('div', { class: 'review' });
   if (!st.shared) {
-    box.append(el('p', { class: 'history-empty', text: 'When a budget is shared through a folder, anything that needs a person after other people’s changes arrive is listed here: a value changed by two people, a deleted item still in use, two items with one name.' }));
+    box.append(el('p', { class: 'history-empty', text: t('review.not_shared') }));
     host.replaceChildren(box);
     return;
   }
   if (st.error) box.append(el('p', { class: 'history-error', text: st.error, attrs: { role: 'alert' } }));
   const items = st.items;
   if (!items) {
-    box.append(el('p', { class: 'history-empty', text: 'Looking…' }));
+    box.append(el('p', { class: 'history-empty', text: t('review.looking') }));
     host.replaceChildren(box);
     return;
   }
   if (!items.length) {
-    box.append(el('p', { class: 'history-empty', text: 'Nothing to review. Everyone’s changes fit together.' }));
+    box.append(el('p', { class: 'history-empty', text: t('review.nothing_to_review') }));
     host.replaceChildren(box);
     return;
   }
-  const list = el('ol', { class: 'review-list', attrs: { 'aria-label': 'Things to review' } });
+  const list = el('ol', { class: 'review-list', attrs: { 'aria-label': t('review.things_to_review') } });
   for (const it of items) list.append(item(it));
   box.append(list);
   host.replaceChildren(box);
@@ -122,7 +123,7 @@ function item(it) {
   const actions = el('div', { class: 'review-actions' });
   const entry = jumpEntry(it.place);
   if (entry && st.ctx && typeof st.ctx.jumpTo === 'function') {
-    actions.append(el('button', { class: 'btn btn-quiet', text: 'Go there', attrs: { type: 'button' }, on: { click: () => st.ctx.jumpTo(entry) } }));
+    actions.append(el('button', { class: 'btn btn-quiet', text: t('review.go_there'), attrs: { type: 'button' }, on: { click: () => st.ctx.jumpTo(entry) } }));
   }
   if (it.key === 'overwritten' && Array.isArray(it.values) && it.values.length) {
     const values = el('div', { class: 'share-values' });
@@ -132,15 +133,15 @@ function item(it) {
           'div',
           { class: `share-value ${v.kept ? 'is-kept' : ''}` },
           el('span', { class: `share-avatar share-avatar-sm ${colorClass(v.color)}`, text: initials(v.name) }),
-          el('span', { class: 'share-value-who', text: v.me ? 'You' : v.name }),
-          el('span', { class: 'share-value-text', text: v.value || '(blank)', title: v.value }),
-          el('span', { class: 'share-value-when', text: `${localTime(v.time)}${v.kept ? ' · kept' : ''}` }),
+          el('span', { class: 'share-value-who', text: v.me ? t('review.you') : v.name }),
+          el('span', { class: 'share-value-text', text: v.value || t('review.blank'), title: v.value }),
+          el('span', { class: 'share-value-when', text: v.kept ? t('review.time_kept', { time: localTime(v.time) }) : localTime(v.time) }),
         ),
       );
       actions.append(
         el('button', {
           class: v.kept ? 'btn btn-primary' : 'btn',
-          text: v.kept ? `Keep ${short(v.value)}` : `Use ${short(v.value)}`,
+          text: v.kept ? t('review.keep', { value: short(v.value) }) : t('review.use', { value: short(v.value) }),
           attrs: { type: 'button' },
           on: { click: () => useValue(it.place, v.index) },
         }),
@@ -153,7 +154,7 @@ function item(it) {
 }
 
 function short(v) {
-  const s = String(v === undefined || v === null || v === '' ? '(blank)' : v);
+  const s = String(v === undefined || v === null || v === '' ? t('review.blank') : v);
   return s.length > 24 ? `${s.slice(0, 23)}…` : s;
 }
 

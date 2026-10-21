@@ -2,6 +2,8 @@
 // data that may be missing or of the wrong type, a count with its noun, and
 // a rejection as text.
 
+import { t } from './i18n.js';
+
 /** `v` when it is a plain object, else an empty one. */
 export function obj(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
@@ -35,8 +37,14 @@ export function sourceText(view, kind, name) {
   const s = all && all[kind] && Object.prototype.hasOwnProperty.call(all[kind], name) ? all[kind][name] : null;
   if (!s || typeof s !== 'object') return '';
   const parts = [];
-  if (str(s.pack)) parts.push(`From ${s.pack}${str(s.pack_version) ? ` (${s.pack_version})` : ''}${str(s.effective) ? `, effective ${s.effective}` : ''}`);
-  else if (str(s.effective)) parts.push(`Effective ${s.effective}`);
+  const pack = str(s.pack);
+  const version = str(s.pack_version);
+  const date = str(s.effective);
+  if (pack && version && date) parts.push(t('util.source_pack_version_effective', { pack, version, date }));
+  else if (pack && version) parts.push(t('util.source_pack_version', { pack, version }));
+  else if (pack && date) parts.push(t('util.source_pack_effective', { pack, date }));
+  else if (pack) parts.push(t('util.source_pack', { pack }));
+  else if (date) parts.push(t('util.source_effective', { date }));
   if (str(s.notes)) parts.push(str(s.notes));
   for (const u of Array.isArray(s.urls) ? s.urls : []) if (str(u)) parts.push(str(u));
   return parts.join('. ');
@@ -44,9 +52,9 @@ export function sourceText(view, kind, name) {
 
 /** The ways a flat fringe can count a line, as [value, label] (decisions.md, entry 54). */
 export const FLAT_BASES = [
-  ['amount', 'Amount only (standard)'],
-  ['amount_counts', 'Amount, plus counts in X and 4X'],
-  ['quantity', 'Full quantity'],
+  ['amount', t('util.flat_basis.amount')],
+  ['amount_counts', t('util.flat_basis.amount_counts')],
+  ['quantity', t('util.flat_basis.quantity')],
 ];
 
 /** Whether `unit` is an hour among the budget's `units`: one hour long, or named Hour (any case). */
@@ -66,8 +74,8 @@ export function isHourUnit(units, unit) {
 export function flatCountWords(def, units) {
   const d = obj(def);
   let out = '';
-  if (d.basis === 'amount_counts') out += ', plus counts in X and 4X';
-  else if (d.basis === 'quantity') out += ', full quantity';
-  if (str(d.max_hours_per_day) !== '' && isHourUnit(units, d.unit)) out += `, up to ${d.max_hours_per_day} hours a day`;
+  if (d.basis === 'amount_counts') out += t('util.flat_count.amount_counts');
+  else if (d.basis === 'quantity') out += t('util.flat_count.quantity');
+  if (str(d.max_hours_per_day) !== '' && isHourUnit(units, d.unit)) out += t('util.flat_count.max_hours', { hours: d.max_hours_per_day });
   return out;
 }

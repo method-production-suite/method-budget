@@ -111,7 +111,7 @@ docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, im
 What the slice built, against the list this audit gave:
 
 1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
-   2,100 entries, 65 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   2,550 entries, 67 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
    with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
    language lacks (with a console warning) and the system's language picked, English by
    default. The table loads as one of the page's own scripts under its
@@ -126,10 +126,17 @@ What the slice built, against the list this audit gave:
    (`main.js`), the common dialog buttons (`modal.js`) and the status bar (`footer.js`);
    in the second pass, sharing (`share.js`), the Activity tab (`activity.js`), Budget
    Setup's Charges, Credits, Info, Settings and Baseline tabs (`topsheet-setup.js`), the
-   printed reports (`report.js`) and the report setup (`reportsetup.js`). The wording is unchanged; plurals written out ("1 row", "3 rows") became plural
-   entries. `src/i18n.rs` fails on a new `text:`, `title:`, `label:`, `placeholder:`,
+   printed reports (`report.js`) and the report setup (`reportsetup.js`); in the third
+   pass, the tools panel's frame and window (`tools.js`, `toolswin.js`), Notes, History,
+   Versions, the Library, Review and Compare (`notes.js`, `history.js`, `versions.js`,
+   `library.js`, `review.js`, `compare.js`), the tab strips and split view (`tabs.js`,
+   `pane.js`), the grid's right-click menu (`context.js`), `util.js`'s shared phrases and
+   the toolbar and fixed words of `ui/index.html` (keyed with `data-i18n` attributes that
+   `fillPage()` fills at boot). The wording is unchanged; plurals written out ("1 row",
+   "3 rows") became plural entries. `src/i18n.rs` fails on a new `text:`, `title:`, `label:`, `placeholder:`,
    `message:`, `hint:`, `aria-label` or `toast()` literal with letters in a converted
-   script, on a key missing from the table and on an entry nothing uses.
+   script, on a word in `ui/index.html` with no key or English that differs from the
+   table's, on a key missing from the table and on an entry nothing uses.
 3. **Engine messages with stable codes**: not started. Validation errors, problems in
    cells and import reviews still come from `method-core`, `method-format` and
    `method-session` as English sentences.
@@ -144,14 +151,16 @@ What the slice built, against the list this audit gave:
 
 Still English inline, for the next passes:
 
-- **The rest of the page**: the tools panel's other tabs and dialogs (`library.js`,
-  `packs.js`, `notes.js`, `history.js`, `presets.js`, `explain.js`, `overtime.js`,
-  `actuals.js`, `actualsimport.js`, `comments.js`, `review.js`, `compare.js`,
-  `diffmerge.js`, `versions.js`, `importsetup.js`, `sheetimport.js`, `coaimport.js`,
-  `exchangeimport.js`, `scheduledays.js`, `sharing.js`, `context.js`, `levels.js`,
-  `grid.js` and the rest), `util.js`'s shared phrases (a flat fringe's count words, a
-  setup pack's source), the toolbar in `ui/index.html`, and words that come from Rust as
-  data (a start-window row's kind, the chart groups).
+- **The rest of the page**: the tools panel's other tabs and dialogs (`packs.js`,
+  `presets.js`, `explain.js`, `overtime.js`, `actuals.js`, `actualsimport.js`,
+  `comments.js`, `diffmerge.js`, `importsetup.js`, `sheetimport.js`, `coaimport.js`,
+  `exchangeimport.js`, `scheduledays.js`, `ratepick.js`, `rename.js`, `renumber.js`),
+  sharing's banners (`sharing.js`), the grid's levels and quick entry (`levels.js`,
+  `quickentry.js`, `rowformat.js`'s color names, which the right-click menu shows),
+  `safety.js`, `display-settings.js`, `convertbanner.js`, `clipboard.js` and the rest; the
+  words those scripts pass to `util.js`'s `plural()`; and words that come from Rust as
+  data (a start-window row's kind, the chart groups). The page's `<title>`, the product's
+  name, stays in `ui/index.html`.
 - **The engine's messages** (item 3) and **the native dialogs** (item 4).
 - **Elsewhere**: the command line, the MCP tools, the website (`site/`), the release
   notes and the README are English and stay so for now.

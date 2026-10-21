@@ -29,6 +29,7 @@ import { el, isMac } from './dom.js';
 import { anchoredForm } from './modal.js';
 import { readPref, writePref } from './prefs.js';
 import { obj, str, errText } from './util.js';
+import { t } from './i18n.js';
 
 const st = {
   host: null,
@@ -104,8 +105,8 @@ function ownerKey(owner) {
 }
 
 function topsheet() {
-  const t = obj(st.view.budget).topsheet;
-  return Array.isArray(t) ? t : [];
+  const top = obj(st.view.budget).topsheet;
+  return Array.isArray(top) ? top : [];
 }
 
 function selection() {
@@ -124,10 +125,10 @@ function targets() {
   const named = (x) => `${str(x.code)} ${str(x.name)}`.trim();
   const out = [];
   const pushAccount = (a) => {
-    if (a && a.code !== undefined) out.push({ owner: { account: str(a.code) }, title: `Account ${named(a)}`, notes: a.notes });
+    if (a && a.code !== undefined) out.push({ owner: { account: str(a.code) }, title: t('notes.account_title', { name: named(a) }), notes: a.notes });
   };
   const pushCategory = (c) => {
-    if (c && c.kind !== 'production_total' && c.code !== undefined) out.push({ owner: { category: str(c.code) }, title: `Category ${named(c)}`, notes: c.notes });
+    if (c && c.kind !== 'production_total' && c.code !== undefined) out.push({ owner: { category: str(c.code) }, title: t('notes.category_title', { name: named(c) }), notes: c.notes });
   };
   if (sel.level === 'details') {
     const account = obj(st.view.account);
@@ -138,7 +139,7 @@ function targets() {
       if (i >= 0) {
         const d = details[i];
         const what = str(d.description).trim();
-        out.push({ owner: { row: id }, title: `Line ${i + 1}${what ? `: ${what}` : ''}`, notes: d.notes });
+        out.push({ owner: { row: id }, title: what ? t('notes.line_title_with', { num: i + 1, what }) : t('notes.line_title', { num: i + 1 }), notes: d.notes });
       }
     }
     const cat = top[account.ti];
@@ -187,12 +188,12 @@ function byKey(key) {
 
 function restoreFocus(info) {
   if (!info) return;
-  const t = byKey(info.key);
-  if (!t) return;
-  t.focus({ preventScroll: true });
-  if (info.start !== undefined && typeof t.setSelectionRange === 'function') {
+  const node = byKey(info.key);
+  if (!node) return;
+  node.focus({ preventScroll: true });
+  if (info.start !== undefined && typeof node.setSelectionRange === 'function') {
     try {
-      t.setSelectionRange(info.start, info.end);
+      node.setSelectionRange(info.start, info.end);
     } catch {
       // Not a text control.
     }
@@ -210,12 +211,12 @@ function draw() {
       el(
         'section',
         { class: 'notes-line' },
-        el('h3', { class: 'notes-heading', text: 'Notes' }),
-        el('p', { class: 'apply-hint', text: 'Select a line, an account or a category to see or write its notes.' }),
+        el('h3', { class: 'notes-heading', text: t('notes.heading') }),
+        el('p', { class: 'apply-hint', text: t('notes.select_hint') }),
       ),
     );
   }
-  shown.forEach((t, i) => parts.push(ownerSection(t, i)));
+  shown.forEach((tg, i) => parts.push(ownerSection(tg, i)));
   parts.push(listSection(), authorSection());
   host.replaceChildren(...parts);
   restoreFocus(focus);
@@ -262,18 +263,18 @@ function button(text, cls, key, onClick, { label = '', title = '' } = {}) {
 // ---------------------------------------------------------------------------
 // One owner's notes
 
-function ownerSection(t, index) {
-  const okey = ownerKey(t.owner);
+function ownerSection(tg, index) {
+  const okey = ownerKey(tg.owner);
   const hid = `notes-owner-h-${index}`;
   const sec = el('section', { class: 'notes-line', attrs: { 'aria-labelledby': hid } });
-  sec.append(el('h3', { class: 'notes-heading', text: t.title, title: t.title, attrs: { id: hid } }));
-  const notes = (Array.isArray(t.notes) ? t.notes : []).filter((n) => n && typeof n.text === 'string');
+  sec.append(el('h3', { class: 'notes-heading', text: tg.title, title: tg.title, attrs: { id: hid } }));
+  const notes = (Array.isArray(tg.notes) ? tg.notes : []).filter((n) => n && typeof n.text === 'string');
   if (notes.length) {
-    const ul = el('ul', { class: 'notes-cards', attrs: { 'aria-label': `Notes on ${t.title}` } });
-    for (const n of notes) ul.append(el('li', {}, card(t, okey, n)));
+    const ul = el('ul', { class: 'notes-cards', attrs: { 'aria-label': t('notes.notes_on', { title: tg.title }) } });
+    for (const n of notes) ul.append(el('li', {}, card(tg, okey, n)));
     sec.append(ul);
   }
-  sec.append(newBox(t, okey, hid));
+  sec.append(newBox(tg, okey, hid));
   if (st.error && st.errorAt === okey) sec.append(el('p', { class: 'setup-error', text: st.error, attrs: { role: 'alert' } }));
   return sec;
 }
@@ -281,21 +282,21 @@ function ownerSection(t, index) {
 function meta(n) {
   const parts = [];
   const made = when(n.created);
-  parts.push(made || 'Undated');
+  parts.push(made || t('notes.undated'));
   if (n.author) parts.push(str(n.author));
-  if (n.edited) parts.push(`edited ${when(n.edited)}`);
-  if (n.done) parts.push('reviewed');
+  if (n.edited) parts.push(t('notes.edited_at', { when: when(n.edited) }));
+  if (n.done) parts.push(t('notes.reviewed'));
   return parts.join(' · ');
 }
 
-function card(t, okey, n) {
+function card(tg, okey, n) {
   const ekey = `${okey}|${n.id}`;
   const box = el('div', { class: `notes-card${n.done ? ' is-done' : ''}` });
   if (st.editing.has(ekey)) {
     const saved = str(n.text);
     const area = el('textarea', {
       class: 'setup-input notes-text',
-      attrs: { rows: '4', spellcheck: 'true', 'aria-label': `Edit note on ${t.title}` },
+      attrs: { rows: '4', spellcheck: 'true', 'aria-label': t('notes.edit_note_on', { title: tg.title }) },
       data: { key: `notes:edit:${ekey}` },
     });
     area.value = st.drafts.has(ekey) ? st.drafts.get(ekey) : saved;
@@ -311,7 +312,7 @@ function card(t, okey, n) {
         byKey(`notes:editbtn:${ekey}`)?.focus();
         return;
       }
-      const ok = await run(okey, 'update_note', { owner: t.owner, id: n.id, text, edited: now() });
+      const ok = await run(okey, 'update_note', { owner: tg.owner, id: n.id, text, edited: now() });
       if (ok) {
         done();
         draw();
@@ -340,15 +341,15 @@ function card(t, okey, n) {
       el(
         'div',
         { class: 'notes-actions' },
-        el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter saves; empty deletes it` }),
-        button('Cancel', 'setup-btn setup-btn-quiet', `notes:cancel:${ekey}`, cancel),
-        button('Save', 'setup-btn setup-btn-primary', `notes:save:${ekey}`, save),
+        el('span', { class: 'apply-hint', text: t('notes.edit_hint', { mod: isMac ? '⌘' : 'Ctrl+' }) }),
+        button(t('notes.cancel'), 'setup-btn setup-btn-quiet', `notes:cancel:${ekey}`, cancel),
+        button(t('notes.save'), 'setup-btn setup-btn-primary', `notes:save:${ekey}`, save),
       ),
     );
     return box;
   }
-  const del = button('Delete', 'setup-btn setup-btn-quiet notes-mini', `notes:del:${ekey}`, () => remove(t, okey, n, del), {
-    label: 'Delete this note',
+  const del = button(t('notes.delete'), 'setup-btn setup-btn-quiet notes-mini', `notes:del:${ekey}`, () => remove(tg, okey, n, del), {
+    label: t('notes.delete_label'),
   });
   box.append(
     el('p', { class: 'notes-meta', text: meta(n) }),
@@ -356,40 +357,40 @@ function card(t, okey, n) {
     el(
       'div',
       { class: 'notes-card-actions' },
-      button('Edit', 'setup-btn setup-btn-quiet notes-mini', `notes:editbtn:${ekey}`, () => {
+      button(t('notes.edit'), 'setup-btn setup-btn-quiet notes-mini', `notes:editbtn:${ekey}`, () => {
         st.editing.add(ekey);
         draw();
         byKey(`notes:edit:${ekey}`)?.focus();
-      }, { label: 'Edit this note' }),
+      }, { label: t('notes.edit_label') }),
       del,
     ),
   );
   return box;
 }
 
-function remove(t, okey, n, anchor) {
+function remove(tg, okey, n, anchor) {
   anchoredForm({
     anchor,
-    title: 'Delete this note?',
+    title: t('notes.delete_question'),
     message: str(n.text).length > 120 ? `${str(n.text).slice(0, 120)}…` : str(n.text),
-    submitText: 'Delete',
+    submitText: t('notes.delete'),
     danger: true,
-    onSubmit: () => st.ctx.call('delete_note', { owner: t.owner, id: n.id }),
+    onSubmit: () => st.ctx.call('delete_note', { owner: tg.owner, id: n.id }),
   }).then(() => {
     const next = byKey(`notes:new:${okey}`);
     if (next) next.focus({ preventScroll: true });
   });
 }
 
-function newBox(t, okey, hid) {
+function newBox(tg, okey, hid) {
   const dkey = `${okey}|new`;
   const area = el('textarea', {
     class: 'setup-input notes-text notes-new',
     attrs: {
       rows: '3',
       spellcheck: 'true',
-      placeholder: 'Add a note…',
-      'aria-label': `New note on ${t.title}`,
+      placeholder: t('notes.add_placeholder'),
+      'aria-label': t('notes.new_note_on', { title: tg.title }),
       'aria-describedby': `${hid}-hint`,
     },
     data: { key: `notes:new:${okey}`, new: '1' },
@@ -397,7 +398,7 @@ function newBox(t, okey, hid) {
   area.value = st.drafts.get(dkey) || '';
   const add = el('button', {
     class: 'setup-btn setup-btn-primary',
-    text: 'Add',
+    text: t('notes.add'),
     attrs: { type: 'button' },
     data: { key: `notes:add:${okey}`, nobusy: '1' },
   });
@@ -408,7 +409,7 @@ function newBox(t, okey, hid) {
   const submit = async () => {
     const text = area.value;
     if (!text.trim()) return;
-    const ok = await run(okey, 'add_note', { owner: t.owner, text, created: now(), author: author() || null });
+    const ok = await run(okey, 'add_note', { owner: tg.owner, text, created: now(), author: author() || null });
     if (ok) {
       st.drafts.delete(dkey);
       draw();
@@ -444,7 +445,7 @@ function newBox(t, okey, hid) {
     el(
       'div',
       { class: 'notes-actions' },
-      el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter adds it`, attrs: { id: `${hid}-hint` } }),
+      el('span', { class: 'apply-hint', text: t('notes.add_hint', { mod: isMac ? '⌘' : 'Ctrl+' }), attrs: { id: `${hid}-hint` } }),
       add,
     ),
   );
@@ -455,13 +456,13 @@ function newBox(t, okey, hid) {
 
 function entryWhere(n) {
   const acct = `${str(n.account)} ${str(n.account_name)}`.trim();
-  if (n.kind === 'category') return `Category ${`${str(n.category)} ${str(n.category_name)}`.trim()}`;
-  if (n.kind === 'account') return `Account ${acct}`;
-  return `${acct} · line ${n.line}`;
+  if (n.kind === 'category') return t('notes.category_title', { name: `${str(n.category)} ${str(n.category_name)}`.trim() });
+  if (n.kind === 'account') return t('notes.account_title', { name: acct });
+  return t('notes.where_line', { account: acct, line: n.line });
 }
 
 function entryWhat(n) {
-  if (n.kind === 'row') return str(n.description).trim() || '(no description)';
+  if (n.kind === 'row') return str(n.description).trim() || t('notes.no_description');
   if (n.kind === 'account') return str(n.account_name).trim() || str(n.account);
   return str(n.category_name).trim() || str(n.category);
 }
@@ -475,14 +476,14 @@ function listSection() {
     { class: 'notes-all-head' },
     el('h3', {
       class: 'notes-heading',
-      text: list ? `All notes (${list.length}${list.length ? `, ${open} open` : ''})` : 'All notes',
+      text: list ? (list.length ? t('notes.all_notes_open', { count: list.length, open }) : t('notes.all_notes_count', { count: list.length })) : t('notes.all_notes'),
       attrs: { id: 'notes-all-h' },
     }),
   );
-  const only = button('Open only', 'apply-pill', 'notes:openonly', () => {
+  const only = button(t('notes.open_only'), 'apply-pill', 'notes:openonly', () => {
     st.openOnly = !st.openOnly;
     draw();
-  }, { title: 'Hide the notes ticked off as reviewed' });
+  }, { title: t('notes.open_only_tip') });
   only.setAttribute('aria-pressed', String(st.openOnly));
   head.append(only);
   sec.append(head);
@@ -491,20 +492,20 @@ function listSection() {
     return sec;
   }
   if (!list) {
-    sec.append(el('p', { class: 'apply-hint', text: 'Loading…' }));
+    sec.append(el('p', { class: 'apply-hint', text: t('notes.loading') }));
     return sec;
   }
   const shown = st.openOnly ? list.filter((n) => !n.done) : list;
   if (!list.length) {
-    sec.append(el('p', { class: 'setup-empty', text: 'No notes in this budget yet.' }));
+    sec.append(el('p', { class: 'setup-empty', text: t('notes.none_yet') }));
     return sec;
   }
   if (!shown.length) {
-    sec.append(el('p', { class: 'setup-empty', text: 'Every note is ticked off.' }));
+    sec.append(el('p', { class: 'setup-empty', text: t('notes.all_ticked') }));
     return sec;
   }
-  const here = new Set(targets().map((t) => ownerKey(t.owner)));
-  const ul = el('ul', { class: 'notes-list', attrs: { 'aria-label': 'Every note in the budget' } });
+  const here = new Set(targets().map((tg) => ownerKey(tg.owner)));
+  const ul = el('ul', { class: 'notes-list', attrs: { 'aria-label': t('notes.list_label') } });
   for (const n of shown) {
     const okey = ownerKey(n.owner || {});
     const ekey = `${okey}|${n.id}`;
@@ -512,8 +513,8 @@ function listSection() {
       'button',
       {
         class: 'notes-check',
-        title: n.done ? 'Reviewed: click to mark it open again' : 'Tick it off as reviewed',
-        attrs: { type: 'button', role: 'checkbox', 'aria-checked': n.done ? 'true' : 'false', 'aria-label': `Reviewed: ${entryWhat(n)}` },
+        title: n.done ? t('notes.reviewed_tip') : t('notes.tick_tip'),
+        attrs: { type: 'button', role: 'checkbox', 'aria-checked': n.done ? 'true' : 'false', 'aria-label': t('notes.reviewed_label', { what: entryWhat(n) }) },
         data: { key: `notes:done:${ekey}`, nobusy: '1' },
       },
       el('span', { class: 'apply-box', attrs: { 'aria-hidden': 'true' } }),
@@ -526,7 +527,7 @@ function listSection() {
       'button',
       {
         class: 'notes-entry',
-        title: `Go to ${entryWhere(n)}`,
+        title: t('notes.go_to', { where: entryWhere(n) }),
         attrs: { type: 'button', 'aria-current': here.has(okey) ? 'true' : null },
         data: { key: `notes:go:${ekey}`, nobusy: '1' },
       },
@@ -561,7 +562,7 @@ function authorSection() {
   const id = 'notes-author';
   const input = el('input', {
     class: 'setup-input notes-author-input',
-    attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '100', placeholder: 'Leave blank to sign nothing' },
+    attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '100', placeholder: t('notes.author_placeholder') },
     data: { key: 'notes:author' },
   });
   input.value = author();
@@ -569,7 +570,7 @@ function authorSection() {
   return el(
     'section',
     { class: 'notes-author' },
-    el('label', { class: 'setup-label', text: 'Your name on new notes', attrs: { for: id } }),
+    el('label', { class: 'setup-label', text: t('notes.author_label'), attrs: { for: id } }),
     input,
   );
 }

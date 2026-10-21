@@ -34,57 +34,57 @@
   <body>
     <div class="app">
       <header class="toolbar">
-        <div class="toolbar-group" role="group" aria-label="File">
-          <button type="button" class="btn" id="btn-new">New</button>
-          <button type="button" class="btn" id="btn-open">Open</button>
-          <button type="button" class="btn" id="btn-save">Save</button>
-          <button type="button" class="btn" id="btn-saveas">Save As</button>
-          <label class="autosave-switch"><input type="checkbox" id="autosave-switch" checked> Autosave</label>
+        <div class="toolbar-group" role="group" aria-label="File" data-i18n-aria-label="toolbar.file">
+          <button type="button" class="btn" id="btn-new" data-i18n="toolbar.new">New</button>
+          <button type="button" class="btn" id="btn-open" data-i18n="toolbar.open">Open</button>
+          <button type="button" class="btn" id="btn-save" data-i18n="toolbar.save">Save</button>
+          <button type="button" class="btn" id="btn-saveas" data-i18n="toolbar.save_as">Save As</button>
+          <label class="autosave-switch"><input type="checkbox" id="autosave-switch" checked> <span data-i18n="toolbar.autosave">Autosave</span></label>
         </div>
-        <div class="toolbar-group" role="group" aria-label="History">
-          <button type="button" class="btn" id="btn-undo" disabled>Undo</button>
-          <button type="button" class="btn" id="btn-redo" disabled>Redo</button>
+        <div class="toolbar-group" role="group" aria-label="History" data-i18n-aria-label="toolbar.history">
+          <button type="button" class="btn" id="btn-undo" disabled data-i18n="toolbar.undo">Undo</button>
+          <button type="button" class="btn" id="btn-redo" disabled data-i18n="toolbar.redo">Redo</button>
         </div>
-        <div class="toolbar-group" role="group" aria-label="Versions and comparing">
-          <button type="button" class="btn" id="btn-versions">Versions</button>
-          <button type="button" class="btn" id="btn-compare">Compare</button>
+        <div class="toolbar-group" role="group" aria-label="Versions and comparing" data-i18n-aria-label="toolbar.versions_and_comparing">
+          <button type="button" class="btn" id="btn-versions" data-i18n="toolbar.versions">Versions</button>
+          <button type="button" class="btn" id="btn-compare" data-i18n="toolbar.compare">Compare</button>
         </div>
-        <div class="toolbar-group" role="group" aria-label="Budget setup">
-          <button type="button" class="btn" id="btn-setup">Setup</button>
+        <div class="toolbar-group" role="group" aria-label="Budget setup" data-i18n-aria-label="toolbar.budget_setup">
+          <button type="button" class="btn" id="btn-setup" data-i18n="toolbar.setup">Setup</button>
         </div>
         <div class="doc">
           <span class="doc-name" id="doc-name"></span>
-          <span class="doc-dirty" id="doc-dirty" title="Unsaved changes" hidden></span>
+          <span class="doc-dirty" id="doc-dirty" title="Unsaved changes" data-i18n-title="toolbar.unsaved_changes" hidden></span>
         </div>
         <div class="update-status" id="update-status" role="status" aria-live="polite" hidden>
           <span class="update-text" id="update-text" hidden></span>
           <button type="button" class="btn update-restart" id="btn-update" hidden></button>
         </div>
         <div class="share-area" id="share-area" hidden>
-          <div class="share-people" id="share-people" role="group" aria-label="People in this budget"></div>
+          <div class="share-people" id="share-people" role="group" aria-label="People in this budget" data-i18n-aria-label="toolbar.people_in_this_budget"></div>
           <button type="button" class="share-status" id="share-status" aria-haspopup="dialog" data-tone="quiet"><span class="share-dot" aria-hidden="true"></span><span class="share-status-text" id="share-status-text"></span></button>
         </div>
-        <button type="button" class="btn" id="btn-share">Share</button>
-        <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Tools</button>
+        <button type="button" class="btn" id="btn-share" data-i18n="toolbar.share">Share</button>
+        <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel" data-i18n="toolbar.tools">Tools</button>
       </header>
 
       <div class="tabbar" id="tabbar"></div>
 
       <div class="workspace" id="workspace">
         <main class="main">
-          <nav class="crumbs" id="crumbs" aria-label="Budget level"></nav>
+          <nav class="crumbs" id="crumbs" aria-label="Budget level" data-i18n-aria-label="page.budget_level"></nav>
           <div class="banner" id="banner" role="status" hidden></div>
           <div class="convert-banner" id="convert-banner" role="status" hidden></div>
           <div class="share-banner" id="share-banner" role="status" hidden></div>
           <div class="share-banner" id="review-banner" role="status" hidden></div>
           <div class="actions" id="actions"></div>
-          <div class="formula-bar empty" id="formula-bar" role="group" aria-label="Selected cell as typed">
+          <div class="formula-bar empty" id="formula-bar" role="group" aria-label="Selected cell as typed" data-i18n-aria-label="page.selected_cell_as_typed">
             <span class="formula-label" id="formula-label"></span>
             <span class="formula-text" id="formula-text"></span>
           </div>
-          <div class="grid-host" id="grid-host" aria-label="Budget grid"></div>
+          <div class="grid-host" id="grid-host" aria-label="Budget grid" data-i18n-aria-label="page.budget_grid"></div>
         </main>
-        <aside class="panel" id="panel" aria-label="Tools"></aside>
+        <aside class="panel" id="panel" aria-label="Tools" data-i18n-aria-label="page.tools_panel"></aside>
       </div>
 
       <footer class="footer" id="footer"></footer>

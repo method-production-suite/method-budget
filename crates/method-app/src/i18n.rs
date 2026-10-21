@@ -107,6 +107,18 @@ mod tests {
         "topsheet-setup.js",
         "report.js",
         "reportsetup.js",
+        "util.js",
+        "tools.js",
+        "toolswin.js",
+        "notes.js",
+        "history.js",
+        "versions.js",
+        "library.js",
+        "review.js",
+        "compare.js",
+        "tabs.js",
+        "pane.js",
+        "context.js",
     ];
 
     /// Literals that aren't words in a language (a domain name, a file
@@ -275,6 +287,65 @@ mod tests {
         (keys, dynamic)
     }
 
+    /// An attribute's value in a tag's text (`name="value"`).
+    fn attr<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+        let mut from = 0;
+        while let Some(at) = tag[from..].find(&format!("{name}=\"")) {
+            let start = from + at;
+            from = start + name.len() + 2;
+            if tag[..start]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_whitespace())
+            {
+                let end = tag[from..].find('"')?;
+                return Some(&tag[from..from + end]);
+            }
+        }
+        None
+    }
+
+    /// index.html's words, from its <body>: (key, English written there, where)
+    /// for each `data-i18n` text and `data-i18n-aria-label` / `data-i18n-title`
+    /// attribute that i18n.js's fillPage() fills, and the words written with no
+    /// key beside them.
+    fn html_words() -> (Vec<(String, String, String)>, Vec<String>) {
+        let html = std::fs::read_to_string(ui().join("index.html")).unwrap();
+        let body = &html[html.find("<body").expect("index.html has a <body>")..];
+        let mut keyed = Vec::new();
+        let mut loose = Vec::new();
+        let mut open: Option<&str> = None; // the last opening tag, for the text after it
+        let mut rest = body;
+        while let Some(lt) = rest.find('<') {
+            let text = rest[..lt].trim();
+            if text.chars().any(char::is_alphabetic) {
+                match open.and_then(|tag| attr(tag, "data-i18n")) {
+                    Some(key) => {
+                        keyed.push((key.to_string(), text.to_string(), format!("text {text:?}")))
+                    }
+                    None => loose.push(format!("text {text:?}")),
+                }
+            }
+            let gt = rest[lt..].find('>').expect("a tag ends") + lt;
+            let tag = &rest[lt + 1..gt];
+            open = (!tag.starts_with('/')).then_some(tag);
+            for name in ["aria-label", "title"] {
+                if let Some(words) = attr(tag, name) {
+                    match attr(tag, &format!("data-i18n-{name}")) {
+                        Some(key) => keyed.push((
+                            key.to_string(),
+                            words.to_string(),
+                            format!("{name} {words:?}"),
+                        )),
+                        None => loose.push(format!("{name} {words:?}")),
+                    }
+                }
+            }
+            rest = &rest[gt + 1..];
+        }
+        (keyed, loose)
+    }
+
     /// The keys Rust looks up: every `tr("key"` and `tr_with("key"` in src/,
     /// and each menu item's `menu.<id>`.
     fn keys_in_rust() -> BTreeSet<String> {
@@ -383,6 +454,13 @@ mod tests {
                 used.insert(k);
             }
         }
+        for (k, _, _) in html_words().0 {
+            assert!(
+                table.contains_key(&k),
+                "index.html uses {k}, which isn't in ui/i18n/en.js"
+            );
+            used.insert(k);
+        }
         for k in keys_in_rust() {
             assert!(
                 table.contains_key(&k),
@@ -409,6 +487,28 @@ mod tests {
             "words written inline instead of through t() (add them to ui/i18n/en.js):\n  {}",
             problems.join("\n  ")
         );
+    }
+
+    #[test]
+    fn index_html_words_have_keys_and_match_the_table() {
+        let table = parse_table(EN).unwrap();
+        let (keyed, loose) = html_words();
+        assert!(
+            keyed.len() > 10,
+            "only {} keyed words in index.html",
+            keyed.len()
+        );
+        assert!(
+            loose.is_empty(),
+            "index.html words with no data-i18n key beside them: {loose:?}"
+        );
+        for (key, words, place) in keyed {
+            assert_eq!(
+                table.get(&key).and_then(Value::as_str),
+                Some(words.as_str()),
+                "index.html's {place} and ui/i18n/en.js's {key} differ"
+            );
+        }
     }
 
     #[test]

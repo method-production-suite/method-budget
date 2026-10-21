@@ -4894,6 +4894,22 @@ the framework is built and adding a language is a table.
   together from pieces became one entry with names in it, and counts became plural
   entries. Words that arrive from Rust as data (a role's text, an engine warning) are
   shown as they come.
+- **Third pass** (about 450 more entries, about 2,550 in all): the tools panel's frame and
+  its own window (`tools.js`, `toolswin.js`), Notes, History, Versions, the Library,
+  Review and Compare (`notes.js`, `history.js`, `versions.js`, `library.js`, `review.js`,
+  `compare.js`), the tab strips and split view (`tabs.js`, `pane.js`), the grid's
+  right-click menu (`context.js`) and `util.js`'s shared phrases (a setup pack's source, a
+  flat fringe's bases and count words) read the table, and the test holds all twelve to
+  it. The toolbar and the page's other fixed words in `ui/index.html` carry their key in
+  a `data-i18n` attribute (`data-i18n-aria-label`, `data-i18n-title` for those
+  attributes); `fillPage()` in `ui/js/i18n.js` puts the words in at boot (`boot.js`, for
+  every window), and the English stays written in the page for the moment before the
+  scripts run. A test holds every word in the page's body to a key and its English to the
+  table's. Same rules as before: wording unchanged, sentences from pieces became one
+  entry, counts became plural entries. `util.js`'s `plural()` still takes the words its
+  callers give it, so it stays for the scripts not yet converted, and a flat fringe's
+  count words stay pieces (", full quantity") because `apply.js` and `report.js` add them
+  after a rate.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -4908,7 +4924,9 @@ the framework is built and adding a language is a table.
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
 - **Not built** (3.14 stays partial): the rest of the page (the tools panel's other tabs
-  and dialogs, `util.js`'s shared phrases, the toolbar), engine messages with stable codes, the native dialogs, room for longer words and
+  and the import dialogs: presets, packs, Explain, Overtime, actuals, comments, the import
+  reviews, sharing's banners, the grid's levels and quick entry), engine messages with stable codes,
+  the native dialogs, room for longer words and
   a right-to-left check, a language override in the preferences, and the languages
   themselves, which wait on the owner's choice.
 
