@@ -154,6 +154,14 @@ this page goes ahead without waiting.
 
 ### Tests that need the owner's hands or hardware
 
+**Deferred (the owner, 2026-10-20):** "defer windows tests indefinitely. We can do linux ones
+eventually." Windows hands-on tests are off this list: the Windows build is still built and
+tested automatically on every release and in the weekly run, and its release notes keep
+saying it isn't yet tested by a person. Deferred from here: the Windows half of the live
+check (2.25: printing, menu keys, file association, and installing over 0.2.x without an
+old `method-budget.exe` left beside `method-budget-app.exe`, D74) and Narrator or NVDA with
+the screen-reader check.
+
 - [ ] **The sample budget at the first start** (3.20; D84, D86; on 0.6.0, **ready now**): quit the app, move its data
       folder aside (on a Mac `~/Library/Application Support/com.methodbudget.desktop`),
       and start it: Field Station should open in the tab
@@ -192,12 +200,10 @@ this page goes ahead without waiting.
       0.6.0 from the release's `.dmg` and open the Field Station sample; and on an Intel Mac
       that has 0.2.x, Help > Check for Updates should find 0.6.0, download it and restart
       into it.
-- [ ] **Windows and Linux live check** (2.25): install from the release's installers;
-      print the topsheet and detail; menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup
-      keys); double-click a `.mthd` to open it; on Windows, install 0.3.0 over 0.2.x and
-      check the install folder doesn't keep an old `method-budget.exe` beside
-      `method-budget-app.exe` (D74). Use 0.6.0 (**ready now**): earlier Windows builds
-      bundled the chart templates and the sample with Windows line endings.
+- [ ] **Linux live check** (2.25; **eventually**, the owner 2026-10-20): install from the
+      release's `.deb` or AppImage (0.7.0, **ready now**); print the topsheet and detail;
+      menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup keys); double-click a `.mthd` to
+      open it.
 - [ ] **Rate tables in the app** (3.9; D90; about five minutes): open the Field Station
       sample, Budget Setup > Rate Tables, New Table: type two invented classifications with
       a Per Day figure (Add unit… for Week), Save Table, then Revert after a change. Import
@@ -219,8 +225,7 @@ this page goes ahead without waiting.
       should say selected); drill into an account and edit a rate (after a moment it
       should say "Net total ..., up ..."); Cmd+I to add a line; open Rename Budget and
       press Escape (it should say the dialog's name, then come back to the button). Note
-      anything said twice, missed or confusing. Narrator or NVDA on Windows if one is to
-      hand.
+      anything said twice, missed or confusing.
 - [ ] **An update through method-update** (D83; an Apple silicon Mac; **ready now**: 0.4.0
       and 0.5.0 are both signed method-update releases): install 0.4.0 from its release
       page, then in the installed app: Help > Check for Updates finds and downloads it and
@@ -373,7 +378,7 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 | 2.22 | **Sub-budgets**: a filtered copy by categories, accounts and tags, optionally without fringes or notes. Built (decision 39): File > New Sub-Budget…, groups, sets and locations OR within a kind and AND across kinds, new untitled tab stamped with its parent; no fringe lock yet. Needs a live check in the app | 04, inv 14 | [have] | M | none |
 | 2.23 | **History list**: every undo step listed, jump back, or branch it into a version. Built (decision 40): every undo step named by its command ("Edit rate on 21-01 line 3", "Paste 12 rows") with its time; the History tab (bottom tools pane) lists them oldest first, a click undoes or redoes to a step, "Version…" saves a step as a named version without changing the budget. Needs a live check (the tab in the tools window, long histories) | inv 15 | [have] | M | 1.12 |
 | 2.24 | **Group rules as budget settings**. Built (decision 57): `group_rules` with the reference's three rules (lines with no group, a line in a counted and an uncounted group, fringes in group totals), each written only when not the reference's default; Budget Setup's Groups table, `method-budget set` and scripts set them | 14, 24 | [have] | M | decision 3 |
-| 2.25 | **Windows and Linux live check**: printing, menu keys, installers, file association | APP | [partial] | M | none |
+| 2.25 | **Windows and Linux live check**: printing, menu keys, installers, file association. Windows hands-on is deferred indefinitely (the owner, 2026-10-20; built and tested automatically on every release); Linux eventually | APP | [partial] | M | none |
 | 2.26 | **Split view**: two budget tabs side by side in one window, each pane with its own tab strip, breadcrumb and grid; one pane is the target (dot and bold tab) and the toolbar and tools act on it; move a tab to the other pane; exit merges the panes. Built (decision 40): View > Split Right (Shift+Cmd+\\) and Close Split; each pane its own tabs, breadcrumb, grid and footer; the target (accent on its strip, its tab bold) is what the toolbar, menus, keys, tools panel and formula bar act on; one budget can show in both panes; Move Tab to Other Pane (Window menu, a tab's right-click menu) or drag a tab onto the other strip; a resizable divider; the panes kept in tabs.json. Needs a live check (the keys and menus in the system web views, the tools window following the target) | 04 | [have] | M | 1.9 |
 
 ---
