@@ -14,6 +14,10 @@ quick=no
 
 step() { printf '\n== %s\n' "$*"; }
 
+# Every checkout of a repository on this machine may share one build folder
+# (CARGO_TARGET_DIR); cargo says where it is.
+built="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+
 step "format";               cargo fmt --all -- --check
 step "clippy";               cargo clippy --workspace --all-targets --locked -- -D warnings
 step "tests"
@@ -22,7 +26,7 @@ passed="$(printf '%s\n' "$tests" | awk '{s+=$4} END {print s}')"
 failed="$(printf '%s\n' "$tests" | awk '{f+=$6} END {print f}')"
 [ "$failed" = 0 ] || { echo "check.sh: $failed tests failed" >&2; exit 1; }
 step "Field Station";        cargo build --locked -p method-cli
-METHOD=target/debug/method-budget python3 scripts/make-field-station.py --check
+METHOD="$built/debug/method-budget" python3 scripts/make-field-station.py --check
 step "third-party notices";  cargo xtask notices --check
 step "version and notes";    cargo xtask check-version
 step "site and features";    python3 scripts/site.py --check
@@ -32,7 +36,7 @@ step "WebAssembly";          cargo xtask wasm-check
 if [ "$quick" = no ]; then
   step "the page in a browser"
   cargo xtask web
-  node scripts/web-smoke.mjs target/web
+  node scripts/web-smoke.mjs "$built/web"
 fi
 
 echo

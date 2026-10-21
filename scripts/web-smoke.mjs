@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A headless smoke test of the browser build (docs/research/web-session.md):
 //
-//   cargo xtask web && node scripts/web-smoke.mjs [target/web]
+//   cargo xtask web && node scripts/web-smoke.mjs [<build folder>/web]
 //
 // Serves the built folder on 127.0.0.1, opens it in headless Chrome or
 // Chromium with the demo's invented sample budget, Field Station (?open=), and checks that
@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { findChrome, launch } from './chrome-pipe.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DIR = resolve(process.argv[2] || join(REPO, 'target', 'web'));
+const DIR = resolve(process.argv[2] || join(process.env.CARGO_TARGET_DIR || join(REPO, 'target'), 'web'));
 const SAMPLE = join(REPO, 'fixtures', 'field-station', 'field-station.mthd');
 const SAMPLE_PATH = '/smoke-sample.mthd';
 const TIMEOUT_MS = 90_000;

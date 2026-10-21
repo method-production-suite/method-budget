@@ -33,8 +33,9 @@ const BUDGET: &str = "field-station.mthd";
 const SHEET: &str = "camera-department.csv";
 const DRIVER: &str = "scripts/capture-screens.mjs";
 const CLI_TOML: &str = "crates/method-cli/Cargo.toml";
-/// Everything a run makes that isn't a picture in the repository.
-const WORK: &str = "target/screens";
+/// Everything a run makes that isn't a picture in the repository goes in
+/// `screens/` in the build folder ([`crate::target::dir`]).
+const WORK: &str = "screens";
 
 /// Each picture's file name (`hero-light.png`), in order.
 pub fn file_names() -> Vec<String> {
@@ -100,7 +101,8 @@ fn run(cmd: &mut Command, what: &str) -> Result<Vec<u8>, String> {
 }
 
 pub fn capture_command(root: &Path) -> Result<String, String> {
-    let work = root.join(WORK);
+    let built = crate::target::dir(root);
+    let work = built.join(WORK);
     let web = work.join("web");
     crate::web::command(root, Some(web.clone()), false)?;
 
@@ -118,7 +120,7 @@ pub fn capture_command(root: &Path) -> Result<String, String> {
     }
     let name = cli_name(&repo::read(root, CLI_TOML)?)
         .ok_or_else(|| format!("{CLI_TOML} names no [[bin]]"))?;
-    let bin = root.join("target").join("release").join(&name);
+    let bin = built.join("release").join(&name);
     let fixtures = root.join(FIXTURES);
     let output = run(
         Command::new(&bin)
@@ -127,7 +129,7 @@ pub fn capture_command(root: &Path) -> Result<String, String> {
         &format!("{name} totals"),
     )?;
     let output = String::from_utf8(output).map_err(|_| "the totals aren't text".to_string())?;
-    fs::create_dir_all(&work).map_err(|e| format!("couldn't make {WORK}: {e}"))?;
+    fs::create_dir_all(&work).map_err(|e| format!("couldn't make {}: {e}", work.display()))?;
     let terminal = work.join("terminal.json");
     fs::write(
         &terminal,
@@ -184,7 +186,7 @@ fn install(root: &Path, pictures: &Path) -> Result<String, String> {
         format!("{} pictures taken; none changed.\n", file_names().len())
     } else {
         format!(
-            "{} pictures taken; {} files changed:\n{}\nCompare them with: cargo xtask review-screens --out target/screens/review.html\n",
+            "{} pictures taken; {} files changed:\n{}\nCompare them with: cargo xtask review-screens --out review.html\n",
             file_names().len(),
             changed.len(),
             changed

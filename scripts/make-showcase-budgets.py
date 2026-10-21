@@ -34,7 +34,23 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-METHOD = os.environ.get("METHOD", str(REPO / "target" / "release" / "method-budget"))
+
+
+def build_dir() -> Path:
+    """Where cargo builds: `cargo metadata`'s target_directory, which follows
+    CARGO_TARGET_DIR (one build folder shared by every checkout); ./target when
+    cargo can't say."""
+    try:
+        out = subprocess.run(
+            ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+            cwd=REPO, capture_output=True, check=True, text=True,
+        ).stdout
+        return Path(json.loads(out)["target_directory"])
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
+        return REPO / "target"
+
+
+METHOD = os.environ.get("METHOD") or str(build_dir() / "release" / "method-budget")
 
 # ---------------------------------------------------------------------------
 # The MCP client: one server per output folder, newline-delimited JSON-RPC.
@@ -503,7 +519,7 @@ def add_version_and_actuals(out):
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a != "--force"]
-    out = Path(args[0]) if args else REPO / "target" / "showcase"
+    out = Path(args[0]) if args else build_dir() / "showcase"
     if not Path(METHOD).exists():
         sys.exit(f"make-showcase-budgets: no {METHOD} (cargo build --release -p method-cli)")
     build(out.resolve(), "--force" in sys.argv)

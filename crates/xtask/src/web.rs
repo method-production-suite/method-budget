@@ -216,13 +216,12 @@ pub fn command(root: &Path, out: Option<PathBuf>, demo: bool) -> Result<String, 
     if !status.success() {
         return Err(format!("method-web doesn't build for {TARGET}"));
     }
-    let wasm = root
-        .join("target")
+    let wasm = crate::target::dir(root)
         .join(TARGET)
         .join(PROFILE)
         .join("method_web.wasm");
 
-    let out = out.unwrap_or_else(|| root.join("target").join("web"));
+    let out = out.unwrap_or_else(|| crate::target::dir(root).join("web"));
     clear(&out)?;
     copy_dir(&root.join(UI), &out)?;
     let index = out.join("index.html");
