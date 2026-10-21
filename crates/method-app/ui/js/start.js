@@ -20,6 +20,7 @@ import { menuRunsAppKeys } from './shortcuts.js';
 import {
   KINDS,
   accountsText,
+  chartGroupName,
   chartSections,
   fileNameFrom,
   filterEntries,
@@ -658,7 +659,7 @@ function open(ctx, first, charts) {
       };
       const parts = [];
       for (const s of sections) {
-        parts.push(el('h4', { class: 'st-chart-group', text: s.group }));
+        parts.push(el('h4', { class: 'st-chart-group', text: chartGroupName(s.group) }));
         parts.push(...s.ours.map(row));
         if (s.studio.length) {
           parts.push(el('p', { class: 'st-chart-sub', text: t('start.studio_and_network_charts_numbers') }));

@@ -4910,6 +4910,33 @@ the framework is built and adding a language is a table.
   callers give it, so it stays for the scripts not yet converted, and a flat fringe's
   count words stay pieces (", full quantity") because `apply.js` and `report.js` add them
   after a rate.
+- **Fourth pass** (about 1,280 more entries, about 3,850 in all, 172 with plural forms):
+  the rest of the page reads the table. The tools panel's other tabs and dialogs (setup
+  packs, presets, Explain, Overtime, actuals and their import, comments, Import Setup and
+  the templates dialog, the spreadsheet, chart-of-accounts, budget-export and schedule-day
+  imports, the rate picker, Rename and Renumber: `packs.js`, `presets.js`, `explain.js`,
+  `overtime.js`, `actuals.js`, `actualsimport.js`, `comments.js`, `importsetup.js`,
+  `sheetimport.js`, `coaimport.js`, `exchangeimport.js`, `scheduledays.js`, `ratepick.js`,
+  `rename.js`, `renumber.js`), What Changed and Merge (`diffmerge.js`), sharing's banners
+  (`sharing.js`), the grid's levels, quick entry, row colors and autocomplete (`levels.js`,
+  `quickentry.js`, `rowformat.js`, `autocomplete.js`), backups and recovery
+  (`safety.js`), the display settings and the View menu's announcements
+  (`display-settings.js`, `display.js`), the convert banner, pasting, the note tooltip,
+  the panel's resizer, the popup menu's fallback name and the not-connected error
+  (`convertbanner.js`, `clipboard.js`, `order.js`, `panelsize.js`, `menu.js`, `api.js`).
+  The scripts with no words of their own (`announce.js`, `boot.js`, `dom.js`,
+  `format.js`, `grid.js`, `host.js`, `prefs.js`, `sheet.js`) join the list too, so every
+  script in `ui/js` is held to the table and the test fails on a script missing from it.
+  Same rules as before. The pieces the third pass kept are whole sentences now: a flat
+  fringe's rate with its count (`util.js`'s `flatCount()` says how it counts, and
+  `apply.js` and `report.js` each pick a whole entry, "{rate} per {unit}, full quantity"),
+  and the review's "3 items to add." (each caller gives whole entries for its picked
+  summary instead of a "to add" piece). `util.js`'s `plural()` is gone: every count is a
+  plural entry. Chart groups ("Feature", "Television") and a diff's change kinds, which
+  arrive from Rust as ids, are shown through the table. Two small fixes came with it:
+  Budget Setup's helper kit no longer names `plural`, which the first pass had stopped
+  importing, and `crates/xtask/src/target.rs`, which `main` names but was never added,
+  is in the tree.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -4923,12 +4950,19 @@ the framework is built and adding a language is a table.
   the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
-- **Not built** (3.14 stays partial): the rest of the page (the tools panel's other tabs
-  and the import dialogs: presets, packs, Explain, Overtime, actuals, comments, the import
-  reviews, sharing's banners, the grid's levels and quick entry), engine messages with stable codes,
-  the native dialogs, room for longer words and
-  a right-to-left check, a language override in the preferences, and the languages
-  themselves, which wait on the owner's choice.
+- **Not built** (3.14 stays partial): engine messages with stable codes (the words that
+  arrive from Rust as data, such as import problems, Explain's steps and conflict text,
+  are shown as they come), the native dialogs, room for longer words and a right-to-left
+  check, a language override in the preferences, and the languages themselves, which wait
+  on the owner's choice. A few things stay inline on purpose: key names in shortcut text
+  (`dom.js`, as in `shortcuts.js`), the "Untitled" file name that matches Rust's, and
+  separators such as " · " and ", " that join list items; a few long tooltips are still
+  lines joined with a line break, each line an entry. Some words stay pieces where a
+  whole sentence would not fit the screen or would need a key per combination: the
+  overtime band row's words around its inputs ("then", "hours at"), the schedule-day
+  summary's count phrases joined with commas, and a kind's name filled into sentences as
+  `{what}` (Rename's "Enter a {what} name.", the paste review's "{action}"), which a
+  language with genders may need to split later.
 
 ## 95. The owner's key: start again, and the first key seen remembered (2026-10-20, the owner's decision)
 

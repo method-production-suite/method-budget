@@ -30,7 +30,7 @@ import { rowColor, fringePercent, chargeLabel, fringeRowOf, topsheetOrder } from
 import { setRules } from './sheet.js';
 import { orderedNames } from './order.js';
 import { invoke, connected } from './api.js';
-import { flatCountWords } from './util.js';
+import { flatCount } from './util.js';
 import { t } from './i18n.js';
 
 // ---------------------------------------------------------------------------
@@ -1152,13 +1152,27 @@ function fringesSection(ctx) {
     const sum = sums[name] || null;
     const pct = f.kind !== 'flat';
     const rate = formula(f.rate);
-    const limit = pct ? (typeof f.cutoff === 'number' ? t('report.up_to', { amount: money(f.cutoff) }) : '') : `${f.unit ? t('report.per_unit', { unit: f.unit }) : t('report.per_line')}${flatCountWords(f, ctx.b.units)}`;
+    const limit = pct ? (typeof f.cutoff === 'number' ? t('report.up_to', { amount: money(f.cutoff) }) : '') : flatLimit(f, ctx.b.units);
     rows.push(row(el('tr', { class: 'rpt-row' }, td(name, 'name'), td(f.description || '', 'txt'), td(pct ? t('report.percent') : t('report.flat'), 'txt'), td(rate.text ? (pct ? `${rate.text}%` : rate.text) : '', `num${rate.formula ? ' formula' : ''}`), td(limit, 'txt'), td(sum ? String(sum.uses) : '', 'num'), td(sum ? m(sum.total) : '', 'num'))));
     if (sum) total += sum.total;
   }
   if (!rows.length) rows.push(emptyRow(t('report.no_fringes'), spec.length));
   else if (ctx.r) rows.push(row(el('tr', { class: 'rpt-st-total' }, td(t('report.total_fringes'), 'name', spec.length - 1), td(money(total), 'num'))));
   return [simpleTable(t('report.section.fringes'), 'rpt-fringes', spec, rows)];
+}
+
+/** A flat fringe's unit and count as the fringes table shows them: "Per Day, full quantity". */
+function flatLimit(f, units) {
+  const { basis, hours } = flatCount(f, units);
+  if (!f.unit) {
+    if (basis === 'amount_counts') return t('report.per_line_counts');
+    if (basis === 'quantity') return t('report.per_line_quantity');
+    return t('report.per_line');
+  }
+  const params = { unit: f.unit, hours };
+  if (basis === 'amount_counts') return hours ? t('report.per_unit_counts_hours', params) : t('report.per_unit_counts', params);
+  if (basis === 'quantity') return hours ? t('report.per_unit_quantity_hours', params) : t('report.per_unit_quantity', params);
+  return hours ? t('report.per_unit_hours', params) : t('report.per_unit', params);
 }
 
 /** How many detail rows name each global in a formula. */

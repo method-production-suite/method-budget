@@ -25,6 +25,7 @@
 
 import { el } from './dom.js';
 import { setRules } from './sheet.js';
+import { t } from './i18n.js';
 
 // A global name: letters, digits and _, with at least one letter or _ (it
 // may start with digits, 1ZG; decisions.md, entry 56).
@@ -102,6 +103,22 @@ export function listToken(value, caret) {
   return { from, to, token: value.slice(from, to).trim() };
 }
 
+/** The "Add" item's words for adding `name` as a new `config.addKind`. */
+function addText(config, name) {
+  switch (config.addKind) {
+    case 'unit':
+      return t('autocomplete.add_unit', { name });
+    case 'currency':
+      return t('autocomplete.add_currency', { name });
+    case 'set':
+      return t('autocomplete.add_set', { name });
+    case 'location':
+      return t('autocomplete.add_location', { name });
+    default:
+      return t('autocomplete.add_other', { what: config.addLabel || config.addKind, name });
+  }
+}
+
 /**
  * What to offer for `value` with the caret at `caret`.
  *   config: { mode, candidates: [{ name, hint }], addKind, addLabel }
@@ -140,9 +157,9 @@ export function suggest(config, value, caret) {
   let extra = null;
   if (config.addKind && token && !exact && !token.includes(',')) {
     if (config.mode === 'formula') {
-      extra = { kind: 'create', name: token, label: `Create global “${token}”` };
+      extra = { kind: 'create', name: token, label: t('autocomplete.create_global', { name: token }) };
     } else {
-      extra = { kind: 'add', name: token, label: `Add ${config.addLabel || config.addKind} “${token}”` };
+      extra = { kind: 'add', name: token, label: addText(config, token) };
     }
   }
   if (extra) items.push(extra);
@@ -193,7 +210,7 @@ export class Assist {
     this.id = `ac-list-${listCount}`;
     this.root = el('div', {
       class: 'ac-list',
-      attrs: { id: this.id, role: 'listbox', 'aria-label': config.label || 'Suggestions' },
+      attrs: { id: this.id, role: 'listbox', 'aria-label': config.label || t('autocomplete.suggestions') },
     });
     // Keep focus in the cell editor: a press on the list must not blur it.
     this.root.addEventListener('mousedown', (e) => {

@@ -5,12 +5,13 @@
 import { decimal } from './format.js';
 import { tagCellText, notesTitle } from './order.js';
 import { totalText, currencyTotalText, numberCell, budgetDisplay, hiddenFactors } from './display.js';
+import { t } from './i18n.js';
 
 // Totals with the user's choice of decimals (display.js; 2 unless they chose
 // whole amounts). Never changes a value.
 const money = totalText;
 
-const NA = { text: '', placeholder: 'n/a', cls: 'na' };
+const NA = { text: '', placeholder: t('levels.na'), cls: 'na' };
 
 /** Looks things up across the budget and report once per view. */
 export function indexView(view) {
@@ -35,11 +36,11 @@ export function indexView(view) {
   // screen): row id -> { field: message }.
   const cellIssues = new Map();
   for (const issue of view.issues || []) {
-    const t = issue.target || {};
-    if (t.kind !== 'cell') continue;
-    const m = cellIssues.get(t.row_id) || {};
-    m[t.field] = m[t.field] ? `${m[t.field]}; ${issue.message}` : issue.message;
-    cellIssues.set(t.row_id, m);
+    const tgt = issue.target || {};
+    if (tgt.kind !== 'cell') continue;
+    const m = cellIssues.get(tgt.row_id) || {};
+    m[tgt.field] = m[tgt.field] ? `${m[tgt.field]}; ${issue.message}` : issue.message;
+    cellIssues.set(tgt.row_id, m);
   }
   // Accounts with a problem cell anywhere, by topsheet and account index.
   const badAccounts = new Set();
@@ -99,13 +100,13 @@ export function percentText(p) {
 export function costCells(f, opts = {}) {
   if (!f || typeof f !== 'object') return {};
   const n = typeof f.count === 'number' ? f.count : 0;
-  const act = { text: money(f.actual), title: `${n} ${n === 1 ? 'transaction' : 'transactions'}` };
+  const act = { text: money(f.actual), title: t('levels.transactions', { count: n }) };
   const out = {
     act,
-    etc: { text: money(f.etc), title: opts.method ? opts.method : 'Estimate to complete' },
-    eac: { text: money(f.eac), title: 'Estimate at completion: actual plus estimate to complete' },
-    cvar: { text: money(f.variance), title: f.over ? 'Over budget: the estimate at completion is more than the budget' : 'Budget minus the estimate at completion' },
-    spent: { text: percentText(f.percent), title: 'Actual as a percentage of the budget' },
+    etc: { text: money(f.etc), title: opts.method ? opts.method : t('levels.etc_short_tip') },
+    eac: { text: money(f.eac), title: t('levels.col.eac_tip') },
+    cvar: { text: money(f.variance), title: f.over ? t('levels.over_budget_tip') : t('levels.budget_minus_eac') },
+    spent: { text: percentText(f.percent), title: t('levels.col.spent_tip') },
   };
   if (f.over) out.cvar.cls = 'cost-over';
   return out;
@@ -113,10 +114,10 @@ export function costCells(f, opts = {}) {
 
 /** How an account's estimate to complete is worked out, in words, for a tooltip. */
 function methodText(m) {
-  if (!m || typeof m !== 'object') return 'Estimate to complete: budget minus actual';
-  if (m.kind === 'manual') return `Estimate to complete: typed (${money(m.amount)})`;
-  if (m.kind === 'percent_complete') return `Estimate to complete: ${m.percent}% complete`;
-  return 'Estimate to complete: budget minus actual';
+  if (!m || typeof m !== 'object') return t('levels.etc.budget_minus_actual');
+  if (m.kind === 'manual') return t('levels.etc.typed', { amount: money(m.amount) });
+  if (m.kind === 'percent_complete') return t('levels.etc.percent_complete', { percent: m.percent });
+  return t('levels.etc.budget_minus_actual');
 }
 
 /** The cost figures of category `ci` and its account `ai` (null when there are none). */
@@ -136,9 +137,9 @@ export function varianceCells(ch) {
   if (!ch || typeof ch !== 'object') return {};
   const orig =
     ch.original === null || ch.original === undefined
-      ? { text: '', placeholder: 'new', cls: 'muted', title: 'Added since the baseline was locked' }
-      : { text: money(ch.original), title: 'When the baseline was locked' };
-  const diff = ch.variance === null || ch.variance === undefined ? { ...NA } : { text: money(ch.variance), title: 'Change since the baseline was locked' };
+      ? { text: '', placeholder: t('levels.new'), cls: 'muted', title: t('levels.added_since_baseline') }
+      : { text: money(ch.original), title: t('levels.when_baseline_locked') };
+  const diff = ch.variance === null || ch.variance === undefined ? { ...NA } : { text: money(ch.variance), title: t('levels.change_since_baseline') };
   return { orig, var: diff };
 }
 
@@ -173,14 +174,18 @@ function moneyCell(cents, extra = {}) {
  * charges line up with them.
  */
 export function chargeLabel(b, entry, i, fmt) {
-  const name = (entry && entry.name) || 'Charge';
+  const name = (entry && entry.name) || t('levels.charge');
   const applied = (Array.isArray(b && b.charges) ? b.charges : []).filter((c) => c && c.applied !== false);
   const c = applied[i];
   if (!c || c.name !== entry.name) return name;
-  let label = name;
-  if (c.label_percent === true && c.kind === 'percent' && c.percent !== undefined && c.percent !== null) label += ` ${c.percent}%`;
-  if (c.label_excluded === true) label += ` (excluding ${fmt(entry.excluded)})`;
-  return label;
+  const pct = c.label_percent === true && c.kind === 'percent' && c.percent !== undefined && c.percent !== null;
+  const excl = c.label_excluded === true;
+  const percent = pct ? c.percent : null;
+  const amount = excl ? fmt(entry.excluded) : null;
+  if (pct && excl) return t('levels.charge_percent_excluding', { name, percent, amount });
+  if (pct) return t('levels.charge_percent', { name, percent });
+  if (excl) return t('levels.charge_excluding', { name, amount });
+  return name;
 }
 
 /**
@@ -194,7 +199,7 @@ export function fringeRowOf(b) {
   const text = (v) => (typeof v === 'string' ? v.trim() : '');
   return {
     account: text(f.account),
-    description: text(f.description) || 'Total Fringes',
+    description: text(f.description) || t('levels.total_fringes'),
     position: Number.isInteger(f.position) && f.position >= 0 ? f.position : null,
   };
 }
@@ -217,7 +222,7 @@ function staticRow(key, cls, label, total, extra = {}) {
   };
 }
 
-const PROBLEM = 'Some cells inside have problems; totals count them as blank.';
+const PROBLEM = t('levels.problem');
 
 /**
  * Whether a category or account row may be hidden as zero-balance (View >
@@ -237,9 +242,9 @@ function isZero(total, bad, change, cost = null) {
 // Double-clicking a code or name edits it in place; elsewhere on a category's
 // row, double-click opens the category (grid.js editOnDoubleClick).
 export const TOPSHEET_COLUMNS = [
-  { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
-  { key: 'total', label: 'Total', cls: 'num' },
+  { key: 'code', label: t('levels.col.acct'), editOnDoubleClick: true },
+  { key: 'name', label: t('levels.col.description'), editOnDoubleClick: true, rowHeader: true },
+  { key: 'total', label: t('levels.col.total'), cls: 'num' },
 ];
 
 /** Columns with the shown Orig and Var (and cost) columns put before Total. */
@@ -272,7 +277,7 @@ export function topsheetRows(ix, choices = null) {
       const lv = ix.levels.find((l) => l.ti === ti);
       const lc = lvCost(lv);
       if (lv && lv.rep && lv.rep.posted_fringes) {
-        rows.push(staticRow(`f${ti}`, 'posted', 'Fringes', lv.rep.posted_fringes, lc ? costCells(lc.posted_fringes) : {}));
+        rows.push(staticRow(`f${ti}`, 'posted', t('levels.fringes'), lv.rep.posted_fringes, lc ? costCells(lc.posted_fringes) : {}));
       }
       rows.push({
         key: `t${ti}`,
@@ -316,9 +321,9 @@ export function topsheetRows(ix, choices = null) {
   // net total (Budget > Settings). Display only.
   const disp = budgetDisplay(ix.b);
   if (disp.summary_rows) {
-    rows.push(staticRow('s-atl', 'summary first', 'Total above-the-line', r.total_atl, cost ? costCells(cost.total_atl) : {}));
-    rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl, cost ? costCells(cost.total_btl) : {}));
-    rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl, cost ? costCells(cost.atl_btl) : {}));
+    rows.push(staticRow('s-atl', 'summary first', t('levels.total_atl'), r.total_atl, cost ? costCells(cost.total_atl) : {}));
+    rows.push(staticRow('s-btl', 'summary', t('levels.total_btl'), r.total_btl, cost ? costCells(cost.total_btl) : {}));
+    rows.push(staticRow('s-atlbtl', 'summary', t('levels.total_atl_btl'), r.atl_btl, cost ? costCells(cost.atl_btl) : {}));
   }
   if (frShown && frAt === null) rows.push(fringeRow(disp.summary_rows ? 'summary' : 'summary first'));
   // Charges newest first (the reverse of the budget's list).
@@ -328,22 +333,22 @@ export function topsheetRows(ix, choices = null) {
   }
   // Transactions no account in the chart claims: in the actual, never in the budget.
   if (costShown && cost.unassigned && cost.unassigned.count) {
-    const row = staticRow('s-unassigned', 'summary cost-unassigned', 'Unassigned actuals', null, costCells(cost.unassigned));
-    row.cells.total = { text: '', title: 'Not in the budget: transactions whose account number isn’t in the chart' };
-    row.cells.name.title = 'Transactions whose account number isn’t in the chart, or have none (the Actuals tab lists them)';
+    const row = staticRow('s-unassigned', 'summary cost-unassigned', t('levels.unassigned'), null, costCells(cost.unassigned));
+    row.cells.total = { text: '', title: t('levels.unassigned_total_tip') };
+    row.cells.name.title = t('levels.unassigned_tip');
     rows.push(row);
   }
-  rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, { ...(ix.variance ? varianceCells(ix.variance.grand_total) : {}), ...(cost ? costCells(cost.total) : {}) }));
+  rows.push(staticRow('s-grand', 'summary grand', t('levels.grand_total'), r.grand_total, { ...(ix.variance ? varianceCells(ix.variance.grand_total) : {}), ...(cost ? costCells(cost.total) : {}) }));
   // Credits in reverse application order, then their subtotal with two or more.
   for (const i of topsheetOrder(r.credits.length)) {
     const c = r.credits[i];
-    rows.push(staticRow(`s-cr${i}`, 'summary credit', `Less ${c.name}`, -c.amount));
+    rows.push(staticRow(`s-cr${i}`, 'summary credit', t('levels.less_credit', { name: c.name }), -c.amount));
   }
-  if (r.credits.length >= 2) rows.push(staticRow('s-crsub', 'summary credit', 'Sub Total', -r.credits_total));
-  if (r.credits.length && disp.net_total) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
+  if (r.credits.length >= 2) rows.push(staticRow('s-crsub', 'summary credit', t('levels.sub_total'), -r.credits_total));
+  if (r.credits.length && disp.net_total) rows.push(staticRow('s-net', 'summary grand', t('levels.net_total'), r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
   if (r.display && disp.net_total) {
     const cur = r.totals_currency;
-    const row = staticRow('s-disp', 'summary', `Net total in ${cur}`, r.display.net_total);
+    const row = staticRow('s-disp', 'summary', t('levels.net_total_in', { currency: cur }), r.display.net_total);
     // In that currency's own separators and symbol (decisions.md, entry 61).
     row.cells.total = { text: currencyTotalText(r.display.net_total, (ix.b.currencies || {})[cur]) };
     rows.push(row);
@@ -355,17 +360,17 @@ export function topsheetRows(ix, choices = null) {
 // Accounts in one category
 
 export const ACCOUNT_COLUMNS = [
-  { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
-  { key: 'fringe_total', label: 'Fringes', cls: 'num' },
-  { key: 'total', label: 'Total', cls: 'num' },
+  { key: 'code', label: t('levels.col.acct'), editOnDoubleClick: true },
+  { key: 'name', label: t('levels.col.description'), editOnDoubleClick: true, rowHeader: true },
+  { key: 'fringe_total', label: t('levels.fringes'), cls: 'num' },
+  { key: 'total', label: t('levels.col.total'), cls: 'num' },
 ];
 
 const FRINGE_POSTED = {
-  account: 'Fringes earned by lines in this account; they post to the account, inside its total',
-  category: "Fringes earned by lines in this account; they post to the category's fringe account",
-  production_level: 'Fringes earned by lines in this account; they post above the production total',
-  budget: "Fringes earned by lines in this account; they post to the budget's total fringes",
+  account: t('levels.posted.account'),
+  category: t('levels.posted.category'),
+  production_level: t('levels.posted.production_level'),
+  budget: t('levels.posted.budget'),
 };
 
 /**
@@ -420,7 +425,7 @@ export function accountRows(ix, entry) {
       selectable: false,
       cells: {
         code: { text: rep.fringe_account.code },
-        name: { text: 'Fringes', title: 'Fringes earned by every account in this category' },
+        name: { text: t('levels.fringes'), title: t('levels.fringe_account_tip') },
         total: moneyCell(rep.fringe_account.amount),
         ...(catCost && catCost.fringe_account ? costCells(catCost.fringe_account.figures, { method: methodText(catCost.fringe_account.method) }) : {}),
       },
@@ -431,7 +436,7 @@ export function accountRows(ix, entry) {
     cls: 'summary first grand',
     selectable: false,
     cells: {
-      name: { text: `Total ${entry.cat.name || entry.cat.code}` },
+      name: { text: t('levels.total_named', { name: entry.cat.name || entry.cat.code }) },
       fringe_total: rep ? { text: money(rep.fringe_total), cls: frCls } : NA,
       total: rep ? moneyCell(rep.total) : NA,
       ...(ix.variance ? varianceCells(ix.variance.categories[entry.cat.code]) : {}),
@@ -452,32 +457,32 @@ export function accountRows(ix, entry) {
 // whether they show until the user chooses.
 export const DETAIL_COLUMNS = [
   { key: 'num', label: '#', cls: 'num', width: 44, min: 44, pin: 'left' },
-  { key: 'description', label: 'Description', width: 240, min: 130, pin: 'left', grow: true, rowHeader: true },
-  { key: 'amount', label: 'Amount', cls: 'num', width: 110, min: 70 },
-  { key: 'unit', label: 'Unit', width: 72, min: 50 },
-  { key: 'x', label: 'X', name: 'X (multiplier)', cls: 'num', title: 'Multiplier (blank counts as 1)', width: 52, min: 40, optional: true, on: true },
-  { key: 'unit2', label: 'X unit', title: 'Unit shown next to X', width: 72, min: 54, optional: true, on: false },
-  { key: 'rate', label: 'Rate', cls: 'num', width: 100, min: 78 },
-  { key: 'unit3', label: 'Rate unit', title: 'Unit shown next to the rate', width: 76, min: 54, optional: true, on: false },
-  { key: 'currency', label: 'Cur', name: 'Currency', title: 'Currency (blank is the base currency)', width: 52, min: 42, optional: true, on: true },
-  { key: 'x4', label: '4X', name: '4X (fourth factor)', cls: 'num', title: 'Fourth factor (blank counts as 1)', width: 52, min: 40, optional: true, on: false },
-  { key: 'unit4', label: '4X unit', title: 'Unit shown next to 4X', width: 72, min: 54, optional: true, on: false },
-  { key: 'fringes', label: 'Fringes', title: 'Fringes on this line, separated by commas', width: 140, min: 64, optional: true, on: true },
-  { key: 'fringe_pct', label: 'Fringe %', cls: 'num', title: 'Fringe dollars as a percentage of the line total', width: 76, min: 70, optional: true, on: true },
+  { key: 'description', label: t('levels.col.description'), width: 240, min: 130, pin: 'left', grow: true, rowHeader: true },
+  { key: 'amount', label: t('levels.col.amount'), cls: 'num', width: 110, min: 70 },
+  { key: 'unit', label: t('levels.col.unit'), width: 72, min: 50 },
+  { key: 'x', label: t('levels.col.x'), name: t('levels.col.x_name'), cls: 'num', title: t('levels.col.x_tip'), width: 52, min: 40, optional: true, on: true },
+  { key: 'unit2', label: t('levels.col.unit2'), title: t('levels.col.unit2_tip'), width: 72, min: 54, optional: true, on: false },
+  { key: 'rate', label: t('levels.col.rate'), cls: 'num', width: 100, min: 78 },
+  { key: 'unit3', label: t('levels.col.unit3'), title: t('levels.col.unit3_tip'), width: 76, min: 54, optional: true, on: false },
+  { key: 'currency', label: t('levels.col.currency'), name: t('levels.col.currency_name'), title: t('levels.col.currency_tip'), width: 52, min: 42, optional: true, on: true },
+  { key: 'x4', label: t('levels.col.x4'), name: t('levels.col.x4_name'), cls: 'num', title: t('levels.col.x4_tip'), width: 52, min: 40, optional: true, on: false },
+  { key: 'unit4', label: t('levels.col.unit4'), title: t('levels.col.unit4_tip'), width: 72, min: 54, optional: true, on: false },
+  { key: 'fringes', label: t('levels.fringes'), title: t('levels.col.fringes_tip'), width: 140, min: 64, optional: true, on: true },
+  { key: 'fringe_pct', label: t('levels.col.fringe_pct'), cls: 'num', title: t('levels.col.fringe_pct_tip'), width: 76, min: 70, optional: true, on: true },
   // The full fringe percent: every fringe before cutoffs and ranges (decisions.md, entry 61).
-  { key: 'fringe_full_pct', label: 'Full fringe %', name: 'Full fringe % (before cutoffs)', cls: 'num', title: 'The line’s fringes before cutoffs and ranges, as a percentage of the line total', width: 96, min: 84, optional: true, on: false },
-  { key: 'fringe_total', label: 'Fringe $', cls: 'num', title: 'Fringe dollars this line earns', width: 104, min: 92, optional: true, on: true },
-  { key: 'groups', label: 'Groups', title: 'Groups, separated by commas', width: 130, min: 60, optional: true, on: true },
-  { key: 'set', label: 'Set', width: 90, min: 60, optional: true, on: false },
-  { key: 'location', label: 'Location', width: 110, min: 70, optional: true, on: false },
+  { key: 'fringe_full_pct', label: t('levels.col.fringe_full_pct'), name: t('levels.col.fringe_full_pct_name'), cls: 'num', title: t('levels.col.fringe_full_pct_tip'), width: 96, min: 84, optional: true, on: false },
+  { key: 'fringe_total', label: t('levels.col.fringe_total'), cls: 'num', title: t('levels.col.fringe_total_tip'), width: 104, min: 92, optional: true, on: true },
+  { key: 'groups', label: t('levels.col.groups'), title: t('levels.col.groups_tip'), width: 130, min: 60, optional: true, on: true },
+  { key: 'set', label: t('levels.col.set'), width: 90, min: 60, optional: true, on: false },
+  { key: 'location', label: t('levels.col.location'), width: 110, min: 70, optional: true, on: false },
   // The person a line pays (decisions.md, entry 79): shown by default once a line has one.
-  { key: 'person', label: 'Person', title: 'The person this line pays: their percent fringe cutoffs apply once, across every account', width: 120, min: 70, optional: true, on: 'persons' },
+  { key: 'person', label: t('levels.col.person'), title: t('levels.col.person_tip'), width: 120, min: 70, optional: true, on: 'persons' },
   // With a baseline only (`baseline: true`), shown by default then.
-  { key: 'orig', label: 'Orig', name: 'Orig (original total)', cls: 'num', title: 'The total when the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
-  { key: 'var', label: 'Var', name: 'Var (change since the baseline)', cls: 'num', title: 'How far the total has moved since the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
+  { key: 'orig', label: t('levels.col.orig'), name: t('levels.col.orig_name'), cls: 'num', title: t('levels.col.orig_tip'), width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
+  { key: 'var', label: t('levels.col.var'), name: t('levels.col.var_name'), cls: 'num', title: t('levels.col.var_tip'), width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
   // With actuals only (`cost: true`), shown by default then: the transactions assigned to each line.
-  { key: 'act', label: 'Actual', name: 'Actual (actual to date)', cls: 'num', title: 'Actual to date: the imported transactions (on a line, those assigned to it)', width: 120, min: 96, optional: true, on: 'cost', cost: true },
-  { key: 'total', label: 'Total', cls: 'num', width: 130, min: 116, pin: 'right' },
+  { key: 'act', label: t('levels.col.act'), name: t('levels.col.act_name'), cls: 'num', title: t('levels.col.act_tip'), width: 120, min: 96, optional: true, on: 'cost', cost: true },
+  { key: 'total', label: t('levels.col.total'), cls: 'num', width: 130, min: 116, pin: 'right' },
 ];
 
 /** The optional detail columns, for the column menu. */
@@ -492,10 +497,10 @@ export const BASELINE_COLUMNS = DETAIL_COLUMNS.filter((c) => c.baseline);
  */
 export const COST_COLUMNS = [
   DETAIL_COLUMNS.find((c) => c.key === 'act'),
-  { key: 'etc', label: 'ETC', name: 'ETC (estimate to complete)', cls: 'num', title: 'Estimate to complete: budget minus actual unless the Actuals tab sets another way', optional: true, on: 'cost', cost: true },
-  { key: 'eac', label: 'EAC', name: 'EAC (estimate at completion)', cls: 'num', title: 'Estimate at completion: actual plus estimate to complete', optional: true, on: 'cost', cost: true },
-  { key: 'cvar', label: 'EAC Var', name: 'EAC Var (budget minus EAC)', cls: 'num', title: 'Budget minus the estimate at completion; marked when over budget', optional: true, on: 'cost', cost: true },
-  { key: 'spent', label: '% Spent', name: '% Spent (actual of budget)', cls: 'num', title: 'Actual as a percentage of the budget', optional: true, on: 'cost', cost: true },
+  { key: 'etc', label: t('levels.col.etc'), name: t('levels.col.etc_name'), cls: 'num', title: t('levels.col.etc_tip'), optional: true, on: 'cost', cost: true },
+  { key: 'eac', label: t('levels.col.eac'), name: t('levels.col.eac_name'), cls: 'num', title: t('levels.col.eac_tip'), optional: true, on: 'cost', cost: true },
+  { key: 'cvar', label: t('levels.col.cvar'), name: t('levels.col.cvar_name'), cls: 'num', title: t('levels.col.cvar_tip'), optional: true, on: 'cost', cost: true },
+  { key: 'spent', label: t('levels.col.spent'), name: t('levels.col.spent_name'), cls: 'num', title: t('levels.col.spent_tip'), optional: true, on: 'cost', cost: true },
 ];
 
 /**
@@ -529,7 +534,7 @@ function formulaCell(f, issue, ctx = {}) {
   return numberCell(f, { ...ctx, value: ctx.values ? ctx.values[ctx.field] : undefined, issue });
 }
 
-const COMMENTED = 'Review comments to settle: see the Comments tab';
+const COMMENTED = t('levels.commented');
 
 /** A number cell marked when its row has review comments to settle. */
 function commentedCell(cell, on) {
@@ -548,9 +553,9 @@ function noted(cell, notes) {
  * (full names in the tooltip), names when editing or copying.
  */
 function tagCell(b, table, list, issue) {
-  const t = tagCellText(b, table, list);
-  const cell = { text: t.text, edit: t.edit };
-  if (t.title) cell.title = t.title;
+  const tc = tagCellText(b, table, list);
+  const cell = { text: tc.text, edit: tc.edit };
+  if (tc.title) cell.title = tc.title;
   if (issue) cell.error = issue;
   return cell;
 }
@@ -594,7 +599,7 @@ export function personKey(name) {
 export function rateFromTable(cell, check) {
   if (!check || typeof check !== 'object') return cell;
   const words = typeof check.words === 'string' ? check.words : '';
-  const title = check.state === 'changed' ? `${words}\nRight-click the line and choose Update rate to take the table's figure.` : words;
+  const title = check.state === 'changed' ? `${words}\n${t('levels.rate_changed_hint')}` : words;
   cell.title = [cell.title, title.charAt(0).toUpperCase() + title.slice(1)].filter(Boolean).join('\n');
   const cls = check.state === 'changed' ? 'rate-from-table rate-table-changed' : 'rate-from-table';
   cell.cls = cell.cls ? `${cell.cls} ${cls}` : cls;
@@ -612,15 +617,14 @@ export function personCell(ix, person) {
   const p = key && ix.persons ? ix.persons[key] : null;
   const name = p && p.name ? p.name : String(person || '').trim();
   if (!p) return cell;
-  const lines = `${p.lines} ${p.lines === 1 ? 'line' : 'lines'}`;
-  const where = `${p.accounts.length === 1 ? 'account' : 'accounts'} ${p.accounts.join(', ')}`;
-  const parts = [`${name}: paid ${money(p.pay)} on ${lines} in ${where}`];
+  const paid = { name, pay: money(p.pay), count: p.lines, accounts: p.accounts.join(', ') };
+  const parts = [p.accounts.length === 1 ? t('levels.person.paid_in_account', paid) : t('levels.person.paid_in_accounts', paid)];
   for (const f of p.fringes || []) {
     if (f.cutoff === null || f.cutoff === undefined) continue;
     parts.push(
       f.reached
-        ? `${f.fringe}: ${money(f.pay)} of a ${money(f.cutoff)} cutoff, reached; ${money(f.amount)} across the lines`
-        : `${f.fringe}: ${money(f.pay)} of a ${money(f.cutoff)} cutoff, ${money(f.cutoff - f.pay)} left`,
+        ? t('levels.person.cutoff_reached', { fringe: f.fringe, pay: money(f.pay), cutoff: money(f.cutoff), amount: money(f.amount) })
+        : t('levels.person.cutoff_left', { fringe: f.fringe, pay: money(f.pay), cutoff: money(f.cutoff), left: money(f.cutoff - f.pay) }),
     );
   }
   cell.title = parts.join('\n');
@@ -675,7 +679,7 @@ function acctActual(ix, entry, ai) {
   const ac = costOf(ix, entry.ci, ai);
   if (!ac) return {};
   const f = ac.figures;
-  return { act: { text: money(f.actual), title: `The account's actual to date (${f.count} ${f.count === 1 ? 'transaction' : 'transactions'}; lines show the ones assigned to them)` } };
+  return { act: { text: money(f.actual), title: t('levels.account_actual_tip', { count: f.count }) } };
 }
 
 /** A line with nothing typed in it yet (a newly inserted one): no description and no numbers. */
@@ -769,11 +773,11 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     };
     const note = notesTitle(d.notes);
     const num = { text: String(i + 1), cls: 'muted' };
-    if (ranges[i]) num.title = `Fringe range ${d.fringe_range}: percent fringe cutoffs apply to these lines together`;
+    if (ranges[i]) num.title = t('levels.fringe_range_tip', { range: d.fringe_range });
     const hidden = hiddenFactors(d, values[i], shown, base);
     if (hidden.length) {
       num.cls = 'muted hidden-factor';
-      const what = `A hidden column changes this line's total: ${hidden.join(', ')}`;
+      const what = t('levels.hidden_factor_tip', { list: hidden.join(', ') });
       num.title = num.title ? `${what}\n${num.title}` : what;
     }
     if (ix.commented.rows.has(d.id)) Object.assign(num, commentedCell(num, true));
@@ -789,7 +793,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
 
     const description = {
       ...textCell(d.description, issues.description),
-      placeholder: sub ? 'Subtotal' : kind === 'adjustment' ? 'Adjustment' : line && isFreshLine(d) ? 'Type a description' : '',
+      placeholder: sub ? t('levels.subtotal') : kind === 'adjustment' ? t('levels.adjustment') : line && isFreshLine(d) ? t('levels.type_a_description') : '',
     };
     if (note) {
       description.cls = 'has-note';
@@ -815,7 +819,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       cells.fringes = tagCell(ix.b, 'fringes', d.fringes, issues.fringes);
     } else if (kind === 'adjustment') {
       cells.rate = adjBase.has(d.id)
-        ? { text: money(adjBase.get(d.id)), cls: 'auto', title: 'Sum of the lines above, back to the previous adjustment' }
+        ? { text: money(adjBase.get(d.id)), cls: 'auto', title: t('levels.adjustment_base_tip') }
         : {};
       // An adjustment row can carry fringes too (decisions.md, entry 56).
       cells.fringes = tagCell(ix.b, 'fringes', d.fringes, issues.fringes);
@@ -826,7 +830,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     } else if (sub) {
       cells.total = moneyCell(rr.subtotal);
     } else if (!rr.included) {
-      cells.total = { text: '', placeholder: 'not counted', cls: 'muted', title: 'A group on this line is out of the budget total' };
+      cells.total = { text: '', placeholder: t('levels.not_counted'), cls: 'muted', title: t('levels.not_counted_tip') };
     } else {
       const foreign = rr.currency && rr.currency !== base;
       cells.total = moneyCell(rr.total, foreign ? { title: `${money(rr.local_total)} ${rr.currency}` } : {});
@@ -840,7 +844,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     if (ix.variance && rr && (line || kind === 'adjustment')) Object.assign(cells, varianceCells(ix.variance.rows[d.id]));
     if (ix.cost && (line || kind === 'adjustment')) {
       const got = ix.cost.lines ? ix.cost.lines[d.id] : null;
-      if (got) cells.act = { text: money(got.amount), title: `${got.count} ${got.count === 1 ? 'transaction' : 'transactions'} assigned to this line` };
+      if (got) cells.act = { text: money(got.amount), title: t('levels.line_actual_tip', { count: got.count }) };
     }
     if (rr && (line || kind === 'adjustment') && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${fringePercent(c, rr.total)}`);
@@ -848,7 +852,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       cells.fringe_full_pct = {
         text: fringePercent(rr.fringe_full_total || 0, rr.total),
         cls: 'muted',
-        title: 'Every fringe on the line before cutoffs and ranges',
+        title: t('levels.fringe_full_tip'),
       };
     }
 
@@ -865,7 +869,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     cls: 'summary first grand',
     selectable: false,
     cells: {
-      description: { text: `Total ${acct.name || acct.code}` },
+      description: { text: t('levels.total_named', { name: acct.name || acct.code }) },
       total: ar ? moneyCell(ar.details_total) : NA,
       fringe_total: ar ? { text: money(ar.fringe_total), cls: 'muted' } : NA,
       fringe_pct: ar && ar.details_total && ar.fringe_total ? { text: fringePercent(ar.fringe_total, ar.details_total), cls: 'muted' } : {},
@@ -878,7 +882,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       key: 'acct-total-fr',
       cls: 'summary',
       selectable: false,
-      cells: { description: { text: 'Total with fringes' }, total: moneyCell(ar.total), ...acctChange },
+      cells: { description: { text: t('levels.total_with_fringes') }, total: moneyCell(ar.total), ...acctChange },
     });
   }
   return rows;

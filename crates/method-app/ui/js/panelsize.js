@@ -7,6 +7,7 @@
 import { el, $ } from './dom.js';
 import { setRules, dynamicStyles } from './sheet.js';
 import { readPref, writePref } from './prefs.js';
+import { t } from './i18n.js';
 
 const SIZES = {
   // styles.css .panel and tools.css .workspace.tools-bottom > .panel
@@ -60,8 +61,8 @@ export function syncResizer() {
   const s = sizeOf(ctx.position());
   const key = bottom ? 'bottom' : 'right';
   resizer.setAttribute('aria-orientation', bottom ? 'horizontal' : 'vertical');
-  resizer.setAttribute('aria-label', bottom ? 'Tools panel height' : 'Tools panel width');
-  resizer.title = `Drag to resize the tools panel; double-click for the standard ${bottom ? 'height' : 'width'}`;
+  resizer.setAttribute('aria-label', bottom ? t('panelsize.height_label') : t('panelsize.width_label'));
+  resizer.title = bottom ? t('panelsize.height_title') : t('panelsize.width_title');
   resizer.setAttribute('aria-valuemin', String(s.min));
   resizer.setAttribute('aria-valuemax', String(panelMax(ctx.position())));
   resizer.setAttribute('aria-valuenow', String(panelSize[key] === null ? s.fallback : panelSize[key]));

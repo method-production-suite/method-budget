@@ -22,6 +22,29 @@ import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { createdText, versionsOf } from './versions.js';
+import { t } from './i18n.js';
+
+// What happened to a thing, by Rust's kind key (shown in capitals by the CSS).
+const KIND_WORDS = {
+  added: t('diffmerge.kind.added'),
+  removed: t('diffmerge.kind.removed'),
+  changed: t('diffmerge.kind.changed'),
+  moved: t('diffmerge.kind.moved'),
+  renamed: t('diffmerge.kind.renamed'),
+  renumbered: t('diffmerge.kind.renumbered'),
+};
+
+/**
+ * A sentence with names in bold: `text` is the translated words with the
+ * `{name}` placeholders of `bold` still in them; each one becomes a <strong>
+ * of its value, so a translation can put them in any order.
+ */
+function boldSentence(text, bold) {
+  return text.split(/(\{[A-Za-z0-9_]+\})/).filter((part) => part !== '').map((part) => {
+    const name = part.startsWith('{') && part.endsWith('}') ? part.slice(1, -1) : null;
+    return name !== null && Object.prototype.hasOwnProperty.call(bold, name) ? el('strong', { text: bold[name] }) : part;
+  });
+}
 
 let uid = 0;
 function nextId(prefix) {
@@ -85,7 +108,7 @@ function section(title, items, extra = null, group = null) {
     'section',
     { class: 'cmp-side-section', attrs: group ? { role: 'radiogroup', 'aria-label': group } : {} },
     el('h3', { class: 'cmp-side-head', text: title }),
-    items.length ? el('div', { class: 'cmp-side-list' }, ...items) : el('p', { class: 'cmp-side-empty', text: 'None' }),
+    items.length ? el('div', { class: 'cmp-side-list' }, ...items) : el('p', { class: 'cmp-side-empty', text: t('diffmerge.none') }),
     extra,
   );
 }
@@ -110,8 +133,8 @@ function moneyTable(lines, caption, go) {
         'tr',
         {},
         el('th', { class: 'wc-money-name', attrs: { scope: 'row' } }, name),
-        el('td', { class: 'num', text: l.before === null || l.before === undefined ? 'none' : money(l.before) }),
-        el('td', { class: 'num', text: l.after === null || l.after === undefined ? 'none' : money(l.after) }),
+        el('td', { class: 'num', text: l.before === null || l.before === undefined ? t('diffmerge.none_cell') : money(l.before) }),
+        el('td', { class: 'num', text: l.after === null || l.after === undefined ? t('diffmerge.none_cell') : money(l.after) }),
         el('td', { class: l.delta < 0 ? 'num wc-delta is-down' : 'num wc-delta', text: deltaText(l.delta) }),
       ),
     );
@@ -127,9 +150,9 @@ function moneyTable(lines, caption, go) {
         'tr',
         {},
         el('th', { attrs: { scope: 'col' } }),
-        el('th', { class: 'num', text: 'Before', attrs: { scope: 'col' } }),
-        el('th', { class: 'num', text: 'After', attrs: { scope: 'col' } }),
-        el('th', { class: 'num', text: 'Change', attrs: { scope: 'col' } }),
+        el('th', { class: 'num', text: t('diffmerge.before'), attrs: { scope: 'col' } }),
+        el('th', { class: 'num', text: t('diffmerge.after'), attrs: { scope: 'col' } }),
+        el('th', { class: 'num', text: t('diffmerge.change'), attrs: { scope: 'col' } }),
       ),
     ),
     body,
@@ -147,7 +170,7 @@ function changeList(changes, go) {
         ? el('button', { class: 'wc-go wc-text', text: c.text, attrs: { type: 'button' } })
         : el('span', { class: 'wc-text', text: c.text });
       if (c.go) text.addEventListener('click', () => go(c.go));
-      list.append(el('li', { class: `wc-item is-${c.kind}` }, el('span', { class: 'wc-kind', text: c.kind }), text));
+      list.append(el('li', { class: `wc-item is-${c.kind}` }, el('span', { class: 'wc-kind', text: KIND_WORDS[c.kind] || c.kind }), text));
     }
     host.append(el('section', { class: 'wc-group' }, el('h3', { class: 'wc-group-head', text: g.group }), list));
   }
@@ -163,7 +186,7 @@ export function showWhatChanged(ctx) {
   if (doc === null || doc === undefined) return;
   const view = ctx.view();
   const m = remembered(doc);
-  const tabIds = new Set((ctx.tabs() || []).map((t) => t.id));
+  const tabIds = new Set((ctx.tabs() || []).map((tab) => tab.id));
   const versionIds = new Set(versionsOf(view).map((v) => v.id));
   const hasFile = Boolean(view && view.file && view.file.path);
   const a = m.against;
@@ -175,7 +198,7 @@ export function showWhatChanged(ctx) {
   let problem = '';
   let seq = 0;
   let closeFn = null;
-  const side = el('div', { class: 'cmp-side', attrs: { role: 'radiogroup', 'aria-label': 'Compare with' } });
+  const side = el('div', { class: 'cmp-side', attrs: { role: 'radiogroup', 'aria-label': t('diffmerge.compare_with') } });
   const host = el('div', { class: 'cmp-table-host wc-host', attrs: { tabindex: '-1' } });
   const status = el('p', { class: 'cmp-status', attrs: { role: 'status' } });
 
@@ -202,7 +225,7 @@ export function showWhatChanged(ctx) {
     const src = keepPicked(m, p);
     if (!src) return;
     if (src.kind === 'tab' && src.doc === doc) {
-      problem = 'That file is this budget.';
+      problem = t('diffmerge.that_file_is_this_budget');
       draw();
       return;
     }
@@ -211,22 +234,22 @@ export function showWhatChanged(ctx) {
 
   function drawSide() {
     const name = 'wc-against';
-    const tabs = (ctx.tabs() || []).filter((t) => t.id !== doc);
-    const addBtn = el('button', { class: 'btn cmp-add-files', text: 'Choose a File…', attrs: { type: 'button' } });
+    const tabs = (ctx.tabs() || []).filter((tab) => tab.id !== doc);
+    const addBtn = el('button', { class: 'btn cmp-add-files', text: t('diffmerge.choose_a_file'), attrs: { type: 'button' } });
     addBtn.addEventListener('click', addFile);
     side.replaceChildren(
-      el('p', { class: 'cmp-side-count', text: 'What changed in this budget since:' }),
-      section('This budget', hasFile ? [choice(name, { kind: 'saved' }, m.against, 'Its file as last saved', view.file.dirty ? 'Unsaved changes since' : 'No unsaved changes', view.file.path, pick)] : []),
+      el('p', { class: 'cmp-side-count', text: t('diffmerge.since') }),
+      section(t('diffmerge.this_budget'), hasFile ? [choice(name, { kind: 'saved' }, m.against, t('diffmerge.file_as_last_saved'), view.file.dirty ? t('diffmerge.unsaved_changes_since') : t('diffmerge.no_unsaved_changes'), view.file.path, pick)] : []),
       section(
-        'Versions of this budget',
+        t('diffmerge.versions_of_this_budget'),
         versionsOf(view).map((v) => choice(name, { kind: 'version', id: v.id }, m.against, v.name, createdText(v.created), v.note || v.name, pick)),
       ),
       section(
-        'Open budgets',
-        tabs.map((t) => choice(name, { kind: 'tab', doc: t.id }, m.against, t.label, t.dirty ? 'Unsaved changes' : '', t.path || t.title, pick)),
+        t('diffmerge.open_budgets'),
+        tabs.map((tab) => choice(name, { kind: 'tab', doc: tab.id }, m.against, tab.label, tab.dirty ? t('diffmerge.unsaved_changes') : '', tab.path || tab.title, pick)),
       ),
       section(
-        'Files',
+        t('diffmerge.files'),
         m.files.map((f) => choice(name, { kind: 'file', token: f.token }, m.against, f.label, '', f.path, pick)),
         addBtn,
       ),
@@ -241,7 +264,7 @@ export function showWhatChanged(ctx) {
       draw();
       return;
     }
-    status.textContent = 'Comparing…';
+    status.textContent = t('diffmerge.comparing');
     draw();
     try {
       const r = await ctx.invoke('what_changed', { doc, against: m.against });
@@ -261,7 +284,7 @@ export function showWhatChanged(ctx) {
       return;
     }
     if (!m.against) {
-      host.replaceChildren(el('p', { class: 'cmp-empty', text: 'Choose what to compare this budget with.' }));
+      host.replaceChildren(el('p', { class: 'cmp-empty', text: t('diffmerge.choose_against') }));
       return;
     }
     if (!result) {
@@ -272,22 +295,18 @@ export function showWhatChanged(ctx) {
     const head = el(
       'p',
       { class: 'wc-summary' },
-      `${n === 0 ? 'No changes' : n === 1 ? '1 change' : `${n} changes`} from `,
-      el('strong', { text: result.from.label }),
-      ' to ',
-      el('strong', { text: result.to.label }),
-      '.',
+      ...boldSentence(n === 0 ? t('diffmerge.no_changes_from_to') : t('diffmerge.changes_from_to', { count: n }), { from: result.from.label, to: result.to.label }),
     );
     const notes = [];
-    if (!result.money_known) notes.push(el('p', { class: 'cmp-note', text: 'A budget can’t be totalled, so no money is shown.' }));
-    if (result.from.partial || result.to.partial) notes.push(el('p', { class: 'cmp-note', text: 'Some cells have problems; their money counts as blank, as in the grid.' }));
+    if (!result.money_known) notes.push(el('p', { class: 'cmp-note', text: t('diffmerge.no_money') }));
+    if (result.from.partial || result.to.partial) notes.push(el('p', { class: 'cmp-note', text: t('diffmerge.partial') }));
     const parts = [
       head,
       ...notes,
-      moneyTable(result.totals, 'Topsheet totals', go),
+      moneyTable(result.totals, t('diffmerge.topsheet_totals'), go),
       n ? changeList(result.changes, go) : null,
-      moneyTable(result.categories, 'Categories', go),
-      moneyTable(result.accounts, 'Accounts', go),
+      moneyTable(result.categories, t('diffmerge.categories'), go),
+      moneyTable(result.accounts, t('diffmerge.accounts'), go),
     ];
     host.replaceChildren(...parts.filter(Boolean));
   }
@@ -297,13 +316,13 @@ export function showWhatChanged(ctx) {
   refresh();
 
   closeFn = customDialog((close) => {
-    const done = el('button', { class: 'btn', text: 'Close', attrs: { type: 'button' } });
+    const done = el('button', { class: 'btn', text: t('diffmerge.close'), attrs: { type: 'button' } });
     done.addEventListener('click', close);
-    const title = view && view.budget && view.budget.title ? view.budget.title : 'this budget';
+    const title = view && view.budget && view.budget.title ? t('diffmerge.what_changed_in', { name: view.budget.title }) : t('diffmerge.what_changed_in_this_budget');
     return el(
       'div',
       { class: 'modal compare-dialog wc-dialog', attrs: { role: 'dialog', 'aria-labelledby': 'wc-title' } },
-      el('header', { class: 'cmp-head' }, el('h2', { class: 'modal-title', text: `What changed in ${title}`, attrs: { id: 'wc-title' } }), status, el('span', { class: 'spacer' }), done),
+      el('header', { class: 'cmp-head' }, el('h2', { class: 'modal-title', text: title, attrs: { id: 'wc-title' } }), status, el('span', { class: 'spacer' }), done),
       el('div', { class: 'cmp-body' }, side, host),
     );
   });
@@ -321,7 +340,7 @@ export function showMerge(ctx) {
   if (doc === null || doc === undefined) return;
   const view = ctx.view();
   const m = remembered(doc);
-  const tabIds = new Set((ctx.tabs() || []).map((t) => t.id));
+  const tabIds = new Set((ctx.tabs() || []).map((tab) => tab.id));
   const versionIds = new Set(versionsOf(view).map((v) => v.id));
   const stale = (s) => !s || (s.kind === 'tab' && (!tabIds.has(s.doc) || s.doc === doc)) || (s.kind === 'version' && !versionIds.has(s.id));
   if (stale(m.copy)) m.copy = null;
@@ -336,7 +355,7 @@ export function showMerge(ctx) {
   const side = el('div', { class: 'cmp-side' });
   const host = el('div', { class: 'cmp-table-host wc-host', attrs: { tabindex: '-1' } });
   const status = el('p', { class: 'cmp-status', attrs: { role: 'status' } });
-  const mergeBtn = el('button', { class: 'btn btn-primary', text: 'Merge', attrs: { type: 'button' } });
+  const mergeBtn = el('button', { class: 'btn btn-primary', text: t('diffmerge.merge'), attrs: { type: 'button' } });
 
   async function addFile(purpose) {
     let p;
@@ -350,7 +369,7 @@ export function showMerge(ctx) {
     const src = keepPicked(m, p);
     if (!src) return;
     if (src.kind === 'tab' && src.doc === doc) {
-      problem = purpose === 'copy' ? 'That file is this budget.' : 'This budget can’t be the base.';
+      problem = purpose === 'copy' ? t('diffmerge.that_file_is_this_budget') : t('diffmerge.cant_be_base');
       draw();
       return;
     }
@@ -373,25 +392,25 @@ export function showMerge(ctx) {
   }
 
   function drawSide() {
-    const tabs = (ctx.tabs() || []).filter((t) => t.id !== doc);
-    const copyBtn = el('button', { class: 'btn cmp-add-files', text: 'Choose a File…', attrs: { type: 'button' } });
+    const tabs = (ctx.tabs() || []).filter((tab) => tab.id !== doc);
+    const copyBtn = el('button', { class: 'btn cmp-add-files', text: t('diffmerge.choose_a_file'), attrs: { type: 'button' } });
     copyBtn.addEventListener('click', () => addFile('copy'));
-    const baseBtn = el('button', { class: 'btn cmp-add-files', text: 'Choose a File…', attrs: { type: 'button' } });
+    const baseBtn = el('button', { class: 'btn cmp-add-files', text: t('diffmerge.choose_a_file'), attrs: { type: 'button' } });
     baseBtn.addEventListener('click', () => addFile('base'));
     const files = (name, current, onPick) => m.files.map((f) => choice(name, { kind: 'file', token: f.token }, current, f.label, '', f.path, onPick));
-    const tabChoices = (name, current, onPick) => tabs.map((t) => choice(name, { kind: 'tab', doc: t.id }, current, t.label, t.dirty ? 'Unsaved changes' : '', t.path || t.title, onPick));
+    const tabChoices = (name, current, onPick) => tabs.map((tab) => choice(name, { kind: 'tab', doc: tab.id }, current, tab.label, tab.dirty ? t('diffmerge.unsaved_changes') : '', tab.path || tab.title, onPick));
     side.replaceChildren(
-      section('Returned copy', [...tabChoices('mg-copy', m.copy, pickCopy), ...files('mg-copy', m.copy, pickCopy)], copyBtn, 'Returned copy'),
+      section(t('diffmerge.returned_copy'), [...tabChoices('mg-copy', m.copy, pickCopy), ...files('mg-copy', m.copy, pickCopy)], copyBtn, t('diffmerge.returned_copy')),
       section(
-        'Base: where both started',
+        t('diffmerge.base_head'),
         [
-          choice('mg-base', { kind: 'auto' }, m.base, 'From the copy', 'The version of this budget it was shared from', 'Found from where the copy says it came from', pickBase),
+          choice('mg-base', { kind: 'auto' }, m.base, t('diffmerge.from_the_copy'), t('diffmerge.from_the_copy_sub'), t('diffmerge.from_the_copy_tip'), pickBase),
           ...versionsOf(view).map((v) => choice('mg-base', { kind: 'version', id: v.id }, m.base, v.name, createdText(v.created), v.note || v.name, pickBase)),
           ...tabChoices('mg-base', m.base, pickBase),
           ...files('mg-base', m.base, pickBase),
         ],
         baseBtn,
-        'Base',
+        t('diffmerge.base'),
       ),
     );
   }
@@ -404,7 +423,7 @@ export function showMerge(ctx) {
       draw();
       return;
     }
-    status.textContent = 'Merging…';
+    status.textContent = t('diffmerge.merging');
     draw();
     try {
       const r = await ctx.invoke('merge_preview', { doc, copy: m.copy, base: m.base, picks });
@@ -438,8 +457,8 @@ export function showMerge(ctx) {
       'li',
       { class: 'mg-conflict' },
       el('p', { class: 'mg-what', text: c.what }),
-      c.base !== null && c.base !== undefined ? el('p', { class: 'mg-base', text: `Was: ${c.base}` }) : null,
-      el('div', { class: 'mg-opts', attrs: { role: 'radiogroup', 'aria-label': c.what } }, opt('ours', 'Ours', c.ours), opt('theirs', 'Theirs', c.theirs)),
+      c.base !== null && c.base !== undefined ? el('p', { class: 'mg-base', text: t('diffmerge.was', { value: c.base }) }) : null,
+      el('div', { class: 'mg-opts', attrs: { role: 'radiogroup', 'aria-label': c.what } }, opt('ours', t('diffmerge.ours'), c.ours), opt('theirs', t('diffmerge.theirs'), c.theirs)),
     );
   }
 
@@ -450,7 +469,7 @@ export function showMerge(ctx) {
       return;
     }
     if (!m.copy) {
-      host.replaceChildren(el('p', { class: 'cmp-empty', text: 'Choose the returned copy to merge from.' }));
+      host.replaceChildren(el('p', { class: 'cmp-empty', text: t('diffmerge.choose_copy') }));
       return;
     }
     if (!preview) {
@@ -458,34 +477,30 @@ export function showMerge(ctx) {
       return;
     }
     if (!preview.base) {
-      host.replaceChildren(el('p', { class: 'cmp-empty', text: preview.needs_base || 'Choose the base: the budget both started from.' }));
+      host.replaceChildren(el('p', { class: 'cmp-empty', text: preview.needs_base || t('diffmerge.choose_base') }));
       return;
     }
     const parts = [
       el(
         'p',
         { class: 'wc-summary' },
-        'Merging ',
-        el('strong', { text: preview.copy.label }),
-        ' against ',
-        el('strong', { text: preview.base.label }),
-        '.',
+        ...boldSentence(t('diffmerge.merging_against'), { copy: preview.copy.label, base: preview.base.label }),
       ),
     ];
-    if (preview.problem) parts.push(el('p', { class: 'cmp-note is-error', text: `The merged budget has a problem: ${preview.problem}` }));
-    if (preview.renumbered) parts.push(el('p', { class: 'cmp-note', text: `${preview.renumbered === 1 ? 'A row or version' : `${preview.renumbered} rows or versions`} added on both sides with the same id: the copy’s got a new id.` }));
+    if (preview.problem) parts.push(el('p', { class: 'cmp-note is-error', text: t('diffmerge.merged_problem', { problem: preview.problem }) }));
+    if (preview.renumbered) parts.push(el('p', { class: 'cmp-note', text: t('diffmerge.renumbered', { count: preview.renumbered }) }));
     const nc = preview.conflicts.length;
     if (nc) {
       const groups = groupChanges(preview.conflicts.map((c) => ({ ...c, group_kind: '' })));
       const list = el('div', { class: 'wc-list' });
       for (const g of groups) list.append(el('section', { class: 'wc-group' }, el('h3', { class: 'wc-group-head', text: g.group }), el('ul', { class: 'mg-conflicts' }, ...g.items.map(conflictRow))));
-      parts.push(el('h3', { class: 'mg-head', text: nc === 1 ? '1 conflict: pick a side' : `${nc} conflicts: pick a side for each` }), list);
+      parts.push(el('h3', { class: 'mg-head', text: t('diffmerge.conflicts_head', { count: nc }) }), list);
     } else {
-      parts.push(el('p', { class: 'cmp-note', text: 'No conflicts.' }));
+      parts.push(el('p', { class: 'cmp-note', text: t('diffmerge.no_conflicts') }));
     }
     const n = preview.changes.length;
-    parts.push(el('h3', { class: 'mg-head', text: n === 0 ? 'The merge changes nothing in this budget.' : n === 1 ? 'What the merge brings in: 1 change' : `What the merge brings in: ${n} changes` }));
-    parts.push(moneyTable(preview.totals, 'Topsheet totals', null));
+    parts.push(el('h3', { class: 'mg-head', text: n === 0 ? t('diffmerge.merge_changes_nothing') : t('diffmerge.merge_brings_in', { count: n }) }));
+    parts.push(moneyTable(preview.totals, t('diffmerge.topsheet_totals'), null));
     if (n) parts.push(changeList(preview.changes.map((c) => ({ ...c, go: null })), () => {}));
     host.replaceChildren(...parts.filter(Boolean));
   }
@@ -500,7 +515,7 @@ export function showMerge(ctx) {
       const nc = preview.conflicts.length;
       if (closeFn) closeFn();
       ctx.apply(v);
-      ctx.toast(nc ? `Merged changes from ${label}; ${nc === 1 ? '1 conflict' : `${nc} conflicts`} settled as picked.` : `Merged changes from ${label}.`);
+      ctx.toast(nc ? t('diffmerge.merged_with_conflicts', { name: label, count: nc }) : t('diffmerge.merged', { name: label }));
     } catch (e) {
       busy = false;
       problem = String(e);
@@ -514,13 +529,13 @@ export function showMerge(ctx) {
   refresh();
 
   closeFn = customDialog((close) => {
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('diffmerge.cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', close);
-    const title = view && view.budget && view.budget.title ? view.budget.title : 'this budget';
+    const title = view && view.budget && view.budget.title ? t('diffmerge.merge_into', { name: view.budget.title }) : t('diffmerge.merge_into_this_budget');
     return el(
       'div',
       { class: 'modal compare-dialog wc-dialog', attrs: { role: 'dialog', 'aria-labelledby': 'mg-title' } },
-      el('header', { class: 'cmp-head' }, el('h2', { class: 'modal-title', text: `Merge changes into ${title}`, attrs: { id: 'mg-title' } }), status, el('span', { class: 'spacer' }), cancel, mergeBtn),
+      el('header', { class: 'cmp-head' }, el('h2', { class: 'modal-title', text: title, attrs: { id: 'mg-title' } }), status, el('span', { class: 'spacer' }), cancel, mergeBtn),
       el('div', { class: 'cmp-body' }, side, host),
     );
   });

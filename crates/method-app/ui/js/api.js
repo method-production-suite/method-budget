@@ -1,6 +1,8 @@
 // The only way the UI talks to the app: Tauri's invoke, through one queue so
 // commands always run in the order the user made them.
 
+import { t } from './i18n.js';
+
 const tauri = window.__TAURI__;
 
 export const connected = Boolean(tauri && tauri.core && typeof tauri.core.invoke === 'function');
@@ -27,7 +29,7 @@ export function invoke(cmd, args = {}) {
   const extra = defaults ? defaults() : null;
   const all = extra ? { ...extra, ...args } : args;
   const run = async () => {
-    if (!connected) throw 'This window is not connected to Method Budget.';
+    if (!connected) throw t('api.not_connected');
     try {
       return await tauri.core.invoke(cmd, all);
     } catch (e) {

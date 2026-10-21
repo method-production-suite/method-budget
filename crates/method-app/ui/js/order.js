@@ -11,6 +11,7 @@
 // Also: a short summary of an item's notes for a tooltip.
 
 import { obj } from './util.js';
+import { t } from './i18n.js';
 
 /** The kind name commands take for each table (`rename_setup_item`, `set_setup_order`...). */
 export const TABLE_KIND = {
@@ -94,8 +95,8 @@ const TIP_NOTES = 3;
 export function notesTitle(notes) {
   const list = noteList(notes);
   if (!list.length) return '';
-  const cut = (t) => (t.length > TIP_CHARS ? `${t.slice(0, TIP_CHARS).trimEnd()}…` : t);
+  const cut = (s) => (s.length > TIP_CHARS ? `${s.slice(0, TIP_CHARS).trimEnd()}…` : s);
   const lines = list.slice(0, TIP_NOTES).map((n) => `${n.done ? '✓ ' : ''}${cut(n.text.trim())}`);
-  if (list.length > TIP_NOTES) lines.push(`and ${list.length - TIP_NOTES} more`);
-  return `${list.length === 1 ? 'Note' : `${list.length} notes`}:\n${lines.join('\n')}`;
+  if (list.length > TIP_NOTES) lines.push(t('order.and_more', { count: list.length - TIP_NOTES }));
+  return t('order.notes_title', { count: list.length, lines: lines.join('\n') });
 }

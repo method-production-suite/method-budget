@@ -12,19 +12,20 @@
 import { anchoredForm } from './modal.js';
 import { openContextMenu } from './menu.js';
 import { saveItemToLibrary } from './library.js';
+import { t } from './i18n.js';
 
 // Letters, digits and _, with at least one letter or _ (decisions.md, entry 56).
 const GLOBAL_NAME = /^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/;
 
 /** Each kind: what it is called, and its table in the view's budget. */
 export const RENAME_KINDS = {
-  global: { what: 'global', table: 'globals' },
-  fringe: { what: 'fringe', table: 'fringes' },
-  group: { what: 'group', table: 'groups' },
-  unit: { what: 'unit', table: 'units' },
-  set: { what: 'set', table: 'sets' },
-  location: { what: 'location', table: 'locations' },
-  currency: { what: 'currency', table: 'currencies' },
+  global: { what: t('rename.kind.global'), table: 'globals' },
+  fringe: { what: t('rename.kind.fringe'), table: 'fringes' },
+  group: { what: t('rename.kind.group'), table: 'groups' },
+  unit: { what: t('rename.kind.unit'), table: 'units' },
+  set: { what: t('rename.kind.set'), table: 'sets' },
+  location: { what: t('rename.kind.location'), table: 'locations' },
+  currency: { what: t('rename.kind.currency'), table: 'currencies' },
 };
 
 function has(obj, k) {
@@ -34,27 +35,27 @@ function has(obj, k) {
 /** Why `to` can't be the new name of `kind` item `from`, or null. */
 export function renameProblem(kind, from, to, budget) {
   const info = RENAME_KINDS[kind];
-  if (!info) return 'That can’t be renamed.';
+  if (!info) return t('rename.cannot');
   const b = budget && typeof budget === 'object' ? budget : {};
-  if (to === '') return kind === 'currency' ? 'Enter a currency code.' : `Enter a ${info.what} name.`;
+  if (to === '') return kind === 'currency' ? t('rename.enter_code') : t('rename.enter_name', { what: info.what });
   if (kind === 'global') {
-    if (!GLOBAL_NAME.test(to)) return `“${to}” can’t be a global name: use letters, digits and _, with at least one letter or _.`;
+    if (!GLOBAL_NAME.test(to)) return t('rename.bad_global', { name: to });
   } else if (to.includes(',')) {
-    return kind === 'currency' ? 'Codes can’t contain commas.' : 'Names can’t contain commas.';
+    return kind === 'currency' ? t('rename.code_commas') : t('rename.name_commas');
   }
   if (to === from) return null;
-  if (kind === 'currency' && (to === b.base_currency || has(b.currencies, to))) return `${to} is already a currency here.`;
-  if (kind !== 'currency' && has(b[info.table], to)) return `There is already a ${info.what} named ${to}.`;
+  if (kind === 'currency' && (to === b.base_currency || has(b.currencies, to))) return t('rename.currency_taken', { name: to });
+  if (kind !== 'currency' && has(b[info.table], to)) return t('rename.name_taken', { what: info.what, name: to });
   return null;
 }
 
 /** What a finished rename says: the new name, and how many places changed. */
 export function renamedText(kind, from, reply) {
-  const info = RENAME_KINDS[kind] || { what: 'item' };
+  const info = RENAME_KINDS[kind] || { what: t('rename.kind.item') };
   const n = Number(reply && reply.places) || 0;
   const to = reply && typeof reply.name === 'string' ? reply.name : '';
-  const where = n === 0 ? 'nothing used it yet' : n === 1 ? '1 place updated' : `${n} places updated`;
-  return `Renamed ${info.what} ${from} to ${to}: ${where}.`;
+  if (n === 0) return t('rename.renamed_none', { what: info.what, from, to });
+  return t('rename.renamed', { count: n, what: info.what, from, to });
 }
 
 /**
@@ -68,13 +69,13 @@ export function renameItem({ anchor, kind, name, ctx }) {
   let reply = null;
   return anchoredForm({
     anchor,
-    title: `Rename ${info.what} ${name}`,
+    title: t('rename.title', { what: info.what, name }),
     message:
       kind === 'global'
-        ? 'Every formula that uses it changes with it, as one step you can undo. Totals stay the same.'
-        : 'Every line and setting that uses it changes with it, as one step you can undo. Totals stay the same.',
-    fields: [{ key: 'name', label: kind === 'currency' ? 'New code' : 'New name', value: name }],
-    submitText: 'Rename',
+        ? t('rename.message_global')
+        : t('rename.message'),
+    fields: [{ key: 'name', label: kind === 'currency' ? t('rename.new_code') : t('rename.new_name'), value: name }],
+    submitText: t('rename.rename'),
     onSubmit: (v) => {
       const to = String(v.name || '').trim();
       const bad = renameProblem(kind, name, to, ctx.budget ? ctx.budget() : {});
@@ -101,10 +102,10 @@ export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = nu
   const info = RENAME_KINDS[kind];
   if (!info) return;
   const items = [];
-  if (edit) items.push({ label: 'Edit…', run: edit });
+  if (edit) items.push({ label: t('rename.edit'), run: edit });
   items.push({
-    label: 'Rename everywhere…',
-    title: 'Give it a new name; every line, formula and setting that uses it follows',
+    label: t('rename.rename_everywhere'),
+    title: t('rename.rename_everywhere_title'),
     run: () =>
       renameItem({ anchor, kind, name, ctx }).then((to) => {
         if (to !== null && onRenamed) onRenamed(to);
@@ -114,11 +115,11 @@ export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = nu
   for (const x of extra) items.push(x);
   // A copy into the personal setup library, with what it needs (library.js).
   items.push({
-    label: 'Save to Library…',
-    title: 'Copy it, and what it needs, into your setup library',
+    label: t('rename.save_to_library'),
+    title: t('rename.save_to_library_title'),
     run: () => saveItemToLibrary(ctx, kind, name),
   });
-  if (remove) items.push({ separator: true }, { label: 'Delete…', run: remove });
+  if (remove) items.push({ separator: true }, { label: t('rename.delete'), run: remove });
   const point = at && typeof at.clientX === 'number' ? { x: at.clientX, y: at.clientY } : at;
-  openContextMenu(point, { label: `${info.what} ${name}`, items, returnFocus: () => anchor && anchor.focus && anchor.focus() });
+  openContextMenu(point, { label: t('rename.menu_label', { what: info.what, name }), items, returnFocus: () => anchor && anchor.focus && anchor.focus() });
 }

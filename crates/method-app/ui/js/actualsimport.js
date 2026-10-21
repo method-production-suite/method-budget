@@ -22,28 +22,28 @@ import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { readPref, writePref } from './prefs.js';
 import { localStamp } from './versions.js';
-import { plural } from './util.js';
+import { t } from './i18n.js';
 
 /** The fields' names in the dialog, by the key Rust uses. */
 export const FIELD_LABELS = {
-  date: 'Date',
-  account: 'Account number',
-  amount: 'Amount',
-  debit: 'Debit',
-  credit: 'Credit',
-  vendor: 'Vendor',
-  description: 'Description',
-  reference: 'Reference',
-  tags: 'Tags',
+  date: t('actualsimport.field.date'),
+  account: t('actualsimport.field.account'),
+  amount: t('actualsimport.field.amount'),
+  debit: t('actualsimport.field.debit'),
+  credit: t('actualsimport.field.credit'),
+  vendor: t('actualsimport.field.vendor'),
+  description: t('actualsimport.field.description'),
+  reference: t('actualsimport.field.reference'),
+  tags: t('actualsimport.field.tags'),
 };
 
 const FIELD_TITLES = {
-  account: 'Read with this budget’s account numbering. Numbers the budget doesn’t have are listed below for review.',
-  amount: 'Used when the row has one; otherwise Debit minus Credit',
-  debit: 'A cost (with Credit, when there is no Amount column)',
-  credit: 'A refund or credit, taken off',
-  reference: 'Invoice, purchase order or check number',
-  tags: 'Labels, separated by commas',
+  account: t('actualsimport.field_tip.account'),
+  amount: t('actualsimport.field_tip.amount'),
+  debit: t('actualsimport.field_tip.debit'),
+  credit: t('actualsimport.field_tip.credit'),
+  reference: t('actualsimport.field_tip.reference'),
+  tags: t('actualsimport.field_tip.tags'),
 };
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ export function showDialog(ctx, picked) {
   const updateButton = () => {
     const p = st.preview;
     ui.ok.disabled = busy || !p || p.count === 0;
-    ui.ok.textContent = p && p.count ? `Import ${plural(p.count, 'Transaction', 'Transactions')}` : 'Import';
+    ui.ok.textContent = p && p.count ? t('actualsimport.import_n', { count: p.count }) : t('actualsimport.import');
   };
 
   const refresh = async (extra = {}) => {
@@ -242,10 +242,10 @@ export function showDialog(ctx, picked) {
   const fieldSelect = (key) => {
     const select = el('select', {
       class: 'modal-input si-col',
-      attrs: { 'aria-label': `Column for ${FIELD_LABELS[key] || key}` },
+      attrs: { 'aria-label': t('actualsimport.column_for', { field: FIELD_LABELS[key] || key }) },
       data: { siKey: `field-${key}` },
     });
-    select.append(el('option', { text: '(not imported)', attrs: { value: '' } }));
+    select.append(el('option', { text: t('actualsimport.not_imported'), attrs: { value: '' } }));
     for (const c of st.preview ? st.preview.columns : []) {
       select.append(el('option', { text: columnLabel(c), attrs: { value: String(c.index) } }));
     }
@@ -265,20 +265,20 @@ export function showDialog(ctx, picked) {
     if (picked.sheets.length > 1) {
       const sheet = el('select', { class: 'modal-input', attrs: { id: 'ai-sheet' }, data: { siKey: 'sheet' } });
       picked.sheets.forEach((s, i) => {
-        sheet.append(el('option', { text: `${s.name}${s.hidden ? ' (hidden)' : ''}, ${plural(s.rows, 'row', 'rows')}`, attrs: { value: String(i) } }));
+        sheet.append(el('option', { text: s.hidden ? t('actualsimport.sheet_option_hidden', { name: s.name, count: s.rows }) : t('actualsimport.sheet_option', { name: s.name, count: s.rows }), attrs: { value: String(i) } }));
       });
       sheet.value = String(st.sheet);
       sheet.addEventListener('change', () => {
         st.sheet = Number(sheet.value);
         startSheet();
       });
-      parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: 'Sheet' }), sheet));
+      parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: t('actualsimport.sheet') }), sheet));
     }
     const header = el('select', { class: 'modal-input', attrs: { id: 'ai-header' }, data: { siKey: 'header' } });
-    header.append(el('option', { text: 'No header row: data from row 1', attrs: { value: '' } }));
+    header.append(el('option', { text: t('actualsimport.no_header_row'), attrs: { value: '' } }));
     for (const r of p ? p.raw : []) {
       const cells = r.cells.filter((c) => c.trim() !== '').slice(0, 5).join(' | ');
-      header.append(el('option', { text: `Row ${r.row}: ${cells || '(empty)'}`, attrs: { value: String(r.row - 1) } }));
+      header.append(el('option', { text: t('actualsimport.header_option', { row: r.row, cells: cells || t('actualsimport.empty_row') }), attrs: { value: String(r.row - 1) } }));
     }
     header.value = st.headerRow === null ? '' : String(st.headerRow);
     header.addEventListener('change', () => {
@@ -286,14 +286,14 @@ export function showDialog(ctx, picked) {
       st.presetName = '';
       refresh({ guess: true });
     });
-    parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: 'Header row' }), header));
+    parts.push(el('label', { class: 'modal-field si-field' }, el('span', { text: t('actualsimport.header_row') }), header));
     ui.top.replaceChildren(...parts);
     const info = p && picked.sheets[st.sheet];
     ui.truncated.hidden = !(info && info.truncated);
   };
 
   const buildPresets = () => {
-    const select = el('select', { class: 'modal-input', attrs: { 'aria-label': 'Saved mappings' }, data: { siKey: 'preset' } });
+    const select = el('select', { class: 'modal-input', attrs: { 'aria-label': t('actualsimport.saved_mappings') }, data: { siKey: 'preset' } });
     select.addEventListener('change', () => {
       const p = st.presets.find((q) => q.name === select.value);
       if (!p) return;
@@ -303,9 +303,9 @@ export function showDialog(ctx, picked) {
     });
     const name = el('input', {
       class: 'modal-input si-preset-name',
-      attrs: { type: 'text', placeholder: 'Name for this mapping', 'aria-label': 'Name for this mapping', maxlength: String(MAX_NAME), spellcheck: 'false', autocomplete: 'off' },
+      attrs: { type: 'text', placeholder: t('actualsimport.mapping_name'), 'aria-label': t('actualsimport.mapping_name'), maxlength: String(MAX_NAME), spellcheck: 'false', autocomplete: 'off' },
     });
-    const save = el('button', { class: 'btn', text: 'Save Mapping', attrs: { type: 'button' } });
+    const save = el('button', { class: 'btn', text: t('actualsimport.save_mapping'), attrs: { type: 'button' } });
     save.addEventListener('click', () => {
       const n = name.value.trim();
       if (!n || !st.preview) {
@@ -324,7 +324,7 @@ export function showDialog(ctx, picked) {
       writePref(PRESETS_PREF, st.presets);
       st.presetName = n;
       renderPresets();
-      ui.presetNote.textContent = `Saved. A file with these column titles will start with "${n}".`;
+      ui.presetNote.textContent = t('actualsimport.saved_note', { name: n });
     });
     ui.presetControls = { select, name };
     ui.presets.replaceChildren(select, name, save);
@@ -332,12 +332,12 @@ export function showDialog(ctx, picked) {
 
   const renderPresets = () => {
     const { select, name } = ui.presetControls;
-    select.replaceChildren(el('option', { text: st.presets.length ? 'Saved mappings…' : 'No saved mappings', attrs: { value: '' } }));
+    select.replaceChildren(el('option', { text: st.presets.length ? t('actualsimport.saved_mappings_pick') : t('actualsimport.no_saved_mappings'), attrs: { value: '' } }));
     for (const p of st.presets) select.append(el('option', { text: p.name, attrs: { value: p.name } }));
     select.value = st.presetName && st.presets.some((p) => p.name === st.presetName) ? st.presetName : '';
     select.disabled = !st.presets.length;
     if (st.presetName && !name.value) name.value = st.presetName;
-    ui.presetNote.textContent = st.presetName ? `Using the saved mapping "${st.presetName}".` : '';
+    ui.presetNote.textContent = st.presetName ? t('actualsimport.using_mapping', { name: st.presetName }) : '';
   };
 
   const renderMapping = () => {
@@ -355,49 +355,49 @@ export function showDialog(ctx, picked) {
       return;
     }
     const unassigned = p.unassigned || 0;
-    let line = `${plural(p.count, 'transaction', 'transactions')} totaling ${money(p.total)} into ${plural(p.accounts, 'account', 'accounts')}`;
-    if (unassigned) line += `, ${unassigned} unassigned`;
-    line += '.';
+    const what = { transactions: t('actualsimport.n_transactions', { count: p.count }), total: money(p.total), accounts: t('actualsimport.n_accounts', { count: p.accounts }) };
+    const sentences = [unassigned ? t('actualsimport.summary_unassigned', { ...what, unassigned }) : t('actualsimport.summary', what)];
     const skipped = p.skipped_count + p.duplicates_skipped;
-    if (skipped) line += ` ${plural(skipped, 'row', 'rows')} skipped.`;
-    if (p.headings) line += ` ${plural(p.headings, 'heading row', 'heading rows')} only set the account below.`;
+    if (skipped) sentences.push(t('actualsimport.rows_skipped', { count: skipped }));
+    if (p.headings) sentences.push(t('actualsimport.heading_rows', { count: p.headings }));
+    const line = sentences.join(' ');
     const parts = [el('p', { class: 'si-summary-main', text: line })];
-    parts.push(el('p', { class: 'modal-message', text: `Actual to date ${money(p.actual_before)} now, ${money(p.actual_after)} after the import.` }));
-    if (p.date_order_found) parts.push(el('p', { class: 'si-more', text: `Dates read ${p.date_order === 'day_first' ? 'day first (30/9/2026)' : 'month first (9/30/2026)'}, as the file's dates show.` }));
+    parts.push(el('p', { class: 'modal-message', text: t('actualsimport.actual_to_date', { before: money(p.actual_before), after: money(p.actual_after) }) }));
+    if (p.date_order_found) parts.push(el('p', { class: 'si-more', text: p.date_order === 'day_first' ? t('actualsimport.dates_read_day_first') : t('actualsimport.dates_read_month_first') }));
     ui.summary.replaceChildren(...parts);
   };
 
   const renderRows = () => {
     const p = st.preview;
     if (!p || !p.transactions.length) {
-      ui.rows.replaceChildren(el('p', { class: 'modal-message', text: p ? 'No transactions will be imported with these choices.' : '' }));
+      ui.rows.replaceChildren(el('p', { class: 'modal-message', text: p ? t('actualsimport.no_transactions') : '' }));
       return;
     }
     const cols = [
-      ['row', 'Row', 'num'],
-      ['date', 'Date', ''],
-      ['account', 'Account', ''],
-      ['vendor', 'Vendor', 'si-desc'],
-      ['description', 'Description', 'si-desc'],
-      ['reference', 'Reference', ''],
-      ['amount', 'Amount', 'num'],
+      ['row', t('actualsimport.col.row'), 'num'],
+      ['date', t('actualsimport.col.date'), ''],
+      ['account', t('actualsimport.col.account'), ''],
+      ['vendor', t('actualsimport.col.vendor'), 'si-desc'],
+      ['description', t('actualsimport.col.description'), 'si-desc'],
+      ['reference', t('actualsimport.col.reference'), ''],
+      ['amount', t('actualsimport.col.amount'), 'num'],
     ];
     const head = el('tr', {}, ...cols.map(([, label, cls]) => el('th', { class: cls, text: label })));
-    const body = p.transactions.map((t) =>
+    const body = p.transactions.map((tx) =>
       el(
         'tr',
         {},
         ...cols.map(([key, , cls]) => {
           let text;
-          if (key === 'amount') text = money(t.amount);
-          else if (key === 'account') text = t.account ? (t.assigned ? `${t.account} ${t.account_name}`.trim() : `${t.account} (unassigned)`) : '(none)';
-          else text = t[key] === null || t[key] === undefined ? '' : String(t[key]);
+          if (key === 'amount') text = money(tx.amount);
+          else if (key === 'account') text = tx.account ? (tx.assigned ? `${tx.account} ${tx.account_name}`.trim() : t('actualsimport.account_unassigned', { account: tx.account })) : t('actualsimport.no_account_cell');
+          else text = tx[key] === null || tx[key] === undefined ? '' : String(tx[key]);
           return el('td', { class: cls, text, title: cls === 'si-desc' ? text : '' });
         }),
       ),
     );
     const table = el('table', { class: 'si-table' }, el('thead', {}, head), el('tbody', {}, ...body));
-    const more = p.count > p.transactions.length ? el('p', { class: 'si-more', text: `The first ${p.transactions.length} of ${p.count} transactions.` }) : null;
+    const more = p.count > p.transactions.length ? el('p', { class: 'si-more', text: t('actualsimport.first_of', { shown: p.transactions.length, count: p.count }) }) : null;
     ui.rows.replaceChildren(...[el('div', { class: 'si-table-wrap' }, table), more].filter(Boolean));
   };
 
@@ -410,15 +410,15 @@ export function showDialog(ctx, picked) {
       return;
     }
     ui.codes.hidden = false;
-    const head = el('tr', {}, el('th', { text: 'Account in the file' }), el('th', { class: 'num', text: 'Rows' }), el('th', { class: 'num', text: 'Amount' }), el('th', { text: 'Import as' }));
+    const head = el('tr', {}, el('th', { text: t('actualsimport.codes.account') }), el('th', { class: 'num', text: t('actualsimport.codes.rows') }), el('th', { class: 'num', text: t('actualsimport.codes.amount') }), el('th', { text: t('actualsimport.codes.import_as') }));
     const body = p.unmatched.map((u) => {
       const select = el('select', {
         class: 'modal-input si-col',
-        attrs: { 'aria-label': `Import account ${u.key || 'none'} as` },
+        attrs: { 'aria-label': u.key ? t('actualsimport.codes.import_account_as', { account: u.key }) : t('actualsimport.codes.import_none_as') },
         data: { siKey: `code-${u.key}` },
       });
-      select.append(el('option', { text: 'Unassigned (keep the number)', attrs: { value: 'keep' } }));
-      select.append(el('option', { text: 'Skip these rows', attrs: { value: 'skip' } }));
+      select.append(el('option', { text: t('actualsimport.codes.keep'), attrs: { value: 'keep' } }));
+      select.append(el('option', { text: t('actualsimport.codes.skip'), attrs: { value: 'skip' } }));
       for (const c of p.chart) select.append(el('option', { text: `${c.code} ${c.name}`.trim(), attrs: { value: `map:${c.code}` } }));
       select.value = u.choice === 'map' ? `map:${u.account}` : u.choice;
       if (select.value === '') select.value = 'keep';
@@ -426,21 +426,22 @@ export function showDialog(ctx, picked) {
         st.codes[u.key] = select.value;
         schedule();
       });
-      const label = u.key ? (u.text && u.text !== u.key ? `${u.text} (${u.key})` : u.key) : '(no account)';
+      const label = u.key ? (u.text && u.text !== u.key ? `${u.text} (${u.key})` : u.key) : t('actualsimport.codes.no_account');
       return el('tr', {}, el('td', { text: label }), el('td', { class: 'num', text: String(u.rows) }), el('td', { class: 'num', text: money(u.amount) }), el('td', {}, select));
     });
     ui.codes.replaceChildren(
-      el('h3', { class: 'si-heading', text: 'Account numbers not in this budget' }),
-      el('p', { class: 'si-more', text: 'Keep them unassigned (the cost report lists them apart, and adding the account later picks them up), skip them, or put them in an account.' }),
+      el('h3', { class: 'si-heading', text: t('actualsimport.codes.heading') }),
+      el('p', { class: 'si-more', text: t('actualsimport.codes.intro') }),
       el('div', { class: 'si-table-wrap' }, el('table', { class: 'si-table' }, el('thead', {}, head), el('tbody', {}, ...body))),
     );
   };
 
+  /** `what`: the heading, with the count in it. */
   const noteList = (items, count, what, open = false) => {
     if (!count) return null;
-    const list = el('ul', { class: 'si-notes' }, ...items.map((n) => el('li', { text: `Row ${n.row}: ${n.message}` })));
-    if (count > items.length) list.append(el('li', { class: 'si-more', text: `and ${count - items.length} more` }));
-    const d = el('details', { class: 'si-details' }, el('summary', { text: `${what} (${count})` }), list);
+    const list = el('ul', { class: 'si-notes' }, ...items.map((n) => el('li', { text: t('actualsimport.row_note', { row: n.row, message: n.message }) })));
+    if (count > items.length) list.append(el('li', { class: 'si-more', text: t('actualsimport.and_more', { count: count - items.length }) }));
+    const d = el('details', { class: 'si-details' }, el('summary', { text: what }), list);
     if (open) d.open = true;
     return d;
   };
@@ -451,15 +452,17 @@ export function showDialog(ctx, picked) {
       ui.details.replaceChildren();
       return;
     }
-    const dups = p.duplicates.map((d) => ({
-      row: d.row,
-      message: `${d.repeats === null ? 'matches a transaction already in this budget' : `repeats row ${d.repeats}`} (${[d.date, d.account, money(d.amount), d.description].filter(Boolean).join(', ')}): ${d.skipped ? 'skipped' : 'imported'}`,
-    }));
+    const dupMessage = (d) => {
+      const details = [d.date, d.account, money(d.amount), d.description].filter(Boolean).join(', ');
+      if (d.repeats === null) return d.skipped ? t('actualsimport.dup.existing_skipped', { details }) : t('actualsimport.dup.existing_imported', { details });
+      return d.skipped ? t('actualsimport.dup.repeat_skipped', { row: d.repeats, details }) : t('actualsimport.dup.repeat_imported', { row: d.repeats, details });
+    };
+    const dups = p.duplicates.map((d) => ({ row: d.row, message: dupMessage(d) }));
     ui.details.replaceChildren(
       ...[
-        noteList(dups, p.duplicate_count, 'Possible duplicates', p.duplicate_count > 0 && p.duplicates_skipped < p.duplicate_count),
-        noteList(p.skipped, p.skipped_count, 'Skipped rows'),
-        noteList(p.warnings, p.warning_count, 'Rows with something left out'),
+        noteList(dups, p.duplicate_count, t('actualsimport.possible_duplicates', { count: p.duplicate_count }), p.duplicate_count > 0 && p.duplicates_skipped < p.duplicate_count),
+        noteList(p.skipped, p.skipped_count, t('actualsimport.skipped_rows', { count: p.skipped_count })),
+        noteList(p.warnings, p.warning_count, t('actualsimport.rows_left_out', { count: p.warning_count })),
       ].filter(Boolean),
     );
   };
@@ -484,13 +487,13 @@ export function showDialog(ctx, picked) {
 
   customDialog(
     (closeDialog) => {
-      const title = el('h2', { class: 'modal-title', text: `Import actuals: ${picked.file}`, attrs: { id: 'ai-title' } });
+      const title = el('h2', { class: 'modal-title', text: t('actualsimport.title', { file: picked.file }), attrs: { id: 'ai-title' } });
       const intro = el('p', {
         class: 'modal-message',
-        text: 'Map the columns of your accounting export. Each transaction is matched to an account by its number, and the cost report adds them up. Nothing changes until you import, and the whole import can be removed later from the Actuals tab.',
+        text: t('actualsimport.intro'),
       });
       ui.top = el('div', { class: 'si-top' });
-      ui.truncated = el('p', { class: 'si-note', text: 'This sheet is larger than the import reads (100,000 rows, 256 columns, 2 million cells): only what was read is shown and imported.' });
+      ui.truncated = el('p', { class: 'si-note', text: t('actualsimport.truncated') });
       ui.truncated.hidden = true;
       ui.presets = el('div', { class: 'si-presets' });
       ui.presetNote = el('p', { class: 'si-more', attrs: { 'aria-live': 'polite' } });
@@ -507,18 +510,18 @@ export function showDialog(ctx, picked) {
         return { b, row: el('label', { class: 'rs-check', attrs: { for: id } }, b, el('span', { text })) };
       };
       const order = el('select', { class: 'modal-input si-col', attrs: { id: 'ai-date-order' } });
-      order.append(el('option', { text: 'As the file’s dates show (month first when they don’t)', attrs: { value: '' } }));
-      order.append(el('option', { text: 'Month first (9/30/2026)', attrs: { value: 'month_first' } }));
-      order.append(el('option', { text: 'Day first (30/9/2026)', attrs: { value: 'day_first' } }));
+      order.append(el('option', { text: t('actualsimport.date_order.auto'), attrs: { value: '' } }));
+      order.append(el('option', { text: t('actualsimport.date_order.month_first'), attrs: { value: 'month_first' } }));
+      order.append(el('option', { text: t('actualsimport.date_order.day_first'), attrs: { value: 'day_first' } }));
       order.value = st.dateOrder;
       order.addEventListener('change', () => {
         st.dateOrder = order.value;
         schedule();
       });
-      const negate = box('ai-negate', 'Costs are negative numbers in this file (flip every sign)', () => st.negate, (v) => (st.negate = v));
-      const carry = box('ai-carry', 'Empty account cells take the account above (reports that name each account once)', () => st.carryAccount, (v) => (st.carryAccount = v));
-      const existing = box('ai-existing', 'Skip rows that match a transaction already in this budget (same date, account, amount and description)', () => st.skipExisting, (v) => (st.skipExisting = v));
-      const repeats = box('ai-repeats', 'Skip rows that repeat an earlier row of the file', () => st.skipRepeats, (v) => (st.skipRepeats = v));
+      const negate = box('ai-negate', t('actualsimport.option.negate'), () => st.negate, (v) => (st.negate = v));
+      const carry = box('ai-carry', t('actualsimport.option.carry'), () => st.carryAccount, (v) => (st.carryAccount = v));
+      const existing = box('ai-existing', t('actualsimport.option.skip_existing'), () => st.skipExisting, (v) => (st.skipExisting = v));
+      const repeats = box('ai-repeats', t('actualsimport.option.skip_repeats'), () => st.skipRepeats, (v) => (st.skipRepeats = v));
       ui.syncOptions = () => {
         order.value = st.dateOrder;
         negate.b.checked = st.negate;
@@ -527,7 +530,7 @@ export function showDialog(ctx, picked) {
       const options = el(
         'div',
         { class: 'si-options' },
-        el('label', { class: 'si-inline', attrs: { for: 'ai-date-order' } }, el('span', { text: 'Dates' }), order),
+        el('label', { class: 'si-inline', attrs: { for: 'ai-date-order' } }, el('span', { text: t('actualsimport.dates') }), order),
         negate.row,
         carry.row,
         existing.row,
@@ -542,8 +545,8 @@ export function showDialog(ctx, picked) {
       ui.error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       ui.error.hidden = true;
 
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ui.ok = el('button', { class: 'btn btn-primary', text: 'Import', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
+      ui.ok = el('button', { class: 'btn btn-primary', text: t('actualsimport.import'), attrs: { type: 'button' } });
       ui.ok.disabled = true;
       cancel.addEventListener('click', () => closeDialog());
       ui.ok.addEventListener('click', async () => {
@@ -568,13 +571,13 @@ export function showDialog(ctx, picked) {
         { class: 'si-scroll' },
         ui.top,
         ui.truncated,
-        el('h3', { class: 'si-heading', text: 'Columns' }),
+        el('h3', { class: 'si-heading', text: t('actualsimport.columns') }),
         ui.presets,
         ui.presetNote,
         ui.mapping,
-        el('h3', { class: 'si-heading', text: 'Options' }),
+        el('h3', { class: 'si-heading', text: t('actualsimport.options') }),
         options,
-        el('h3', { class: 'si-heading', text: 'Preview' }),
+        el('h3', { class: 'si-heading', text: t('actualsimport.preview') }),
         ui.summary,
         ui.rows,
         ui.codes,

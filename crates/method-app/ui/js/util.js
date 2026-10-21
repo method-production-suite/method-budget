@@ -14,11 +14,6 @@ export function str(v) {
   return v === undefined || v === null ? '' : String(v);
 }
 
-/** "1 line", "3 lines". */
-export function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 /** A rejection as text: the message string commands reject with (api.js), or an Error's message. */
 export function errText(e) {
   if (typeof e === 'string') return e;
@@ -67,15 +62,14 @@ export function isHourUnit(units, unit) {
 }
 
 /**
- * How flat fringe `def` counts beyond its unit, as words to add after it:
- * ", plus counts in X and 4X", ", full quantity", ", up to 12 hours a day"
- * (for a fringe charged per hour only). '' for the standard count.
+ * How flat fringe `def` counts beyond its unit: `basis` ('amount', the
+ * standard count; 'amount_counts', plus counts in X and 4X; 'quantity', the
+ * full quantity) and `hours`, its most hours a day ('' when none, or when it
+ * isn't charged per hour). apply.js and report.js each word the whole phrase.
  */
-export function flatCountWords(def, units) {
+export function flatCount(def, units) {
   const d = obj(def);
-  let out = '';
-  if (d.basis === 'amount_counts') out += t('util.flat_count.amount_counts');
-  else if (d.basis === 'quantity') out += t('util.flat_count.quantity');
-  if (str(d.max_hours_per_day) !== '' && isHourUnit(units, d.unit)) out += t('util.flat_count.max_hours', { hours: d.max_hours_per_day });
-  return out;
+  const basis = d.basis === 'amount_counts' || d.basis === 'quantity' ? d.basis : 'amount';
+  const hours = str(d.max_hours_per_day) !== '' && isHourUnit(units, d.unit) ? str(d.max_hours_per_day) : '';
+  return { basis, hours };
 }

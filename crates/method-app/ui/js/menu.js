@@ -17,6 +17,7 @@
 
 import { el } from './dom.js';
 import { setRules } from './sheet.js';
+import { t } from './i18n.js';
 
 let open = null; // { root, anchor, opts, items, typed, typedAt }
 
@@ -453,7 +454,7 @@ function contextTypeAhead(e, lv, buttons, from) {
 function openLevel(items, depth, parent, { at = null, focusFirst = true } = {}) {
   const root = el('div', {
     class: `popup-menu ctx-menu ctx-l${depth}`,
-    attrs: { role: 'menu', 'aria-label': parent ? parent.dataset.label : cm.opts.label || 'Menu' },
+    attrs: { role: 'menu', 'aria-label': parent ? parent.dataset.label : cm.opts.label || t('menu.popup_label') },
     on: { keydown: onContextKey, contextmenu: (e) => e.preventDefault() },
   });
   root.append(...items.map((it, i) => contextItem(it, i, depth)));

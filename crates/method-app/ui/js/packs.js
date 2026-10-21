@@ -25,26 +25,30 @@ import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { selectionState, showReview } from './importsetup.js';
 import { localStamp } from './versions.js';
+import { t } from './i18n.js';
 
 /** Kinds as a pack lists them: [kind, heading]. */
 export const PACK_KINDS = [
-  ['global', 'Globals'],
-  ['fringe', 'Fringes'],
-  ['group', 'Groups'],
-  ['unit', 'Units'],
-  ['set', 'Sets'],
-  ['location', 'Locations'],
-  ['currency', 'Currencies'],
-  ['charge', 'Charges'],
-  ['credit', 'Credits'],
-  ['tag_preset', 'Tag presets'],
-  ['line_preset', 'Line blocks'],
-  ['report_preset', 'Report presets'],
-  ['ot_pattern', 'Overtime patterns'],
-  ['rate_table', 'Rate tables'],
+  ['global', t('library.kind.global')],
+  ['fringe', t('library.kind.fringe')],
+  ['group', t('library.kind.group')],
+  ['unit', t('library.kind.unit')],
+  ['set', t('library.kind.set')],
+  ['location', t('library.kind.location')],
+  ['currency', t('library.kind.currency')],
+  ['charge', t('library.kind.charge')],
+  ['credit', t('library.kind.credit')],
+  ['tag_preset', t('library.kind.tag_preset')],
+  ['line_preset', t('library.kind.line_preset')],
+  ['report_preset', t('library.kind.report_preset')],
+  ['ot_pattern', t('library.kind.ot_pattern')],
+  ['rate_table', t('library.kind.rate_table')],
 ];
 
 const keyOf = (kind, name) => `${kind}\u0000${name}`;
+
+/** A budget file's extension (a pack is a budget file). */
+const BUDGET_EXT = '.mthd';
 
 function str(v) {
   return typeof v === 'string' ? v : '';
@@ -67,9 +71,9 @@ function input(value = '', attrs = {}) {
 }
 
 function textarea(value = '', rows = 2) {
-  const t = el('textarea', { class: 'modal-input pk-text', attrs: { rows: String(rows), spellcheck: 'true' } });
-  t.value = value;
-  return t;
+  const area = el('textarea', { class: 'modal-input pk-text', attrs: { rows: String(rows), spellcheck: 'true' } });
+  area.value = value;
+  return area;
 }
 
 /** The export's items, flat: { kind, name, folder, definition, needs }. */
@@ -128,7 +132,7 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
       const by = needed.get(k);
       r.box.checked = included.has(k);
       r.box.disabled = Boolean(by) && !explicit.has(k);
-      r.comes.textContent = by ? `Comes with ${by.map((x) => x.name).join(', ')}` : '';
+      r.comes.textContent = by ? t('packs.comes_with', { names: by.map((x) => x.name).join(', ') }) : '';
       r.comes.hidden = !by;
     }
     for (const [box, keys] of groupBoxes) {
@@ -137,7 +141,7 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
       box.indeterminate = on > 0 && on < keys.length;
     }
     const n = included.size;
-    summary.textContent = n ? `${n} ${n === 1 ? 'item' : 'items'} in the pack.` : 'Tick the items for the pack.';
+    summary.textContent = n ? t('packs.in_pack', { count: n }) : t('packs.tick_prompt');
     ok.disabled = n === 0;
   };
 
@@ -152,7 +156,7 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
   };
 
   const groupBox = (label, keys, cls) => {
-    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': `Put every item in ${label} in the pack` } });
+    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': t('packs.tick_all', { label }) } });
     box.addEventListener('change', () => tickAll(keys));
     groupBoxes.push([box, keys]);
     return el('label', { class: `rs-check ${cls}` }, box, el('span', { text: label }));
@@ -160,7 +164,7 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
 
   const itemRow = (it) => {
     const k = keyOf(it.kind, it.name);
-    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': `Put ${it.name} in the pack` } });
+    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': t('packs.tick_one', { name: it.name }) } });
     box.addEventListener('change', () => {
       if (box.checked) explicit.add(k);
       else explicit.delete(k);
@@ -180,11 +184,11 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
   };
 
   const form = {
-    title: input(str(data.title), { 'aria-label': 'Pack title' }),
+    title: input(str(data.title), { 'aria-label': t('packs.pack_title') }),
     version: input('', { placeholder: '2026.1' }),
     effective: input('', { type: 'date' }),
-    region: input('', { placeholder: 'Region or jurisdiction' }),
-    author: input('', { placeholder: 'Who made it' }),
+    region: input('', { placeholder: t('packs.region_hint') }),
+    author: input('', { placeholder: t('packs.author_hint') }),
     description: textarea('', 2),
     notes: textarea('', 2),
     urls: textarea('', 2),
@@ -194,48 +198,48 @@ export async function exportPack(ctx, source = 'budget', picked = []) {
     (closeDialog) => {
       const titleId = nextId('pk-title');
       const parts = [
-        el('h2', { class: 'modal-title', text: source === 'library' ? 'Export a setup pack from your library' : `Export a setup pack from ${str(data.source)}`, attrs: { id: titleId } }),
+        el('h2', { class: 'modal-title', text: source === 'library' ? t('packs.export_title_library') : t('packs.export_title', { source: str(data.source) }), attrs: { id: titleId } }),
         el('p', {
           class: 'modal-message',
-          text: 'A setup pack is a budget file with setup items and no lines, to share or keep. Tick what goes in it; what an item needs comes with it. The details say what the pack is and where its figures come from.',
+          text: t('packs.export_intro'),
         }),
       ];
       const scroll = el('div', { class: 'imp-scroll pk-scroll' });
       for (const [kind, heading] of PACK_KINDS) {
         const group = items.filter((it) => it.kind === kind);
         if (!group.length) continue;
-        scroll.append(groupBox(`${heading} (${group.length})`, group.map((it) => keyOf(it.kind, it.name)), 'imp-kind'));
+        scroll.append(groupBox(t('packs.heading_count', { heading, count: group.length }), group.map((it) => keyOf(it.kind, it.name)), 'imp-kind'));
         const folders = [...new Set(group.map((it) => it.folder).filter(Boolean))].sort();
         const unfiled = group.filter((it) => !it.folder);
         if (unfiled.length) scroll.append(el('ul', { class: 'safety-list imp-list' }, ...unfiled.map(itemRow)));
         for (const f of folders) {
           const inFolder = group.filter((it) => it.folder === f);
-          scroll.append(groupBox(`${f} (${inFolder.length})`, inFolder.map((it) => keyOf(it.kind, it.name)), 'pk-folder'));
+          scroll.append(groupBox(t('packs.heading_count', { heading: f, count: inFolder.length }), inFolder.map((it) => keyOf(it.kind, it.name)), 'pk-folder'));
           scroll.append(el('ul', { class: 'safety-list imp-list pk-in-folder' }, ...inFolder.map(itemRow)));
         }
       }
-      if (!items.length) scroll.append(el('p', { class: 'modal-message', text: 'There are no setup items to put in a pack.' }));
+      if (!items.length) scroll.append(el('p', { class: 'modal-message', text: t('packs.export_empty') }));
       parts.push(scroll);
       parts.push(
-        el('h3', { class: 'si-heading', text: 'Details' }),
+        el('h3', { class: 'si-heading', text: t('packs.details') }),
         el(
           'div',
           { class: 'pk-form' },
-          field('Title', form.title),
-          field('Version', form.version),
-          field('Effective date', form.effective),
-          field('Region', form.region),
-          field('Made by', form.author),
-          el('div', { class: 'pk-wide' }, field('Description', form.description)),
-          el('div', { class: 'pk-wide' }, field('Where the figures come from', form.notes)),
-          el('div', { class: 'pk-wide' }, field('Source links (one per line)', form.urls)),
+          field(t('packs.field.title'), form.title),
+          field(t('packs.field.version'), form.version),
+          field(t('packs.field.effective'), form.effective),
+          field(t('packs.field.region'), form.region),
+          field(t('packs.field.author'), form.author),
+          el('div', { class: 'pk-wide' }, field(t('packs.field.description'), form.description)),
+          el('div', { class: 'pk-wide' }, field(t('packs.field.notes'), form.notes)),
+          el('div', { class: 'pk-wide' }, field(t('packs.field.urls'), form.urls)),
         ),
       );
       summary = el('p', { class: 'imp-summary', attrs: { 'aria-live': 'polite' } });
       error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ok = el('button', { class: 'btn btn-primary', text: 'Export Pack…', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
+      ok = el('button', { class: 'btn btn-primary', text: t('packs.export_ok'), attrs: { type: 'button' } });
       cancel.addEventListener('click', () => closeDialog());
       ok.addEventListener('click', async () => {
         const picks = items.filter((it) => explicit.has(keyOf(it.kind, it.name))).map((it) => ({ kind: it.kind, name: it.name }));
@@ -273,15 +277,15 @@ export function detailLines(pack) {
   const d = pack && pack.details;
   if (!d) return [];
   const out = [];
-  for (const [label, v] of [
-    ['Version', d.version],
-    ['Effective', d.effective],
-    ['Region', d.region],
-    ['Made by', d.author],
-    ['Made', str(pack.created).slice(0, 10)],
-    ['From the budget', pack.source_title],
+  for (const [line, v] of [
+    [(value) => t('packs.detail.version', { value }), d.version],
+    [(value) => t('packs.detail.effective', { value }), d.effective],
+    [(value) => t('packs.detail.region', { value }), d.region],
+    [(value) => t('packs.detail.author', { value }), d.author],
+    [(value) => t('packs.detail.created', { value }), str(pack.created).slice(0, 10)],
+    [(value) => t('packs.detail.source', { value }), pack.source_title],
   ]) {
-    if (str(v).trim()) out.push(`${label}: ${str(v).trim()}`);
+    if (str(v).trim()) out.push(line(str(v).trim()));
   }
   return out;
 }
@@ -289,7 +293,7 @@ export function detailLines(pack) {
 /** The review's header: the pack's details and sources, as nodes. */
 function packHeader(pack) {
   if (!pack || !pack.is_pack || !pack.details) {
-    return [el('p', { class: 'modal-message', text: 'This file is not a setup pack; its setup items can still be imported.' })];
+    return [el('p', { class: 'modal-message', text: t('packs.not_a_pack') })];
   }
   const d = pack.details;
   const box = el('div', { class: 'pk-about' });
@@ -297,7 +301,7 @@ function packHeader(pack) {
   const lines = detailLines(pack);
   if (lines.length) box.append(el('div', { class: 'pk-about-line', text: lines.join(' · ') }));
   if (str(d.description).trim()) box.append(el('div', { class: 'pk-about-line', text: d.description }));
-  if (str(d.notes).trim()) box.append(el('div', { class: 'pk-about-line', text: `Sources: ${d.notes}` }));
+  if (str(d.notes).trim()) box.append(el('div', { class: 'pk-about-line', text: t('packs.sources', { notes: d.notes }) }));
   // Links are text: the app never opens them.
   for (const u of d.urls || []) box.append(el('div', { class: 'pk-about-link', text: u, title: u }));
   return [box];
@@ -308,36 +312,30 @@ function reviewText(r) {
   const title = r.pack && r.pack.details ? r.pack.details.title : r.source;
   if (r.into === 'library') {
     return {
-      title: () => `Import ${title} into your library`,
-      intro: "Tick what to copy into your library. What an item needs comes with it. Where the library has an item of the same name set up differently, it keeps its own version unless you choose otherwise. What comes in is marked with the pack's title, version and effective date.",
-      okText: 'Import into Library',
-      keepText: "Keep the library's version",
-      takeText: "Use the pack's version",
-      renameText: (to) => `Add the pack's as ${to}`,
-      choiceTitle: "The pack's version replaces the library's; a new name leaves the library's as it is.",
-      hereLabel: 'Library',
-      otherLabel: 'Pack',
-      status: { new: 'New to the library', same: 'Same in the library', differs: 'Different in the library' },
-      emptyText: 'The pack has no setup items.',
-      doing: 'to import',
-      tickAll: (heading) => `Import every item in ${heading}`,
-      tickOne: (what) => `Import ${what}`,
+      title: () => t('packs.lib.title', { title }),
+      intro: t('packs.lib.intro'),
+      okText: t('packs.lib.ok'),
+      keepText: t('packs.lib.keep'),
+      takeText: t('packs.take'),
+      renameText: (to) => t('packs.rename', { to }),
+      choiceTitle: t('packs.lib.choice_tip'),
+      hereLabel: t('packs.lib.here'),
+      otherLabel: t('packs.other'),
+      status: { new: t('packs.lib.status_new'), same: t('packs.lib.status_same'), differs: t('packs.lib.status_differs') },
+      emptyText: t('packs.review_empty'),
     };
   }
   return {
-    title: () => `Import ${title}`,
-    intro: "Tick what to bring into this budget. What an item needs comes with it. Where this budget has an item of the same name set up differently, it keeps its own version unless you choose otherwise. What comes in is marked with the pack's title, version and effective date.",
-    okText: 'Import',
-    keepText: "Keep this budget's version",
-    takeText: "Use the pack's version",
-    renameText: (to) => `Add the pack's as ${to}`,
-    choiceTitle: "The pack's version replaces this budget's for everything here that uses it; a new name leaves this budget's as it is.",
-    hereLabel: 'Here',
-    otherLabel: 'Pack',
-    emptyText: 'The pack has no setup items.',
-    doing: 'to import',
-    tickAll: (heading) => `Import every item in ${heading}`,
-    tickOne: (what) => `Import ${what}`,
+    title: () => t('packs.title', { title }),
+    intro: t('packs.intro'),
+    okText: t('importsetup.ok'),
+    keepText: t('importsetup.keep'),
+    takeText: t('packs.take'),
+    renameText: (to) => t('packs.rename', { to }),
+    choiceTitle: t('packs.choice_tip'),
+    hereLabel: t('importsetup.here'),
+    otherLabel: t('packs.other'),
+    emptyText: t('packs.review_empty'),
   };
 }
 
@@ -429,59 +427,67 @@ export function packsSection(ctx, opts = {}) {
   if (packsState.view === null && !packsState.loading && !packsState.error) loadPacks(ctx.call, ctx.redraw);
   const refresh = () => loadPacks(ctx.call, ctx.redraw);
   const withRefresh = { ...ctx, refresh };
-  const parts = [el('h3', { class: 'pk-section-title', text: 'Setup packs' })];
+  const parts = [el('h3', { class: 'pk-section-title', text: t('packs.section_title') })];
   parts.push(
     el(
       'div',
       { class: 'library-actions' },
-      smallButton('Export Pack…', 'packs:export', () => exportPack(withRefresh, 'budget'), { title: "Make a setup pack of this budget's setup items" }),
-      smallButton('Import Pack…', 'packs:import', () => importPack(withRefresh, 'budget'), { title: 'Bring setup items from a pack file into this budget' }),
+      smallButton(t('packs.export_btn'), 'packs:export', () => exportPack(withRefresh, 'budget'), { title: t('packs.export_tip') }),
+      smallButton(t('packs.import_btn'), 'packs:import', () => importPack(withRefresh, 'budget'), { title: t('packs.import_tip') }),
       opts.hasLibrary
-        ? smallButton('Export Library…', 'packs:export-library', () => exportPack(withRefresh, 'library'), { title: 'Make a setup pack of items from your library' })
+        ? smallButton(t('packs.export_library_btn'), 'packs:export-library', () => exportPack(withRefresh, 'library'), { title: t('packs.export_library_tip') })
         : null,
       opts.hasLibrary
-        ? smallButton('Import into Library…', 'packs:import-library', () => importPack(withRefresh, 'library'), {
+        ? smallButton(t('packs.import_library_btn'), 'packs:import-library', () => importPack(withRefresh, 'library'), {
             enabled: opts.libraryWritable,
-            title: opts.libraryWritable ? 'Bring setup items from a pack file into your library' : 'The library is open as a tab: change it there',
+            title: opts.libraryWritable ? t('packs.import_library_tip') : t('packs.library_in_tab'),
           })
         : null,
     ),
   );
   const v = packsState.view;
   if (packsState.error) parts.push(el('p', { class: 'setup-error apply-error', text: packsState.error, attrs: { role: 'alert' } }));
-  else if (!v) parts.push(el('p', { class: 'setup-empty', text: 'Looking for packs…' }));
+  else if (!v) parts.push(el('p', { class: 'setup-empty', text: t('packs.looking') }));
   else {
-    const list = el('ul', { class: 'apply-items pk-list', attrs: { 'aria-label': 'Setup packs' } });
+    const list = el('ul', { class: 'apply-items pk-list', attrs: { 'aria-label': t('packs.section_title') } });
     for (const p of v.packs || []) {
       const title = str(p.title) || str(p.file);
-      const meta = [p.version ? `v${p.version}` : '', p.effective ? `effective ${p.effective}` : '', p.region, p.place === 'bundled' ? 'comes with the app' : '', `${p.items} ${p.items === 1 ? 'item' : 'items'}`].filter(Boolean).join(' · ');
-      const head = el('div', { class: 'pk-item-text' }, el('span', { class: 'apply-name', text: title, title: `${str(p.file)}.mthd` }), el('span', { class: 'apply-desc', text: p.problem && !p.items ? p.problem : meta }));
+      const meta = [
+        p.version ? t('packs.meta.version', { version: p.version }) : '',
+        p.effective ? t('packs.meta.effective', { date: p.effective }) : '',
+        p.region,
+        p.place === 'bundled' ? t('packs.meta.bundled') : '',
+        t('packs.meta.items', { count: p.items }),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      const head = el('div', { class: 'pk-item-text' }, el('span', { class: 'apply-name', text: title, title: `${str(p.file)}${BUDGET_EXT}` }), el('span', { class: 'apply-desc', text: p.problem && !p.items ? p.problem : meta }));
       const actions = el(
         'div',
         { class: 'library-actions' },
-        smallButton('Add to This Budget…', `packs:add:${p.token}`, () => reviewListed(withRefresh, p.token, 'budget'), { enabled: p.items > 0 }),
-        opts.hasLibrary ? smallButton('Add to Library…', `packs:lib:${p.token}`, () => reviewListed(withRefresh, p.token, 'library'), { enabled: p.items > 0 && opts.libraryWritable }) : null,
+        smallButton(t('packs.add_to_budget'), `packs:add:${p.token}`, () => reviewListed(withRefresh, p.token, 'budget'), { enabled: p.items > 0 }),
+        opts.hasLibrary ? smallButton(t('packs.add_to_library'), `packs:lib:${p.token}`, () => reviewListed(withRefresh, p.token, 'library'), { enabled: p.items > 0 && opts.libraryWritable }) : null,
       );
       list.append(el('li', { class: 'pk-item' }, head, actions));
     }
     if (!(v.packs || []).length) {
-      parts.push(el('p', { class: 'setup-empty', text: 'No packs yet. Packs you export to your Packs folder, or drop into it, are listed here.' }));
+      parts.push(el('p', { class: 'setup-empty', text: t('packs.none_yet') }));
     }
     parts.push(list);
     parts.push(
       el(
         'div',
         { class: 'library-actions' },
-        smallButton('Show Packs Folder', 'packs:reveal', async () => {
+        smallButton(t('packs.show_folder'), 'packs:reveal', async () => {
           try {
             await ctx.call('packs_reveal', {});
           } catch (e) {
             ctx.toast(e);
           }
         }, { title: str(v.folder) }),
-        smallButton('Refresh', 'packs:refresh', refresh, { title: 'Look for packs again' }),
+        smallButton(t('packs.refresh'), 'packs:refresh', refresh, { title: t('packs.refresh_tip') }),
       ),
     );
   }
-  return el('section', { class: 'pk-section', attrs: { 'aria-label': 'Setup packs' } }, ...parts);
+  return el('section', { class: 'pk-section', attrs: { 'aria-label': t('packs.section_title') } }, ...parts);
 }

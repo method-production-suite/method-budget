@@ -15,6 +15,7 @@
 // kit's el() (textContent only).
 
 import { invoke } from './api.js';
+import { t } from './i18n.js';
 
 // { doc, q, plan } while a preview is open.
 let pending = null;
@@ -74,7 +75,7 @@ function section(k, tbody, title, changes) {
   for (const c of changes) {
     const bad = c.new === '';
     const cls = bad ? 'rn-bad' : c.old === c.new ? 'rn-same' : null;
-    tbody.append(row(k, cls, [c.old, bad ? 'Doesn’t fit' : c.new]));
+    tbody.append(row(k, cls, [c.old, bad ? t('renumber.doesnt_fit') : c.new]));
   }
 }
 
@@ -82,7 +83,7 @@ function section(k, tbody, title, changes) {
 export function previewBox(k, ck, p, onCancel) {
   const box = k.el('div', 'rn-box');
   box.setAttribute('role', 'group');
-  box.setAttribute('aria-label', 'Renumber accounts');
+  box.setAttribute('aria-label', t('renumber.label'));
   const { plan, q } = p;
   const moved = [...plan.categories, ...plan.accounts].filter((c) => c.old !== c.new).length;
   box.append(
@@ -90,37 +91,37 @@ export function previewBox(k, ck, p, onCancel) {
       'p',
       'setup-hint',
       plan.conflicts.length
-        ? 'Some numbers can’t be carried over to this pattern. Fix them first, or choose another pattern, or change the pattern only.'
-        : `${k.plural(moved, 'number changes', 'numbers change')} with the new pattern. Renumbering also updates the charges, credits, report setups and original totals that name them.`,
+        ? t('renumber.conflicts')
+        : t('renumber.moved', { count: moved }),
     ),
   );
   const table = k.el('table', 'rn-table');
   const thead = k.el('thead');
   const hr = k.el('tr');
-  for (const h of ['Now', 'Becomes']) {
+  for (const h of [t('renumber.now'), t('renumber.becomes')]) {
     const th = k.el('th', null, h);
     th.scope = 'col';
     hr.append(th);
   }
   thead.append(hr);
   const tbody = k.el('tbody');
-  section(k, tbody, 'Categories', plan.categories);
-  section(k, tbody, 'Accounts', plan.accounts);
-  section(k, tbody, 'Fringe accounts', plan.fringe_accounts);
+  section(k, tbody, t('renumber.categories'), plan.categories);
+  section(k, tbody, t('renumber.accounts'), plan.accounts);
+  section(k, tbody, t('renumber.fringe_accounts'), plan.fringe_accounts);
   table.append(thead, tbody);
   const host = k.el('div', 'rn-table-host');
   host.append(table);
   box.append(host);
   const list = (items, cls) => {
     const ul = k.el('ul', `rn-list ${cls}`);
-    for (const t of items) ul.append(k.el('li', null, t));
+    for (const text of items) ul.append(k.el('li', null, text));
     return ul;
   };
   if (plan.conflicts.length) box.append(list(plan.conflicts, 'rn-conflicts'));
   if (plan.warnings.length) box.append(list(plan.warnings, 'setup-hint'));
 
   const actions = k.el('div', 'setup-confirm-actions');
-  const renumber = k.el('button', 'setup-btn setup-btn-primary', 'Renumber accounts to the new pattern');
+  const renumber = k.el('button', 'setup-btn setup-btn-primary', t('renumber.renumber'));
   renumber.type = 'button';
   renumber.disabled = plan.conflicts.length > 0;
   renumber.addEventListener('click', () => {
@@ -129,7 +130,7 @@ export function previewBox(k, ck, p, onCancel) {
     k.setFocusKey(k.key('settings', 'coding', 'category_width'));
     k.run(ck, () => ['renumber_accounts', args(q)], { onError: () => k.setFocusKey(null) });
   });
-  const only = k.el('button', 'setup-btn', 'Change the pattern only');
+  const only = k.el('button', 'setup-btn', t('renumber.pattern_only'));
   only.type = 'button';
   only.addEventListener('click', () => {
     if (k.isBusy()) return;
@@ -137,7 +138,7 @@ export function previewBox(k, ck, p, onCancel) {
     k.setFocusKey(k.key('settings', 'coding', 'category_width'));
     k.run(ck, () => ['set_account_coding', args(q)], { onError: () => k.setFocusKey(null) });
   });
-  const cancel = k.el('button', 'setup-btn setup-btn-quiet', 'Cancel');
+  const cancel = k.el('button', 'setup-btn setup-btn-quiet', t('modal.cancel'));
   cancel.type = 'button';
   cancel.addEventListener('click', () => {
     pending = null;

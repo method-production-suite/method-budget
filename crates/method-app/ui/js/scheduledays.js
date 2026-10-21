@@ -16,46 +16,48 @@
 
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
-import { plural } from './util.js';
+import { t } from './i18n.js';
 
-/** The groups the figures are listed under, in order. */
+/** The groups the figures are listed under, in order: [kind, heading with the count]. */
 const GROUPS = [
-  ['total', 'Shoot days'],
-  ['missing', 'Set from this schedule before, no longer in it (tick to set to 0)'],
-  ['unit', 'Shoot days by unit'],
-  ['set', 'Shoot days by set'],
-  ['location', 'Shoot days by location'],
-  ['week', 'Shoot days by week'],
+  ['total', (count) => t('scheduledays.group.total', { count })],
+  ['missing', (count) => t('scheduledays.group.missing', { count })],
+  ['unit', (count) => t('scheduledays.group.unit', { count })],
+  ['set', (count) => t('scheduledays.group.set', { count })],
+  ['location', (count) => t('scheduledays.group.location', { count })],
+  ['week', (count) => t('scheduledays.group.week', { count })],
 ];
 
 /** What a row would do, in words. */
 export function rowStatus(f) {
   if (f.problem) return f.problem;
-  if (f.changed) return 'Changed in the schedule';
-  if (f.action === 'add') return 'New global';
-  if (f.action === 'update') return 'New value';
-  return f.linked ? 'Up to date' : 'Same value';
+  if (f.changed) return t('scheduledays.status.changed');
+  if (f.action === 'add') return t('scheduledays.status.new_global');
+  if (f.action === 'update') return t('scheduledays.status.new_value');
+  return f.linked ? t('scheduledays.status.up_to_date') : t('scheduledays.status.same_value');
 }
 
 /** The review's first line: the schedule, its sub-board and its days. */
 export function scheduleLine(r) {
   const where = [r.board, r.sub_board].filter((s) => s && s.trim()).join(', ');
-  let s = `${r.schedule || 'Untitled schedule'}${where ? ` (${where})` : ''}: ${plural(r.shoot_days, 'shoot day', 'shoot days')}`;
-  if (r.end && r.end !== r.start) s += `, ${r.start} to ${r.end}`;
-  else if (r.shoot_days) s += `, ${r.start}`;
-  return `${s}.`;
+  const name = r.schedule || t('scheduledays.untitled');
+  const schedule = where ? `${name} (${where})` : name;
+  const days = t('scheduledays.n_shoot_days', { count: r.shoot_days });
+  if (r.end && r.end !== r.start) return t('scheduledays.line_range', { schedule, days, start: r.start, end: r.end });
+  if (r.shoot_days) return t('scheduledays.line_start', { schedule, days, start: r.start });
+  return t('scheduledays.line', { schedule, days });
 }
 
 /** What Set Globals would do, in one sentence. */
 export function applyLine(r) {
   const parts = [];
-  if (r.adds) parts.push(plural(r.adds, 'new global', 'new globals'));
-  if (r.updates) parts.push(plural(r.updates, 'global changes', 'globals change'));
-  if (r.same) parts.push(plural(r.same, 'global already matches', 'globals already match'));
-  if (!parts.length) return 'Nothing is picked.';
+  if (r.adds) parts.push(t('scheduledays.apply.adds', { count: r.adds }));
+  if (r.updates) parts.push(t('scheduledays.apply.updates', { count: r.updates }));
+  if (r.same) parts.push(t('scheduledays.apply.same', { count: r.same }));
+  if (!parts.length) return t('scheduledays.apply.nothing');
   let s = `${parts.join(', ')}.`;
   const unlinked = r.figures.filter((f) => f.picked && !f.linked).length;
-  if (unlinked && r.can_apply) s += ` Set Globals marks ${unlinked === 1 ? 'it' : 'them'} as set from this schedule, so the next import finds ${unlinked === 1 ? 'it' : 'them'} again.`;
+  if (unlinked && r.can_apply) s += ` ${t('scheduledays.apply.marks', { count: unlinked })}`;
   return s;
 }
 
@@ -137,17 +139,17 @@ export function showScheduleDays(ctx, first) {
   };
 
   const figureRow = (f) => {
-    const cb = el('input', { attrs: { type: 'checkbox', 'aria-label': `Set a global from ${f.label}` }, data: { key: f.key, role: 'use' } });
+    const cb = el('input', { attrs: { type: 'checkbox', 'aria-label': t('scheduledays.use_aria', { figure: f.label }) }, data: { key: f.key, role: 'use' } });
     cb.checked = f.picked;
     cb.addEventListener('change', () => setPick(f, cb.checked, f.global));
     const name = el('input', {
       class: 'modal-input sd-global',
-      attrs: { type: 'text', list: 'sd-globals', spellcheck: 'false', autocomplete: 'off', 'aria-label': `Global for ${f.label}` },
+      attrs: { type: 'text', list: 'sd-globals', spellcheck: 'false', autocomplete: 'off', 'aria-label': t('scheduledays.global_aria', { figure: f.label }) },
       data: { key: f.key, role: 'global' },
     });
     name.value = f.global;
     name.addEventListener('change', () => setPick(f, true, name.value.trim()));
-    const now = f.current === null || f.current === undefined ? 'none' : f.current_value ? `${f.current} (${f.current_value})` : f.current;
+    const now = f.current === null || f.current === undefined ? t('scheduledays.none') : f.current_value ? `${f.current} (${f.current_value})` : f.current;
     const cls = [f.problem ? 'si-differs' : '', f.picked ? '' : 'sd-off'].filter(Boolean).join(' ');
     return el(
       'tr',
@@ -177,12 +179,12 @@ export function showScheduleDays(ctx, first) {
           el(
             'tr',
             {},
-            el('th', { text: 'Use' }),
-            el('th', { text: 'Figure' }),
-            el('th', { class: 'num', text: 'Days' }),
-            el('th', { text: 'Global' }),
-            el('th', { class: 'num', text: 'Now' }),
-            el('th', { class: 'num', text: 'New' }),
+            el('th', { text: t('scheduledays.col.use') }),
+            el('th', { text: t('scheduledays.col.figure') }),
+            el('th', { class: 'num', text: t('scheduledays.col.days') }),
+            el('th', { text: t('scheduledays.col.global') }),
+            el('th', { class: 'num', text: t('scheduledays.col.now') }),
+            el('th', { class: 'num', text: t('scheduledays.col.new') }),
             el('th', { text: '' }),
           ),
         ),
@@ -193,21 +195,22 @@ export function showScheduleDays(ctx, first) {
   const renderTop = () => {
     const r = st.review;
     const parts = [el('p', { class: 'si-summary-main', text: scheduleLine(r) })];
-    if (r.generated) parts.push(el('p', { class: 'si-note', text: `Written ${r.generated}.` }));
+    if (r.generated) parts.push(el('p', { class: 'si-note', text: t('scheduledays.written', { when: r.generated }) }));
     if (r.changed.length) {
-      parts.push(el('p', { class: 'si-bad', text: `The schedule changed since these globals were set from it: ${r.changed.join(', ')}.` }));
+      parts.push(el('p', { class: 'si-bad', text: t('scheduledays.changed', { names: r.changed.join(', ') }) }));
     }
     if (r.notes.length) {
       parts.push(
-        el('details', { class: 'si-details', attrs: { open: true } }, el('summary', { text: `Notes on the file (${r.notes.length})` }), el('ul', { class: 'si-notes' }, ...r.notes.map((n) => el('li', { text: n })))),
+        el('details', { class: 'si-details', attrs: { open: true } }, el('summary', { text: t('scheduledays.notes', { count: r.notes.length }) }), el('ul', { class: 'si-notes' }, ...r.notes.map((n) => el('li', { text: n })))),
       );
     }
     ui.top.replaceChildren(...parts);
   };
 
-  const group = (name, open, rows) => {
-    const d = el('details', { class: 'si-details', attrs: { open: st.open.has(name) ? st.open.get(name) : open } }, el('summary', { text: `${name} (${rows.length})` }), table(rows));
-    d.addEventListener('toggle', () => st.open.set(name, d.open));
+  // `id`: the group's name in st.open; `heading`: its words, with the count.
+  const group = (id, heading, open, rows) => {
+    const d = el('details', { class: 'si-details', attrs: { open: st.open.has(id) ? st.open.get(id) : open } }, el('summary', { text: heading }), table(rows));
+    d.addEventListener('toggle', () => st.open.set(id, d.open));
     return d;
   };
 
@@ -217,17 +220,18 @@ export function showScheduleDays(ctx, first) {
     const a = document.activeElement;
     const focused = a && a.dataset && a.dataset.key ? [a.dataset.key, a.dataset.role] : null;
     const parts = [];
-    for (const [kind, label] of GROUPS) {
+    for (const [kind, heading] of GROUPS) {
       const rows = r.figures.filter((f) => f.kind === kind);
       if (!rows.length) continue;
       const open = kind === 'total' || kind === 'missing' || kind === 'location' || rows.some((f) => f.picked);
-      parts.push(group(label, open, rows));
+      parts.push(group(kind, heading(rows.length), open, rows));
     }
     const elements = r.figures.filter((f) => f.kind === 'element');
-    const categories = [...new Set(elements.map((f) => f.category || 'Other'))];
+    const other = t('scheduledays.other_category');
+    const categories = [...new Set(elements.map((f) => f.category || other))];
     for (const c of categories) {
-      const rows = elements.filter((f) => (f.category || 'Other') === c);
-      parts.push(group(`${c} days`, rows.some((f) => f.picked), rows));
+      const rows = elements.filter((f) => (f.category || other) === c);
+      parts.push(group(`element:${c}`, t('scheduledays.group.category', { category: c, count: rows.length }), rows.some((f) => f.picked), rows));
     }
     ui.figures.replaceChildren(...parts);
     if (focused) {
@@ -259,10 +263,10 @@ export function showScheduleDays(ctx, first) {
 
   customDialog(
     (closeDialog) => {
-      const title = el('h2', { class: 'modal-title', text: `Import schedule days: ${first.file}`, attrs: { id: 'sd-title' } });
+      const title = el('h2', { class: 'modal-title', text: t('scheduledays.title', { file: first.file }), attrs: { id: 'sd-title' } });
       const intro = el('p', {
         class: 'modal-message',
-        text: 'Day counts from a schedule set the budget’s globals. Shoot days in all go to SHOOT_DAYS; tick any other figure to set a global from it, and name the global. Prep and wrap globals are left alone. Nothing changes until you set the globals.',
+        text: t('scheduledays.intro'),
       });
       ui.top = el('div', { class: 'si-summary', attrs: { 'aria-live': 'polite' } });
       ui.figures = el('div', { class: 'si-detail-list' });
@@ -270,8 +274,8 @@ export function showScheduleDays(ctx, first) {
       ui.list = el('datalist', { attrs: { id: 'sd-globals' } });
       ui.error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       ui.error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ui.ok = el('button', { class: 'btn btn-primary', text: 'Set Globals', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
+      ui.ok = el('button', { class: 'btn btn-primary', text: t('scheduledays.set_globals'), attrs: { type: 'button' } });
       cancel.addEventListener('click', () => closeDialog());
       ui.ok.addEventListener('click', async () => {
         if (ui.ok.disabled) return;
@@ -292,9 +296,9 @@ export function showScheduleDays(ctx, first) {
         'div',
         { class: 'si-scroll' },
         ui.top,
-        el('h3', { class: 'si-heading', text: 'Figures and globals' }),
+        el('h3', { class: 'si-heading', text: t('scheduledays.figures_heading') }),
         ui.figures,
-        el('h3', { class: 'si-heading', text: 'What Set Globals does' }),
+        el('h3', { class: 'si-heading', text: t('scheduledays.apply_heading') }),
         ui.summary,
         ui.list,
       );

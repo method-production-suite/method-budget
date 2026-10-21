@@ -194,7 +194,9 @@ const ADD_TEXT = {
   otherLabel: t('library.add.other'),
   status: { new: t('library.add.status_new'), same: t('library.add.status_same'), differs: t('library.add.status_differs') },
   emptyText: t('library.add.empty'),
-  doing: t('library.add.doing'),
+  picked: (count) => t('library.add.picked', { count }),
+  pickedAlong: (count, along) => t('library.add.picked_along', { count, along }),
+  tickPrompt: t('library.add.tick_prompt'),
   tickAll: (heading) => t('library.add.tick_all', { heading }),
   tickOne: (what) => t('library.add.tick_one', { what }),
 };
@@ -212,7 +214,9 @@ const SAVE_TEXT = {
   otherLabel: t('library.save.other'),
   status: { new: t('library.save.status_new'), same: t('library.save.status_same'), differs: t('library.save.status_differs') },
   emptyText: t('library.save.empty'),
-  doing: t('library.save.doing'),
+  picked: (count) => t('library.save.picked', { count }),
+  pickedAlong: (count, along) => t('library.save.picked_along', { count, along }),
+  tickPrompt: t('library.save.tick_prompt'),
   tickAll: (heading) => t('library.save.tick_all', { heading }),
   tickOne: (what) => t('library.save.tick_one', { what }),
 };
