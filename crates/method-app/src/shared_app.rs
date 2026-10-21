@@ -28,6 +28,8 @@ use crate::view::View;
 
 /// File > Share…, answered in the web view (the dialog).
 pub const SHARE_ITEM: &str = "file.share";
+/// File > Join from Link…, answered in the web view (decisions.md, entry 97).
+pub const JOIN_ITEM: &str = "file.join_link";
 
 /// Events to the main window.
 /// Changes by other people arrived (or an outside edit was taken in):
@@ -438,6 +440,166 @@ pub fn share_decline_request(
     Ok(sh.status(Instant::now()))
 }
 
+// ---------------------------------------------------------------------------
+// Invites (decisions.md, entry 97; docs/APP.md, "Inviting someone")
+
+/// Invite someone in the Share dialog: records an invite giving `role`
+/// (`scope`: a department editor's category numbers) for `days` days in
+/// budget `doc`, and returns its link, which holds the invite's secret and
+/// is shown once: nothing keeps it.
+#[tauri::command]
+pub fn share_create_invite(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    role: String,
+    scope: Option<Vec<String>>,
+    days: u64,
+) -> Result<shared::CreatedInvite, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.create_invite(&role, &scope.unwrap_or_default(), days)
+}
+
+/// Cancels invite `invite` (32 hex characters) in budget `doc`. Returns the
+/// status.
+#[tauri::command]
+pub fn share_cancel_invite(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    invite: String,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.cancel_invite(&invite)?;
+    Ok(sh.status(Instant::now()))
+}
+
+/// What the Join from Link dialog needs once a link is pasted: the file it
+/// names, and this person's name and color.
+#[derive(Clone, Debug, Serialize)]
+pub struct JoinSetup {
+    pub file: String,
+    pub name: String,
+    pub color: String,
+    pub colors: Vec<&'static str>,
+}
+
+/// Checks a pasted invite link (nothing is opened or written). The error is
+/// a sentence for the person.
+#[tauri::command]
+pub fn share_join_check(link: String) -> Result<JoinSetup, String> {
+    let l = crate::invite_link::InviteLink::parse(&link)?;
+    let actor = this_actor()?;
+    let me = this_person(actor);
+    Ok(JoinSetup {
+        file: l.file,
+        name: me.name,
+        color: me.color,
+        colors: shared::COLORS.to_vec(),
+    })
+}
+
+/// What joining from a link did: the budget joined, in front, and the role
+/// the invite gave, or why it wasn't taken up (the budget stays open, read
+/// only, so the person can try again once the invite arrives).
+#[derive(Clone, Debug, Serialize)]
+pub struct JoinOut {
+    pub view: View,
+    pub role_text: Option<String>,
+    pub error: Option<String>,
+}
+
+/// File > Join from Link…: checks `link`, asks for the budget's `.mthd` in
+/// this person's copy of the shared folder in Rust's own dialog (unless that
+/// budget is open already), checks it is the budget the link is for, opens
+/// and joins it as this computer's actor with name and color `me`, and takes
+/// up the invite. `None` when the dialog was cancelled.
+#[tauri::command]
+pub async fn share_join_from_link<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    link: String,
+    me: Person,
+) -> Result<Option<JoinOut>, String> {
+    let l = crate::invite_link::InviteLink::parse(&link)?;
+    let actor = this_actor()?;
+    let me = Person::tidy(&me.name, &me.color, actor);
+    if me.name.is_empty() {
+        return Err("Type the name other people will see.".into());
+    }
+    shared::write_person(shared::person_path().as_deref(), &me);
+    // The budget open already (a second try): no dialog.
+    let open = {
+        let docs = state.docs();
+        docs.ids().into_iter().find(|id| {
+            docs.get(*id)
+                .and_then(Session::shared)
+                .is_some_and(|sh| sh.budget_id() == l.budget)
+        })
+    };
+    let id = match open {
+        Some(id) => {
+            state.docs().switch(id)?;
+            id
+        }
+        None => {
+            let Some(path) = crate::app::pick_budget(
+                &window,
+                &format!("Choose \u{201c}{}\u{201d} in your shared folder", l.file),
+                None,
+            )?
+            else {
+                return Ok(None);
+            };
+            if !method_format::log::is_shared(&path) {
+                return Err(format!(
+                    "There is no shared change log beside {}. Pick \u{201c}{}\u{201d} in the shared folder it was shared through, once it has synced to this computer.",
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                    l.file
+                ));
+            }
+            let info = method_format::log::LogDir::for_budget(&path)
+                .info()
+                .map_err(|e| e.0)?;
+            if info.budget_id != l.budget {
+                return Err(shared::wrong_budget(&l.file));
+            }
+            let safety = window.state::<crate::safety_app::Safety>();
+            let id = crate::safety_app::open_path(&state, &safety, &path)?;
+            crate::safety_app::refresh_menu(window.app_handle());
+            id
+        }
+    };
+    let mut s = state.lock_doc(Some(id))?;
+    // What reached the folder since, the invite included.
+    s.share_tick(Instant::now());
+    let result = match s.shared_mut() {
+        Some(sh) => {
+            sh.set_me(me);
+            sh.join_invite(&l)
+        }
+        None => Err(
+            "This budget opened on its own, without its shared changes, so the invite can\u{2019}t be used here."
+                .into(),
+        ),
+    };
+    let view = finish(&window, &mut s, None);
+    Ok(Some(match result {
+        Ok(role) => JoinOut {
+            view,
+            role_text: Some(role),
+            error: None,
+        },
+        Err(e) => JoinOut {
+            view,
+            role_text: None,
+            error: Some(e),
+        },
+    }))
+}
+
 /// Start Again… in the status panel (docs/research/owner-key.md, part 1):
 /// on the owner's computer, when a key in the owner's name isn't its own, a
 /// new shared budget from this one takes the log folder's place. The budget
@@ -652,6 +814,10 @@ mod tests {
             "share_withdraw_request",
             "share_allow_request",
             "share_decline_request",
+            "share_create_invite",
+            "share_cancel_invite",
+            "share_join_check",
+            "share_join_from_link",
         ] {
             assert!(APP_RS.contains(&format!("crate::shared_app::{c},")), "{c}");
         }

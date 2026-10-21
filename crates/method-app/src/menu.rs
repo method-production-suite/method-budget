@@ -119,6 +119,8 @@ pub const FILE: &[Entry] = &[
     plain("file.save_share_copy"),
     // Working together through a shared folder (src/shared_app.rs).
     plain("file.share"),
+    // Taking up an invite someone sent (decisions.md, entry 97).
+    plain("file.join_link"),
     SEP,
     plain("file.import_setup"),
     // Setup packs: setup items to share, with where they came from (src/packs.rs).

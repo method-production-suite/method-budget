@@ -1731,6 +1731,13 @@ holding one has `format` 3. A program that reads only version 2 (Method Budget 0
 refuses the folder as newer than it reads, as above, rather than accepting a change written
 in someone else's name. A log without roles never reaches 3.
 
+It is 4 from the first invite on (decisions.md, entry 97): the computer writing the first
+`invite`, `claim` or `cancel_invite` raises it before writing the segment, and every segment
+holding one has `format` 4; segments without one keep the format they were written at, byte
+for byte. A program that reads only version 3 (Method Budget 0.7.0 and older) would refuse a
+change holding an op it doesn't know, so it refuses the folder as newer than it reads, as
+above. A log nobody was ever invited to never reaches 4.
+
 ### Segment files
 
 A segment is UTF-8 text: a header line, then one change per line, each a single-line
@@ -1828,10 +1835,51 @@ budget it knew there, its owner and the owner's key; a log with a new budget id 
 file whose genesis actor isn't that owner is refused, and the owner's key it knew is
 remembered for the new budget too (a different key is then held, as above).
 
-These three (the owner's first `grant`, the owner's first `key`, each `revoke`) judge changes
-outside their own future, so a reader that applied a change before one of them arrived
-folds every change it holds again, in the order it took them, with all three known, until
-nothing more changes. The result is the same whatever order changes arrive in.
+**Invites** (decisions.md, entry 97). Someone who may give a role (by the rules of a
+`grant` to a person with no role) records an `invite`: a random 128-bit `id`, the `role`
+and `scope` it gives, when it `expires`, and `key`, the Ed25519 public key whose 32-byte
+seed is the invite's secret. The secret is never written anywhere in the folder: only the
+link the inviter sends holds it. An invite counts as a role given ahead: from it on, as
+from the first `grant`, an actor without a role reads only, and the owner's first one is
+the owner's first role (signing starts with it, above).
+
+A newcomer takes it up with a `claim` in a change of their own actor (their `key` in the
+same change or before, so it is signed): `invite` names it and `proof` is the invite key's
+Ed25519 signature (128 hex characters) over the bytes `method-budget-log claim v1`, a
+newline, the invite's id (32 hex characters), a newline and the claiming actor (64 hex
+characters). A proof names its actor, so a claim seen in the folder can't be copied into
+anyone else's name. A reader refuses and lists a claim (reason prefix `invite: `) when its
+`lamport` isn't above that of every change in its `deps` (as the reader took them in,
+applied or refused; checked for claims only, since changes written before version 4 may
+not satisfy it); when the invite isn't within the claim's `deps`; when the proof doesn't verify against the invite's
+`key`; when the claiming actor is (or writes for) the owner; when the claim's own `time` is
+later than `expires` (both RFC 3339); when the inviter's role at the claim's `deps` no
+longer lets them give that role to the claimant; and, judged against changes the claim may
+never have seen:
+
+- **cancelled**: a `cancel_invite` of it exists and the claim is not within that change's
+  `deps` (a cutoff, like `revoke`: a claim the canceller had seen stands). A `revoke` of the
+  inviter that the invite hadn't seen cuts claims of their invites the same way;
+- **used**: another claim of the same invite stands that is within this claim's `deps`, or
+  that was made apart from it (neither within the other's `deps`) with a lower
+  `(lamport, actor, seq)`.
+
+A claim that stands gives its actor the invite's `role` as a `grant` would, ranked as the
+inviter ranked at the claim's `deps`. A `cancel_invite` may name a used invite.
+
+**Sealing.** What a claim says it saw can't be checked, so a writer that may give an
+invite's role writes a `cancel_invite` for it as soon as it has applied a claim of it (the
+claim it saw stands; any other made outside its `deps` is cut), and when it sees it unused
+past `expires` by its own clock. It writes none when a cancel is already in; two written at
+once both stand and agree. Until a granter has seen the real claim, a claim that says it saw
+only the invite can still win; after, it can't. Expiry rests on the claim's own `time` only
+until a granter seals the invite.
+
+These (the owner's first `grant`, the owner's first `key`, each `revoke`, each `claim` and
+each `cancel_invite`) judge changes outside their own future, so a reader that applied a
+change before one of them arrived folds every change it holds again, in the order it took
+them, with all of them known, until nothing more changes. The result is the same whatever
+order changes arrive in.
 
 ### Operations
 
@@ -1852,6 +1900,9 @@ the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `n
 | `acts_for` | `person` | The change's actor writes for `person`: a command line or agent on that person's computer, which writes as an actor of its own so it never shares a sequence of changes with the app (decisions.md, entry 78). It has the person's role. Refused (judged at the change's `deps`) unless roles are already set; unless `person` is the owner or has a role; when the actor is the owner's, has a role of its own, writes for someone already, or has a change kept that was made once roles were set; and when `person` itself writes for someone. So it is a new program's first word, and never raises a person's own actor. A segment holding one has `format` 2 like a `grant`. |
 | `key` | `key` | The change's actor's Ed25519 public key, 64 hex characters (below). Once per actor; the change is signed with it. Any role may publish one. A segment holding one has `format` 3. |
 | `revoke` | `actor` | Removes a person: `read_only` and a cutoff at this change's `deps` (below). Who may give it follows `grant`. A segment holding one has `format` 3. |
+| `invite` | `id`, `role`, `scope`, `expires`, `key` | An invite (Signatures, "Invites"): `id` 32 hex characters, `role` and `scope` as in `grant`, `expires` an RFC 3339 time, `key` the public key of the secret in the link (64 hex characters). Who may give it follows a `grant` to a person with no role. A segment holding one has `format` 4. |
+| `claim` | `invite`, `proof` | Takes up invite `invite` for the change's actor; `proof` is the invite key's signature naming that actor. A segment holding one has `format` 4. |
+| `cancel_invite` | `invite` | Cancels an invite: claims outside this change's `deps` are refused. Given by the invite's maker, or anyone who may give its role. A segment holding one has `format` 4. |
 | `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. A grant made after seeing another for the same person replaces it; among grants made apart (none saw the others), the one whose granter ranked higher when giving it wins (owner, then co-owner, then admin), then the later stamp. |
 
 **Roles.** The actor of the first change (the genesis) owns the budget. Until a `grant`
@@ -1952,9 +2003,9 @@ only when there are any, the whole list as one value) and a row's `rate_source`
    dependencies haven't arrived when its number is settled is weighed again when they do.
    A refused change never keeps the real one out.
 4. A change that must be signed and isn't, or whose signature doesn't match its author's
-   key, is refused and listed; so is one made by a removed person after the cutoff, and one
-   by a stranger to the first role that goes beyond read only (see Signatures). The actor's
-   count moves past it.
+   key, is refused and listed; so is one made by a removed person after the cutoff, one
+   by a stranger to the first role that goes beyond read only, and a claim of an invite
+   that doesn't stand (see Signatures). The actor's count moves past it.
 5. The budget is a pure function of the applied changes, with these repairs made on the
    way out and never written back: two live rows with one id (the later shows with an id
    derived from its creating op, in the shared range `[2^32, 2^53)`); two live items of
@@ -1974,6 +2025,8 @@ readers refuse a newer version with a message to update.
 - **Version 2** (2026-10-18): `grant` and `acts_for` (roles; decisions.md, entry 78).
 - **Version 3** (2026-10-20): `key`, `revoke` and the `sig` field (signed changes and
   removal by cutoff; decisions.md, entry 89).
+- **Version 4** (2026-10-21): `invite`, `claim` and `cancel_invite` (invite links;
+  decisions.md, entry 97).
 
 ## Review files
 

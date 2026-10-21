@@ -1475,3 +1475,196 @@ fn a_removed_person_asks_and_is_let_back_in() {
     assert_eq!(st.me.role, "editor");
     assert!(!st.me.removed);
 }
+
+// ---------------------------------------------------------------------------
+// Invite links (decisions.md, entry 97)
+
+const RILEY: ActorId = ActorId([6; 32]);
+const MORGAN: ActorId = ActorId([7; 32]);
+
+/// Every file under `dir`, read as text (the shared folder's contents).
+fn folder_text(dir: &std::path::Path) -> String {
+    let mut out = String::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else {
+                out.push_str(&String::from_utf8_lossy(&std::fs::read(&p).unwrap()));
+            }
+        }
+    }
+    out
+}
+
+/// A session that opens the shared budget at `path` as `who`, with key `k`.
+fn newcomer(path: &std::path::Path, who: ActorId, name: &str, k: u8) -> Session {
+    let mut s = Session::open(path).unwrap();
+    s.join_shared(who, person(name, "green")).unwrap();
+    s.shared_mut().unwrap().use_key(key(k)).unwrap();
+    s
+}
+
+#[test]
+fn an_invite_link_lets_someone_new_join_with_its_role_once() {
+    use method_app::invite_link::{base64url, InviteLink};
+
+    let (path, mut alex, mut jordan) = signed_sessions();
+    let cat = category_of(&alex, "50-01");
+    // Jordan edits everything but doesn't give roles, so can't invite.
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(!st.can_invite && st.invites.is_empty());
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .create_invite("editor", &[], 7)
+        .is_err());
+    // Alex invites someone to edit one category, for a week.
+    let sh = alex.shared_mut().unwrap();
+    assert!(
+        sh.create_invite("department", &[], 7).is_err(),
+        "no category"
+    );
+    assert!(
+        sh.create_invite("editor", &[], 3).is_err(),
+        "1, 7 or 30 days"
+    );
+    let made = sh
+        .create_invite("department", std::slice::from_ref(&cat), 7)
+        .unwrap();
+    assert!(
+        made.link.starts_with("methodbudget:join?v=1&b="),
+        "{}",
+        made.link
+    );
+    assert!(made.role_text.starts_with("Edits "), "{}", made.role_text);
+    let link = InviteLink::parse(&made.link).unwrap();
+    assert_eq!(link.file, "Feature.mthd");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.can_invite);
+    assert_eq!(st.invites.len(), 1);
+    assert_eq!(st.invites[0].state, "open");
+    assert_eq!(st.invites[0].by, "Alex Kim");
+    assert!(st.invites[0].can_cancel);
+    exchange(&mut alex, &mut jordan);
+    // The secret is in the link only: never in the shared folder.
+    let folder = alex.shared().unwrap().folder().to_path_buf();
+    let text = folder_text(&folder);
+    assert!(text.contains(r#""op":"invite""#));
+    assert!(!text.contains(&base64url(&link.secret)));
+    assert!(!text.contains(&method_core::log::ids::hex(&link.secret)));
+    let info = std::fs::read_to_string(folder.join("budget.json")).unwrap();
+    assert!(info.contains("\"version\": 4"), "{info}");
+
+    // Riley opens the budget in their copy of the folder and joins from the
+    // link: the role it gives, nothing more.
+    let mut riley = newcomer(&path, RILEY, "Riley", 6);
+    assert!(riley.shared().unwrap().role().reads_only());
+    let role = riley.shared_mut().unwrap().join_invite(&link).unwrap();
+    assert_eq!(role, made.role_text);
+    let line = first_line(&riley, "50-01");
+    riley.set_detail_field(line, "rate", "777").unwrap();
+    let other = account_outside(&riley, &cat);
+    let outside = first_line(&riley, &other);
+    let e = riley
+        .set_detail_field(outside, "rate", "1")
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("lines and notes in"), "{e}");
+    tick_at(&mut riley, 3);
+    // Heartbeats are read every few seconds.
+    tick_at(&mut alex, 30);
+    assert_eq!(rate_of(&alex, line), "777");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
+    let r = st.people.iter().find(|p| p.actor == RILEY.hex()).unwrap();
+    assert_eq!(r.role, "department");
+    assert_eq!(r.name, "Riley");
+    assert_eq!(st.invites.len(), 1);
+    assert_eq!(st.invites[0].state, "used");
+    assert_eq!(st.invites[0].joined.as_deref(), Some("Riley"));
+    assert!(!st.invites[0].can_cancel);
+    // Alex's app sealed the used invite as soon as Riley's claim arrived:
+    // one cancel, written to the folder, and none again on the next pass.
+    let seals = |s: &Session| {
+        s.shared()
+            .unwrap()
+            .log()
+            .changes()
+            .flat_map(|c| &c.ops)
+            .filter(|op| matches!(op, Op::CancelInvite { .. }))
+            .count()
+    };
+    assert_eq!(seals(&alex), 1);
+    tick_at(&mut alex, 40);
+    assert_eq!(seals(&alex), 1);
+    // Cancelling it by hand is allowed and changes nothing for Riley.
+    let used = st.invites[0].id.clone();
+    alex.shared_mut().unwrap().cancel_invite(&used).unwrap();
+    assert_eq!(seals(&alex), 1, "already sealed");
+    // Riley already has a role: the link is no use to them again.
+    let e = riley.shared_mut().unwrap().join_invite(&link).unwrap_err();
+    assert!(e.contains("already have a role"), "{e}");
+
+    // Used once: Morgan, with the same link, is refused.
+    let mut morgan = newcomer(&path, MORGAN, "Morgan", 7);
+    let e = morgan.shared_mut().unwrap().join_invite(&link).unwrap_err();
+    assert!(e.contains("already used"), "{e}");
+    assert!(morgan.shared().unwrap().role().reads_only());
+
+    // Cancelled: a second invite, cancelled before Morgan uses it.
+    let second = alex
+        .shared_mut()
+        .unwrap()
+        .create_invite("comment", &[], 1)
+        .unwrap();
+    let second_link = InviteLink::parse(&second.link).unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    let open = st.invites.iter().find(|i| i.state == "open").unwrap();
+    assert_eq!(open.role, "comment");
+    alex.shared_mut().unwrap().cancel_invite(&open.id).unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(
+        st.invites.iter().all(|i| i.state == "used"),
+        "a cancelled one isn't listed"
+    );
+    tick_at(&mut alex, 3);
+    tick_at(&mut morgan, 6);
+    let e = morgan
+        .shared_mut()
+        .unwrap()
+        .join_invite(&second_link)
+        .unwrap_err();
+    assert!(e.contains("cancelled"), "{e}");
+
+    // Not here yet: an invite this computer hasn't seen says to try again.
+    let third = alex
+        .shared_mut()
+        .unwrap()
+        .create_invite("comment", &[], 30)
+        .unwrap();
+    let third_link = InviteLink::parse(&third.link).unwrap();
+    let e = morgan
+        .shared_mut()
+        .unwrap()
+        .join_invite(&third_link)
+        .unwrap_err();
+    assert!(e.contains("try again"), "{e}");
+    tick_at(&mut alex, 3);
+    tick_at(&mut morgan, 6);
+    let role = morgan
+        .shared_mut()
+        .unwrap()
+        .join_invite(&third_link)
+        .unwrap();
+    assert_eq!(role, "Notes only");
+
+    // A link for another shared budget is refused in words.
+    let mut wrong = third_link.clone();
+    wrong.budget = "0".repeat(64);
+    let e = riley.shared_mut().unwrap().join_invite(&wrong).unwrap_err();
+    assert!(e.contains("different shared budget"), "{e}");
+    assert!(!e.contains('\u{2014}') && !e.contains('!'), "{e}");
+}

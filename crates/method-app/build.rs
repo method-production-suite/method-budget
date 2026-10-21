@@ -277,6 +277,10 @@ const COMMANDS: &[&str] = &[
     "share_withdraw_request",
     "share_allow_request",
     "share_decline_request",
+    "share_create_invite",
+    "share_cancel_invite",
+    "share_join_check",
+    "share_join_from_link",
     // The personal setup library (src/library.rs)
     "library_view",
     "library_create",

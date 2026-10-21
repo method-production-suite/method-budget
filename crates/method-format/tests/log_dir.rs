@@ -656,10 +656,10 @@ fn the_first_role_starts_signing_and_raises_the_log_format_to_3() {
         }
     }
 
-    // A program that reads only format 2 (Method Budget 0.4.0 to 0.7.0) refuses a
-    // folder at 3 as newer than it reads, rather than taking in changes it
-    // can't check; this one reads 3.
-    assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_SIGNED);
+    // A program that reads only format 2 refuses a folder at 3 as newer
+    // than it reads, rather than taking in changes it can't check; this one
+    // reads 3 (and 4, for invites).
+    assert_eq!(log::LOG_FORMAT_SIGNED, 3);
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -1223,5 +1223,111 @@ fn a_genuine_start_again_joins_silently_where_the_real_key_was_known() {
     let (riley, report) = log::open_in(&path, actor(3), Ids::seeded(7), Some(&riley_keys)).unwrap();
     assert!(report.rejected.is_empty(), "{:?}", report.rejected);
     assert_eq!(riley.log.key_of(actor(1)), Some(real));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------
+// Invites (decisions.md, entry 97)
+
+fn header_format(seg: &std::path::Path) -> u64 {
+    let text = fs::read_to_string(seg).unwrap();
+    let v: serde_json::Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
+    v["segment"]["format"].as_u64().unwrap()
+}
+
+#[test]
+fn an_invite_raises_the_log_format_to_4_and_a_newcomer_joins_with_it() {
+    use method_core::log::{invite::rfc3339_secs, Role, Uid};
+
+    let dir = temp_dir("invite");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    let signed = log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    assert_eq!(info_version(&alex.dir), 3, "no invite yet: 3, as before");
+    let signed_bytes = fs::read(&signed).unwrap();
+
+    // The invite: its secret never reaches the folder, only its key.
+    let secret = [0x5a; 32];
+    let id = Uid(0x1234);
+    let expires = "2026-10-19T14:03:22Z";
+    assert!(rfc3339_secs(expires).is_some());
+    alex.log
+        .invite(
+            id,
+            Role::Comment,
+            expires,
+            log::sign::invite_key(&secret),
+            "Invite",
+            T,
+        )
+        .unwrap();
+    let seg = log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    assert_eq!(info_version(&alex.dir), 4);
+    assert_eq!(header_format(&seg), 4);
+    let text = fs::read_to_string(&seg).unwrap();
+    assert!(text.contains(r#""op":"invite""#), "{text}");
+    assert!(!text.contains(&method_core::log::ids::hex(&secret)));
+    // The segment written before it is unchanged, byte for byte.
+    assert_eq!(fs::read(&signed).unwrap(), signed_bytes);
+    assert_eq!(header_format(&signed), 3);
+
+    // Riley's computer joins the folder and takes up the invite.
+    let (mut riley, report) = log::open(&path, actor(6), Ids::seeded(6)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    keyed(&mut riley.log, 6);
+    assert_eq!(riley.log.role_of(actor(6)), Role::ReadOnly);
+    riley
+        .log
+        .claim(
+            id,
+            log::sign::claim_proof(&secret, id, actor(6)),
+            "Joined",
+            T,
+        )
+        .unwrap();
+    let seg = log::flush(&riley.log, &riley.dir).unwrap().unwrap();
+    assert_eq!(header_format(&seg), 4);
+    // Copying Riley's claim into Morgan's name doesn't work: the proof names
+    // Riley.
+    let (mut morgan, _) = log::open(&path, actor(7), Ids::seeded(7)).unwrap();
+    keyed(&mut morgan.log, 7);
+    let e = morgan
+        .log
+        .claim(
+            id,
+            log::sign::claim_proof(&secret, id, actor(6)),
+            "Joined",
+            T,
+        )
+        .unwrap_err();
+    assert!(e.to_string().contains("secret"), "{e}");
+
+    // Every reader checks the claim with real Ed25519 and gives the role.
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(reader.log.role_of(actor(6)), Role::Comment);
+    assert_eq!(reader.log.invite_claimant(id), Some(actor(6)));
+
+    // A reader of format 3 (Method Budget 0.7.0 and older) refuses this
+    // folder as newer than it reads: `budget.json` says 4, and that reader
+    // compares it with its own 3 exactly as this one compares 99 here.
+    let info = dir.join("Feature.mthd-log").join("budget.json");
+    let text = fs::read_to_string(&info).unwrap();
+    assert!(text.contains("\"version\": 4"), "{text}");
+    fs::write(&info, text.replace("\"version\": 4", "\"version\": 99")).unwrap();
+    let Err(err) = log::open(&path, actor(9), Ids::seeded(9)) else {
+        panic!("a folder newer than this program reads was opened");
+    };
+    assert!(
+        err.0.contains("newer than this program reads (4)"),
+        "{}",
+        err.0
+    );
+    assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_INVITES);
     let _ = fs::remove_dir_all(&dir);
 }

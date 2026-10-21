@@ -191,6 +191,29 @@ pub struct GrantWrite {
     pub removed: bool,
 }
 
+/// An invite as the state keeps it (decisions.md, entry 97): who made it,
+/// in which change and having seen what, and what it gives.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InviteRecord {
+    pub id: Uid,
+    /// The actor whose change made it (a program's invite is its person's).
+    pub by: ActorId,
+    pub change: ChangeId,
+    pub deps: Frontier,
+    /// When it was made, the author's clock (display only).
+    pub time: String,
+    pub role: Role,
+    /// RFC 3339: a claim made after this is refused.
+    pub expires: String,
+    /// The public half of the key whose seed is the link's secret.
+    pub key: PublicKey,
+    /// The claim taken in, when it was used: who joined, and the change.
+    pub claimed: Option<ChangeId>,
+    /// The change that cancelled it, when one is applied (the lowest, when
+    /// more than one is).
+    pub cancelled: Option<ChangeId>,
+}
+
 /// Why a change cannot be applied: it names something that doesn't
 /// exist, or would put an entity where its kind can't go. A change that
 /// fails is skipped whole.
@@ -228,6 +251,8 @@ pub struct State {
     /// Each actor's published key and the change that published it
     /// (decisions.md, entry 89).
     keys: BTreeMap<ActorId, (PublicKey, ChangeId)>,
+    /// Every invite applied, by id (decisions.md, entry 97).
+    invites: BTreeMap<Uid, InviteRecord>,
 }
 
 impl Default for State {
@@ -250,7 +275,13 @@ impl State {
             links: BTreeMap::new(),
             judged: std::collections::BTreeSet::new(),
             keys: BTreeMap::new(),
+            invites: BTreeMap::new(),
         }
+    }
+
+    /// Every invite applied, by id, with whether it was used or cancelled.
+    pub fn invites(&self) -> &BTreeMap<Uid, InviteRecord> {
+        &self.invites
     }
 
     /// `actor`'s published key and the change that published it.
@@ -466,6 +497,34 @@ impl State {
                     }
                 }
                 Op::Grant { .. } | Op::Revoke { .. } => {}
+                Op::Invite { id, role, .. } => {
+                    if self.invites.contains_key(id)
+                        || change.ops[..index]
+                            .iter()
+                            .any(|o| matches!(o, Op::Invite { id: other, .. } if other == id))
+                    {
+                        return Err(bad(index, "the invite already exists".into()));
+                    }
+                    if *role == Role::Owner {
+                        return Err(bad(index, "ownership isn't given with an invite".into()));
+                    }
+                }
+                Op::Claim { .. } => {
+                    if change
+                        .ops
+                        .iter()
+                        .filter(|o| matches!(o, Op::Claim { .. }))
+                        .count()
+                        > 1
+                    {
+                        return Err(bad(index, "one claim per change".into()));
+                    }
+                }
+                Op::CancelInvite { invite } => {
+                    if !self.invites.contains_key(invite) {
+                        return Err(bad(index, "the invite does not exist".into()));
+                    }
+                }
                 Op::Key { .. } => {
                     if change
                         .ops
@@ -496,7 +555,7 @@ impl State {
         if self.genesis.is_none() {
             self.genesis = Some(change.id());
         }
-        if access::started_at(&self.grants, &change.deps) {
+        if access::started(self, &change.deps) {
             self.judged.insert(change.actor);
         }
         for (index, op) in change.ops.iter().enumerate() {
@@ -596,6 +655,55 @@ impl State {
                 }
                 Op::Key { key } => {
                     self.keys.entry(change.actor).or_insert((*key, change.id()));
+                }
+                Op::Invite {
+                    id,
+                    role,
+                    expires,
+                    key,
+                } => {
+                    self.invites.entry(*id).or_insert(InviteRecord {
+                        id: *id,
+                        by: change.actor,
+                        change: change.id(),
+                        deps: change.deps.clone(),
+                        time: change.time.clone(),
+                        role: role.clone(),
+                        expires: expires.clone(),
+                        key: *key,
+                        claimed: None,
+                        cancelled: None,
+                    });
+                }
+                Op::Claim { invite, .. } => {
+                    // Judged before it is applied (`super::invite`): the
+                    // claimant gets the invite's role as a grant by the
+                    // inviter, ranked as the inviter was where the claim was
+                    // made.
+                    if let Some(rec) = self.invites.get(invite).cloned() {
+                        let w = GrantWrite {
+                            role: rec.role.clone(),
+                            rank: access::rank(&access::role_at(self, rec.by, &change.deps)),
+                            deps: change.deps.clone(),
+                            removed: false,
+                        };
+                        match self.grants.get_mut(&change.actor) {
+                            Some(r) => r.write(stamp, w),
+                            None => {
+                                self.grants.insert(change.actor, Register::new(stamp, w));
+                            }
+                        }
+                        if let Some(r) = self.invites.get_mut(invite) {
+                            r.claimed.get_or_insert(change.id());
+                        }
+                    }
+                }
+                Op::CancelInvite { invite } => {
+                    // The lowest cancel, so every order agrees on it.
+                    if let Some(r) = self.invites.get_mut(invite) {
+                        let id = change.id();
+                        r.cancelled = Some(r.cancelled.map_or(id, |c| c.min(id)));
+                    }
                 }
                 Op::ActsFor { person } => match self.links.get_mut(&change.actor) {
                     Some(r) => r.write(stamp, *person),

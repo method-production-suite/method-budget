@@ -1510,6 +1510,10 @@ pub fn run() {
             crate::shared_app::share_withdraw_request,
             crate::shared_app::share_allow_request,
             crate::shared_app::share_decline_request,
+            crate::shared_app::share_create_invite,
+            crate::shared_app::share_cancel_invite,
+            crate::shared_app::share_join_check,
+            crate::shared_app::share_join_from_link,
             // The personal setup library (src/library.rs)
             crate::library::library_view,
             crate::library::library_create,

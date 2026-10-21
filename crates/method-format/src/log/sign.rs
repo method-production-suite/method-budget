@@ -49,6 +49,70 @@ impl Verifier for Ed25519 {
         vk.verify_strict(&message(change), &EdSignature::from_bytes(&sig.0))
             .is_ok()
     }
+
+    fn verify_message(&self, key: &PublicKey, message: &[u8], sig: &Signature) -> bool {
+        let Ok(vk) = VerifyingKey::from_bytes(&key.0) else {
+            return false;
+        };
+        vk.verify_strict(message, &EdSignature::from_bytes(&sig.0))
+            .is_ok()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Invites (decisions.md, entry 97)
+
+/// An invite's secret: 32 bytes, the seed of an Ed25519 key. Only ever in the
+/// link; the log holds its public key ([`invite_key`]).
+pub type InviteSecret = [u8; 32];
+
+/// A fresh invite secret from the system's random numbers.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn new_invite_secret() -> Result<InviteSecret, LogFileError> {
+    let mut seed = [0u8; 32];
+    getrandom::fill(&mut seed)
+        .map_err(|e| LogFileError(format!("no random numbers for an invite: {e}")))?;
+    Ok(seed)
+}
+
+/// In a browser there are no system random numbers here: invites are made
+/// by the desktop app.
+#[cfg(target_arch = "wasm32")]
+pub fn new_invite_secret() -> Result<InviteSecret, LogFileError> {
+    Err(LogFileError("invites are made by the desktop app".into()))
+}
+
+/// A fresh random invite id (16 bytes from the same source).
+#[cfg(not(target_arch = "wasm32"))]
+pub fn new_invite_id() -> Result<method_core::log::Uid, LogFileError> {
+    let mut b = [0u8; 16];
+    getrandom::fill(&mut b)
+        .map_err(|e| LogFileError(format!("no random numbers for an invite: {e}")))?;
+    Ok(method_core::log::Uid(u128::from_le_bytes(b).max(1)))
+}
+
+/// In a browser: see [`new_invite_secret`].
+#[cfg(target_arch = "wasm32")]
+pub fn new_invite_id() -> Result<method_core::log::Uid, LogFileError> {
+    Err(LogFileError("invites are made by the desktop app".into()))
+}
+
+/// The public key an invite with `secret` publishes.
+pub fn invite_key(secret: &InviteSecret) -> PublicKey {
+    KeyPair::from_seed(*secret).public()
+}
+
+/// The proof that `actor` holds invite `invite`'s secret: the invite key's
+/// signature over [`method_core::log::invite::claim_message`].
+pub fn claim_proof(
+    secret: &InviteSecret,
+    invite: method_core::log::Uid,
+    actor: method_core::log::ActorId,
+) -> Signature {
+    use ed25519_dalek::Signer as _;
+    let k = SigningKey::from_bytes(secret);
+    let m = method_core::log::invite::claim_message(invite, actor);
+    Signature(k.sign(&m).to_bytes())
 }
 
 /// A key pair: what this computer signs its changes with.
@@ -184,6 +248,25 @@ mod tests {
         assert!(!Ed25519.verify(&k.public(), &bare));
         // Signing twice gives the same bytes (Ed25519 is deterministic).
         assert_eq!(k.sign(&c), k.sign(&bare));
+    }
+
+    #[test]
+    fn a_claim_proof_checks_for_its_actor_only() {
+        use method_core::log::invite::claim_message;
+        let secret = [5u8; 32];
+        let key = invite_key(&secret);
+        let invite = Uid(42);
+        let p = claim_proof(&secret, invite, ActorId([1; 32]));
+        assert!(Ed25519.verify_message(&key, &claim_message(invite, ActorId([1; 32])), &p));
+        // Copied into someone else's name, or for another invite, it fails;
+        // so does another secret's proof.
+        assert!(!Ed25519.verify_message(&key, &claim_message(invite, ActorId([2; 32])), &p));
+        assert!(!Ed25519.verify_message(&key, &claim_message(Uid(43), ActorId([1; 32])), &p));
+        let other = claim_proof(&[6u8; 32], invite, ActorId([1; 32]));
+        assert!(!Ed25519.verify_message(&key, &claim_message(invite, ActorId([1; 32])), &other));
+        // Fresh secrets and ids differ.
+        assert_ne!(new_invite_secret().unwrap(), new_invite_secret().unwrap());
+        assert_ne!(new_invite_id().unwrap(), new_invite_id().unwrap());
     }
 
     #[test]

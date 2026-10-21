@@ -35,7 +35,7 @@ use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
 /// The highest log format version this build reads.
-pub const LOG_FORMAT_VERSION: u64 = 3;
+pub const LOG_FORMAT_VERSION: u64 = 4;
 /// The version a log is written at until someone is given a role.
 pub const LOG_FORMAT_BASE: u64 = 1;
 /// The version from the first role on (decisions.md, entry 78): `budget.json`
@@ -47,9 +47,25 @@ pub const LOG_FORMAT_ROLES: u64 = 2;
 /// change say 3, so a program that can't check signatures refuses the
 /// folder as newer than it reads rather than taking in unsigned changes.
 pub const LOG_FORMAT_SIGNED: u64 = 3;
+/// The version from the first invite on (decisions.md, entry 97):
+/// `budget.json` and every segment holding an `invite`, a `claim` or a
+/// `cancel_invite` say 4, so a program that reads only 3 (Method Budget
+/// 0.7.0 and older) refuses the folder as newer than it reads rather than
+/// failing on an op it doesn't know.
+pub const LOG_FORMAT_INVITES: u64 = 4;
 
 /// The format a segment holding `changes` is written at.
 fn format_for(changes: &[Change]) -> u64 {
+    if changes.iter().any(|c| {
+        c.ops.iter().any(|op| {
+            matches!(
+                op,
+                Op::Invite { .. } | Op::Claim { .. } | Op::CancelInvite { .. }
+            )
+        })
+    }) {
+        return LOG_FORMAT_INVITES;
+    }
     if changes.iter().any(|c| {
         c.sig.is_some()
             || c.ops
@@ -281,6 +297,53 @@ enum FileOp {
     Revoke {
         actor: String,
     },
+    /// An invite (decisions.md, entry 97): the role it gives (`scope` as
+    /// a grant's), when it expires (RFC 3339), and the public key whose
+    /// secret is in the link.
+    Invite {
+        id: String,
+        role: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        scope: Vec<String>,
+        expires: String,
+        key: String,
+    },
+    /// An invite taken up: the invite key's signature over the invite and
+    /// the change's actor.
+    Claim {
+        invite: String,
+        proof: String,
+    },
+    /// An invite cancelled.
+    #[serde(rename = "cancel_invite")]
+    CancelInvite {
+        invite: String,
+    },
+}
+
+/// A role and its scope as a `grant` or an `invite` writes them.
+fn role_scope(role: &Role) -> (String, Vec<String>) {
+    (
+        role.key().into(),
+        role.scope()
+            .map(|s| s.iter().map(Uid::hex).collect())
+            .unwrap_or_default(),
+    )
+}
+
+/// A role read back from a `grant` or an `invite`.
+fn parse_role(role: &str, scope: &[String]) -> Result<Role, String> {
+    let scope = scope
+        .iter()
+        .map(|u| parse_uid(u))
+        .collect::<Result<_, String>>()?;
+    Role::parse(role, scope).ok_or_else(|| {
+        if Role::parse(role, Default::default()).is_some() {
+            format!("a scope on role {role:?}, which takes none")
+        } else {
+            format!("unknown role {role:?}")
+        }
+    })
 }
 
 fn parse_field(s: &str) -> Result<Field, String> {
@@ -358,13 +421,35 @@ impl From<&Op> for FileOp {
             },
             Op::Key { key } => FileOp::Key { key: key.hex() },
             Op::Revoke { actor } => FileOp::Revoke { actor: actor.hex() },
-            Op::Grant { actor, role } => FileOp::Grant {
-                actor: actor.hex(),
-                role: role.key().into(),
-                scope: role
-                    .scope()
-                    .map(|s| s.iter().map(Uid::hex).collect())
-                    .unwrap_or_default(),
+            Op::Grant { actor, role } => {
+                let (role, scope) = role_scope(role);
+                FileOp::Grant {
+                    actor: actor.hex(),
+                    role,
+                    scope,
+                }
+            }
+            Op::Invite {
+                id,
+                role,
+                expires,
+                key,
+            } => {
+                let (role, scope) = role_scope(role);
+                FileOp::Invite {
+                    id: uid_text(id),
+                    role,
+                    scope,
+                    expires: expires.clone(),
+                    key: key.hex(),
+                }
+            }
+            Op::Claim { invite, proof } => FileOp::Claim {
+                invite: uid_text(invite),
+                proof: proof.hex(),
+            },
+            Op::CancelInvite { invite } => FileOp::CancelInvite {
+                invite: uid_text(invite),
             },
         }
     }
@@ -452,22 +537,29 @@ impl TryFrom<FileOp> for Op {
             FileOp::Revoke { actor } => Op::Revoke {
                 actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
             },
-            FileOp::Grant { actor, role, scope } => {
-                let scope = scope
-                    .iter()
-                    .map(|u| parse_uid(u))
-                    .collect::<Result<_, String>>()?;
-                Op::Grant {
-                    actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
-                    role: Role::parse(&role, scope).ok_or_else(|| {
-                        if Role::parse(&role, Default::default()).is_some() {
-                            format!("a scope on role {role:?}, which takes none")
-                        } else {
-                            format!("unknown role {role:?}")
-                        }
-                    })?,
-                }
-            }
+            FileOp::Grant { actor, role, scope } => Op::Grant {
+                actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
+                role: parse_role(&role, &scope)?,
+            },
+            FileOp::Invite {
+                id,
+                role,
+                scope,
+                expires,
+                key,
+            } => Op::Invite {
+                id: parse_uid(&id)?,
+                role: parse_role(&role, &scope)?,
+                expires,
+                key: PublicKey::parse(&key).ok_or_else(|| format!("bad key {key:?}"))?,
+            },
+            FileOp::Claim { invite, proof } => Op::Claim {
+                invite: parse_uid(&invite)?,
+                proof: Signature::parse(&proof).ok_or_else(|| format!("bad proof {proof:?}"))?,
+            },
+            FileOp::CancelInvite { invite } => Op::CancelInvite {
+                invite: parse_uid(&invite)?,
+            },
         })
     }
 }
@@ -2349,6 +2441,78 @@ mod tests {
             let line = change_to_json(c);
             assert_eq!(&change_from_json(&line).unwrap(), c);
         }
+    }
+
+    /// Invites, claims and cancels (decisions.md, entry 97) round-trip, and
+    /// only a segment holding one is written at format 4.
+    #[test]
+    fn invite_ops_round_trip_and_raise_only_their_segment_to_4() {
+        let ops = vec![
+            Op::Invite {
+                id: Uid(0xabc),
+                role: Role::Department([Uid(7)].into_iter().collect()),
+                expires: "2026-10-28T09:00:00Z".into(),
+                key: PublicKey([3; 32]),
+            },
+            Op::Invite {
+                id: Uid(0xabd),
+                role: Role::Comment,
+                expires: "2026-10-22T09:00:00Z".into(),
+                key: PublicKey([4; 32]),
+            },
+            Op::Claim {
+                invite: Uid(0xabc),
+                proof: Signature([5; 64]),
+            },
+            Op::CancelInvite { invite: Uid(0xabd) },
+        ];
+        let change = Change {
+            actor: actor(1),
+            seq: 1,
+            deps: Frontier::new(),
+            lamport: 1,
+            time: "2026-10-21T00:00:00Z".into(),
+            label: "Invites".into(),
+            ops,
+            sig: None,
+        };
+        let line = change_to_json(&change);
+        for op in [
+            r#""op":"invite""#,
+            r#""op":"claim""#,
+            r#""op":"cancel_invite""#,
+            r#""expires":"2026-10-28T09:00:00Z""#,
+            r#""scope":["#,
+        ] {
+            assert!(line.contains(op), "{op}: {line}");
+        }
+        let back = change_from_json(&line).unwrap();
+        assert_eq!(back, change);
+        assert_eq!(change_to_json(&back), line);
+        // A scope on a role that takes none is refused, as in a grant.
+        let bad = line.replacen(r#""role":"department""#, r#""role":"editor""#, 1);
+        assert!(change_from_json(&bad).unwrap_err().contains("scope"));
+        assert_eq!(
+            format_for(std::slice::from_ref(&change)),
+            LOG_FORMAT_INVITES
+        );
+        // Each op alone raises it; a signed change without one stays at 3.
+        for op in &change.ops {
+            let one = Change {
+                ops: vec![op.clone()],
+                ..change.clone()
+            };
+            assert_eq!(format_for(&[one]), LOG_FORMAT_INVITES, "{op:?}");
+        }
+        let signed = Change {
+            ops: vec![Op::Key {
+                key: PublicKey([9; 32]),
+            }],
+            ..change.clone()
+        };
+        assert_eq!(format_for(&[signed]), LOG_FORMAT_SIGNED);
+        let header = String::from_utf8(segment_bytes(&[change]).unwrap()).unwrap();
+        assert!(header.starts_with(r#"{"segment":{"format":4,"#), "{header}");
     }
 
     #[test]

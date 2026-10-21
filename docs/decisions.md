@@ -5093,3 +5093,149 @@ choices.
   budget is opened again there, another of the owner's computers still seeing it and
   allowing it; a removed person asking, withdrawing, asking again and being let back in.
   Shared commands registered in app.rs, build.rs and the capability (the existing tests).
+
+## 97. Invite links: File > Join from Link…, signed, single-use, expiring (2026-10-21, the owner's decision)
+
+Roadmap 3.18's open decision on invite links (the roadmap's "Invite links for shared
+budgets"; docs/research/collaboration.md 7 and 9.1). The owner (relayed 2026-10-21): "Method
+Budget invite links use option (a), File > Join from Link, now." Clickable `methodbudget://`
+links (option b: Tauri's deep-link plugin, single-instance handling, a static join page) are
+a later item. No new dependency. Docs/APP.md, "Inviting someone" and "Joining from a link",
+says what a person sees; docs/FORMAT.md, "Invites" and "Operations", has the file rules;
+this records the choices.
+
+- **Three ops, format 4.** `invite {id, role, scope, expires, key}`, `claim {invite, proof}`
+  and `cancel_invite {invite}` (`method_core::log::invite`). Strict readers refuse unknown
+  ops, so the first of them raises the log format to 4 (`LOG_FORMAT_INVITES`) the way roles
+  raised it to 2 and keys to 3: `budget.json` and every segment holding one; segments and
+  logs without one stay as they were, byte for byte. Method Budget 0.7.0 and older read 3
+  and refuse such a folder as newer than they read.
+- **The secret is a key, not a hash.** The design's sketch had the invite hold
+  SHA-256(secret) and the claim carry the secret. A claim in the folder would then hand the
+  secret to everyone who can read the folder, and since single use is settled by a rule
+  every computer can apply (below), someone with the folder could copy it into a claim of
+  their own made to look earlier, take the role and push the real newcomer out. Instead the
+  32 random bytes in the link are the seed of an Ed25519 key: the invite holds its public
+  key, and a claim holds that key's signature over `method-budget-log claim v1`, the invite
+  id and the claiming actor (`claim_message`). Only the link's holder can make one, and it
+  names its actor, so it can't be reused. The same `ed25519-dalek` already signs changes;
+  the engine still holds no cryptography (`Verifier::verify_message`). The secret comes from
+  `getrandom`, as keys do, and is never stored: the app shows the link once.
+- **Who may invite**: the rules of a `grant` to someone with no role (`may_give` with a
+  read-only target): the owner anything but ownership, a co-owner anything but co-owner, an
+  admin anything but admin and co-owner. An invite is a role given ahead: it starts roles
+  like a first `grant` (`access::started`), the owner's first invite is the owner's first
+  role (signing starts with it), and `Change::grants` counts it.
+- **Judging a claim** (`invite::judge`, in `Log::judge` after the signature and removal
+  checks): the invite is within the claim's `deps`; the proof verifies; the claimant isn't
+  the owner; the claim's `time` is no later than `expires` (RFC 3339, read by a small parser
+  in the engine); the inviter's role at the claim's `deps` still lets them give the role to
+  the claimant; and `invite::cut`, below. A claim that passes writes a grant of the
+  invite's role for its actor, ranked as the inviter was at the claim's `deps`, so it
+  settles with other grants exactly as the inviter's own grant would. The claimant's key is
+  published before or in the claim (the app opens the budget first, which puts it in), so
+  the claim is signed like any change.
+- **Single use**: of two claims of one invite, the one within the other's `deps` loses (it
+  saw the invite used); of two made apart, the lower `(lamport, actor, seq)` wins. Lamport
+  order is causal-consistent, so this is one total rule; a claim that loses is refused and
+  listed ("used"), and so is everything its author then did under the role. The deterministic
+  rule was picked over "first to arrive", which computers would disagree on.
+- **Cancel is a cutoff**, as removal is (entry 89): a `cancel_invite` (by the invite's maker
+  or anyone who may give its role, having seen the invite) refuses every claim of that
+  invite outside its own `deps`, whatever the claim says it saw. A claim the canceller had
+  seen stands: the invite was used before it was cancelled, and the person stays (Remove
+  them if that isn't wanted). Removing the inviter cancels their invites the same way,
+  unless the invite was made after that removal. This was picked over "a claim that saw the
+  cancel is refused" (the claimant's own word) because cancelling must work against a
+  claimant who doesn't cooperate.
+- **Expiry is the claim's own clock**, until a granter seals it (below). Change times are
+  claims (design 7: wall clocks are not enforceable), so someone holding the link whose
+  clock is wrong, or set back, can join late if no granter has opened the budget since the
+  date.
+- **Sealing, after review (MReview on pull request #92).** What a claim says it saw can be
+  a lie: someone who got the link later could write a claim whose `deps` hold only the
+  invite, with the lowest clock, count as "made apart" and lower, take the invite on every
+  computer and push out the real member and all their work. Three fixes:
+  - *Seal on use.* As soon as a computer that may give the invite's role (its maker, or
+    whoever `may_give` it to a newcomer) has applied a claim, its app records a
+    `cancel_invite` (`Log::seal_invites`, called on every timer pass in
+    `SharedDoc::tick`). As a cutoff it keeps the claim it saw and refuses every claim
+    outside its `deps`, whatever clock it carries. `cancel_invite` therefore accepts a used
+    invite, in the engine and in `SharedDoc::cancel_invite`. One seal per invite: none when
+    a cancel is already in; two granters sealing at once write two cancels, both keep the
+    claim both had seen, and the state keeps the lowest, so every computer agrees.
+  - *Seal on expiry.* Such a computer also records the cancel when it sees an unused
+    invite past its expiry by its own clock, so expiry holds as soon as any granter opens
+    the budget after the date; only before that does it rest on the claimant's clock.
+  - *A claim's clock must be ahead of its `deps`*: its `lamport` above that of every change
+    in its `deps` as the reader took them in, applied or refused (`invite::why::LAMPORT`).
+    Checked for claims only: an honest app's change before this version takes its clock
+    from the applied changes, but its `deps` count refused ones too, so older logs may hold
+    honest changes that don't satisfy it. From this version a log's own clock counts every
+    change taken in, refused ones included (`Log::lamport`), so its claims always pass.
+  The window left: between the real claim and the next time a granter's app reads it, a
+  forged claim that says it saw only the invite and carries the lowest clock that passes
+  can still win, as before. The docs name it.
+- **Order independence.** Claims and cancels join `Bounds` (`claims`, `cancels`) like
+  removals: a claim or cancel arriving after a claim it judges differently makes the log
+  fold again (`changes_verdict` compares `invite::cut` with and without it). The property
+  test `invites_claims_and_cancels_converge_in_any_order` (an owner, an admin and five
+  newcomers making random edits, invites (some already expired), cancels and claims, some
+  with the wrong secret, plus claims written straight into the folder by others; exchanged
+  in random, partial orders; three fresh readers in shuffled and reversed orders) checks the
+  same frontier, refused set, budget, members and invites everywhere, at most one claim per
+  invite, and that "used" and "cancelled" both happen (24 seeds; 300 run once). The state
+  keeps the lowest cancel so every order agrees on it.
+- **The link** (`src/invite_link.rs`): `methodbudget:join?v=1&b=<budget id>&i=<invite
+  id>&s=<secret, base64url>&f=<file name, percent-encoded>`. Versioned (`v`; a newer one is
+  refused with "update"), plain text, found inside a pasted message, and read with
+  `methodbudget://` too so the later clickable links parse the same. The base64url and
+  percent-encoding are a few lines of our own (RFC 4648 vectors tested). The file name lets
+  the person know what to pick; it is never a path.
+- **Joining** (File > Join from Link…, `share_join_check` and `share_join_from_link`): the
+  link is checked, then this person's name and color are asked as Share asks, then Rust's
+  own file dialog picks the `.mthd` (paths never come from the web view). Rust checks the
+  folder's `budget_id` against the link before opening anything, opens and joins it in a tab
+  as this computer's actor (its key goes in), then claims and writes the claim to the
+  folder at once. When the budget is open already (a second try), no dialog. Errors are
+  sentences: wrong budget, used, expired (with the date), cancelled, already a member, a
+  link changed when copied, and not here yet (the inviter's change hasn't synced), which
+  leaves the budget open read only with Try Again.
+- **The Share dialog** (share.js, words in ui/i18n/en.js): Invite someone with the role
+  picker's roles (category checklist for Edits some categories), 1, 7 or 30 days, Create
+  invite link, then the link once with Copy and "Anyone with this link can join as <role>
+  until it's used or <date>. Send it privately."; pending invites with who made them, the
+  role, the date and Cancel Invite; used ones with who joined. Cancelled and expired unused
+  invites aren't listed.
+- **Not built**: clickable links (option b); `method-budget invite` and `join` on the
+  command line and MCP (the app makes and takes invites; the CLI's `log` lists the ops like
+  any change); a QR code; carrying waiting invites across Start Again (entry 95 carries
+  roles, so a person who already joined keeps theirs; an invite not yet used must be made
+  again); more than one use per link.
+- **Tests after review**: a claim whose clock is 0 or equal to the invite's is refused
+  (`LAMPORT`), one ahead passes before any seal, and an honest claim's clock is above a
+  refused change it saw; a granter seals a used invite once, a late claim saying it saw only
+  the invite and tying on the clock with a lower actor is refused in sixteen orders while
+  the member keeps their role and note (without the seal it wins: checked); a granter seals
+  an expired invite by its clock and a claim with its clock set back is refused; two
+  granters sealing at once converge and neither seals again; cancelling a used invite by
+  hand. The property test adds forged claims with only the invite in `deps` at clock 0 and
+  at the lowest clock that passes, and granters sealing each round. App: the owner's app
+  seals Riley's claim once, and a cancel of the used invite is accepted.
+- **Tests.** Core (stand-in signatures): an invite taken up gives its role as a grant would,
+  publishes the claimant's key, works within the role and not outside it, in any order;
+  the wrong secret, a proof copied from another actor, a claim after the expiry, an invite
+  not seen, and the owner claiming are refused and listed; an admin can't invite an admin,
+  and a claim made after the inviter lost the right is refused while one made before stands;
+  a cancel refuses the claim it hadn't seen in twelve orders and keeps the one it had,
+  an editor can't cancel, and removing the inviter cancels; two claims made apart settle on
+  the same one everywhere and the loser's edit is left out; the property test. Format (real
+  Ed25519): the ops round-trip, each raises its segment to 4 and nothing else does, a proof
+  checks for its actor only, the folder goes to 4 with the earlier segment unchanged, the
+  secret never in it, a newcomer joins through the folder and a reader gives the role, and a
+  reader refuses a newer version. App (tests/shared.rs): someone who can't give roles can't
+  invite, the link's secret isn't in the folder and `budget.json` says 4, a third session
+  joins from the link, edits in its category and is refused outside it, the owner's list
+  shows it used by Riley, the same link refused for Morgan, a cancelled link refused, a link
+  not yet synced says try again and then works, a link for another budget refused. Links:
+  round trip, inside a message, broken and newer links refused in words, base64url vectors.

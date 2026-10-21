@@ -9,8 +9,10 @@ folder, File > Share, the status item, presence from heartbeats, flashes, confli
 badges, the Review and Activity tabs, Who Changed This, per-person undo. Phase 3 so
 far: roles (decisions.md, entry 78) and key pairs, signed changes and removal by cutoff
 (entry 89; section 7 says where the build differs from this design), and muted cells,
-locks and access requests through the heartbeat (entry 96). Not yet built: invites (the
-rest of phase 3), iroh live sessions
+locks and access requests through the heartbeat (entry 96), and invite links (entry 97):
+File > Join from Link… with signed, single-use, expiring invites whose secret is an
+Ed25519 key's seed held only in the link (9.1 says where the build differs). Not yet
+built: clickable `methodbudget://` links, iroh live sessions
 (phase 4), the extras (5), and the service-by-service checks of section 5 on real sync
 services.
 Written for the owner's
@@ -795,6 +797,16 @@ A **Share** button at the right end of the toolbar (also File > Share...) opens 
   new dependency; on Windows and Linux, sending the link to an app that is already running
   needs single-instance handling, which decision 20 avoided to save crates. Fallback that
   needs neither: **File > Join from Link...**, paste the link or code.
+
+**As built (decisions.md, entry 97; the owner chose option (a), 2026-10-21)**: File > Join
+from Link… only, folder mode only. The link is `methodbudget:join?v=1&b=<budget id>&i=<invite
+id>&s=<secret>&f=<file name>`, plain text sent any way, with no website; the newcomer must
+already have the shared folder, picks the `.mthd` in it, and joins with a signed claim. The
+invite holds the public key of an Ed25519 key whose seed is the secret, and a claim holds
+that key's signature naming the claimant, so a claim seen in the folder can't be reused.
+Each link works once (every computer settles two uses the same way), expires by the
+claim's own clock, and Cancel cuts any use the canceller hadn't seen. No QR code and no
+short code yet.
 
 ### 9.2 Connection status, always visible
 
