@@ -5,6 +5,7 @@
 
 import { el, $, isMac } from './dom.js';
 import { setRules } from './sheet.js';
+import { t } from './i18n.js';
 
 let open = null;
 
@@ -35,7 +36,7 @@ function openBehind() {
  * message is shown and the dialog stays open. Resolves true when submitted,
  * false when cancelled.
  */
-export function formDialog({ title, message = '', fields = [], submitText = 'OK', danger = false, onSubmit }) {
+export function formDialog({ title, message = '', fields = [], submitText = t('modal.ok'), danger = false, onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
     const previous = document.activeElement;
@@ -59,7 +60,7 @@ export function formDialog({ title, message = '', fields = [], submitText = 'OK'
       form.append(el('label', { class: 'modal-field', attrs: { for: id } }, el('span', { text: f.label }), input));
     }
     form.append(error);
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button' } });
     const ok = el('button', { class: danger ? 'btn btn-danger' : 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
     form.append(el('div', { class: 'modal-actions' }, cancel, ok));
     const backdrop = el('div', { class: 'modal-backdrop' }, form);
@@ -107,7 +108,7 @@ export function formDialog({ title, message = '', fields = [], submitText = 'OK'
 }
 
 /** Asks a yes/no question. Resolves true for yes. */
-export function confirmDialog({ title, message, confirmText = 'OK', danger = false }) {
+export function confirmDialog({ title, message, confirmText = t('modal.ok'), danger = false }) {
   return formDialog({ title, message, submitText: confirmText, danger });
 }
 
@@ -118,7 +119,7 @@ export function confirmDialog({ title, message, confirmText = 'OK', danger = fal
  * shows and the dialog stays open. Resolves true when submitted, false when
  * cancelled (Escape, Cancel, or a click outside).
  */
-export function anchoredDialog({ anchor, title, message = '', label, value = '', placeholder = '', multiline = false, submitText = 'Save', onSubmit }) {
+export function anchoredDialog({ anchor, title, message = '', label, value = '', placeholder = '', multiline = false, submitText = t('modal.save'), onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
     const previous = document.activeElement;
@@ -134,10 +135,10 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
     if (message) form.append(el('p', { class: 'modal-message', text: message }));
     form.append(el('label', { class: 'modal-field', attrs: { for: id } }, el('span', { text: label }), input));
     if (multiline) {
-      form.append(el('p', { class: 'popover-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter saves, Esc cancels` }));
+      form.append(el('p', { class: 'popover-hint', text: t('modal.enter_saves', { mod: isMac ? '⌘' : 'Ctrl+' }) }));
     }
     form.append(error);
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button' } });
     const ok = el('button', { class: 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
     form.append(el('div', { class: 'modal-actions' }, cancel, ok));
     const backdrop = el('div', { class: 'popover-backdrop' }, form);
@@ -203,7 +204,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
  * button red). `extra` ({ text, title, run }) adds a button at the left that
  * closes the form (resolving false) and then calls `run`.
  */
-export function anchoredForm({ anchor, title, message = '', fields = [], submitText = 'Save', danger = false, extra = null, onSubmit }) {
+export function anchoredForm({ anchor, title, message = '', fields = [], submitText = t('modal.save'), danger = false, extra = null, onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
     const previous = document.activeElement;
@@ -216,7 +217,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
     const parts = fields.map((f, i) => formField(f, `popover-f${i}`));
     box.append(...parts.map((p) => p.wrap));
     form.append(box, error);
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('modal.cancel'), attrs: { type: 'button' } });
     const ok = el('button', { class: danger ? 'btn btn-danger' : 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
     const more = extra
       ? el('button', { class: 'btn btn-quiet btn-danger-text popover-extra', text: extra.text, title: extra.title || undefined, attrs: { type: 'button' } })

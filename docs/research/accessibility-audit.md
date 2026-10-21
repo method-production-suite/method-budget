@@ -101,34 +101,61 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
 - Windows high contrast (`forced-colors`) and reduced motion.
 - The printed reports and the spreadsheet export (not screen content).
 
-## Localization: where the words live today
+## Localization: where the words live
 
-Nothing is translated, and this slice starts no translation framework. For a later slice:
+The framework is built and English is its only language (decision 94; how it works:
+docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, imported in
+`ui/js/i18n.js`. Which languages come first is the owner's call (docs/ROADMAP.md,
+"Waiting on the owner").
 
-- **Page text** is written inline in the UI scripts (`crates/method-app/ui/js/*.js`, about
-  730 `text:`, `title:` and `aria-label` strings, plus sentences built with template
-  strings, many with plural forms written out: "1 row", "3 rows") and in `ui/index.html`.
-- **Shortcut names** live in `ui/js/shortcuts.js`; the **menu bar** in
-  `crates/method-app/src/menu.rs` (Rust, matched to shortcuts.js by a test).
-- **Messages from the engine** (validation errors, problems in cells, import reviews) are
-  English strings from `method-core`, `method-format` and `method-session`, shown as they
-  come. Native dialogs (unsaved changes on quit) are built in Rust.
-- **Numbers** use the budget's own decimal and grouping settings (`display.js`); **dates**
-  in History, Notes and Activity already follow the system locale (`toLocaleDateString`).
-- **Elsewhere**: the command line, the MCP tools, the website (`site/`), the release notes
-  and the README are English.
+What the slice built, against the list this audit gave:
 
-What a localization slice would need:
+1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
+   1,200 entries, 41 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
+   language lacks (with a console warning) and the system's language picked, English by
+   default. The table loads as one of the page's own scripts under its
+   Content-Security-Policy; the browser build carries it.
+2. **Strings moved to the table, by area, with a test that fails on a new inline string**:
+   partly. Converted: the start window and New Budget (`start.js`, `startlist.js`), the Help
+   menu's page parts (`help.js`, `licenses.js`, `updates.js`), the shortcut list
+   (`shortcuts.js`), Budget Setup's frame and its list, Globals, Units and Rate Tables
+   tabs (`setupwin.js`, `setuptabs.js`, `setup.js`, `setuplist.js`, `setuplists.js`,
+   `setupbands.js`, `setupframe.js`, `apply.js`, `rates.js`), Find and Replace
+   (`find.js`), the main window's dialogs, toolbar tips, banners and messages
+   (`main.js`), the common dialog buttons (`modal.js`) and the status bar (`footer.js`).
+   The wording is unchanged; plurals written out ("1 row", "3 rows") became plural
+   entries. `src/i18n.rs` fails on a new `text:`, `title:`, `label:`, `placeholder:`,
+   `message:`, `hint:`, `aria-label` or `toast()` literal with letters in a converted
+   script, on a key missing from the table and on an entry nothing uses.
+3. **Engine messages with stable codes**: not started. Validation errors, problems in
+   cells and import reviews still come from `method-core`, `method-format` and
+   `method-session` as English sentences.
+4. **The menu bar and native dialogs reading the same table**: the menu bar is built
+   (`src/menu.rs` takes every item's words from `menu.<id>`, and its menus' names, the app
+   menu, Open Recent, Autosave, Revert to Backup and Check for Updates from the same
+   table; the test matching it to `shortcuts.js` still holds). The native dialogs
+   (unsaved changes on quit, file pickers' titles) are still English in Rust.
+5. **Room for longer words and a right-to-left check**: waits for a language.
+6. **A choice of language**: the system's, picked at start; no override in the
+   preferences yet (there is nothing to choose between).
 
-1. A string table per language and a small lookup (`t('key', {count})`) in the page, with
-   plural rules from the platform's `Intl.PluralRules`, so no new dependency.
-2. Every inline string moved to the table, in passes by area, with a test that fails on a
-   new inline string.
-3. Engine messages given stable codes with their words looked up in the page (or a Rust
-   table for the CLI and native dialogs).
-4. The menu bar and native dialogs reading the same table from Rust.
-5. Layout room for longer words (toolbar, tab strips, column heads) and a right-to-left
-   check if such a language is picked.
-6. A choice of language: the system's, with an override in the preferences.
+Still English inline, for the next passes:
 
-Which languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
+- **Scripts kept out of this slice** while other work on them is open: `share.js`,
+  `activity.js`, `topsheet-setup.js` (Budget Setup's Charges, Credits, Info, Settings and
+  Baseline tabs), `report.js` and `reportsetup.js`.
+- **The rest of the page**: the tools panel's other tabs and dialogs (`library.js`,
+  `packs.js`, `notes.js`, `history.js`, `presets.js`, `explain.js`, `overtime.js`,
+  `actuals.js`, `actualsimport.js`, `comments.js`, `review.js`, `compare.js`,
+  `diffmerge.js`, `versions.js`, `importsetup.js`, `sheetimport.js`, `coaimport.js`,
+  `exchangeimport.js`, `scheduledays.js`, `sharing.js`, `context.js`, `levels.js`,
+  `grid.js` and the rest), `util.js`'s shared phrases (a flat fringe's count words, a
+  setup pack's source), the toolbar in `ui/index.html`, and words that come from Rust as
+  data (a start-window row's kind, the chart groups).
+- **The engine's messages** (item 3) and **the native dialogs** (item 4).
+- **Elsewhere**: the command line, the MCP tools, the website (`site/`), the release
+  notes and the README are English and stay so for now.
+
+Numbers use the budget's own decimal and grouping settings (`display.js`); dates in
+History, Notes and Activity already follow the system locale (`toLocaleDateString`).

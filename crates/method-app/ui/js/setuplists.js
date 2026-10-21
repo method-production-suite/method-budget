@@ -16,6 +16,7 @@
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { showReview } from './importsetup.js';
+import { t } from './i18n.js';
 
 function str(v) {
   return typeof v === 'string' ? v : '';
@@ -29,18 +30,18 @@ function nextId(prefix) {
 
 /** The kinds a spreadsheet holds: [kind, label]. */
 export const SHEET_KINDS = [
-  ['global', 'Globals'],
-  ['fringe', 'Fringes'],
-  ['group', 'Groups'],
-  ['unit', 'Units'],
-  ['set', 'Sets'],
-  ['location', 'Locations'],
-  ['currency', 'Currencies'],
-  ['charge', 'Charges'],
-  ['credit', 'Credits'],
-  ['tag_preset', 'Tag presets'],
-  ['ot_pattern', 'Overtime patterns'],
-  ['rate_table', 'Rate tables'],
+  ['global', t('setup.sheet_kind.global')],
+  ['fringe', t('setup.sheet_kind.fringe')],
+  ['group', t('setup.sheet_kind.group')],
+  ['unit', t('setup.sheet_kind.unit')],
+  ['set', t('setup.sheet_kind.set')],
+  ['location', t('setup.sheet_kind.location')],
+  ['currency', t('setup.sheet_kind.currency')],
+  ['charge', t('setup.sheet_kind.charge')],
+  ['credit', t('setup.sheet_kind.credit')],
+  ['tag_preset', t('setup.sheet_kind.tag_preset')],
+  ['ot_pattern', t('setup.sheet_kind.ot_pattern')],
+  ['rate_table', t('setup.sheet_kind.rate_table')],
 ];
 
 /** File > Export > Setup Lists…: which kinds, as a workbook or CSV files. */
@@ -62,13 +63,13 @@ export function exportSetupLists(ctx) {
       const csv = el('input', { attrs: { type: 'radio', name, value: 'csv' } });
       const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       error.hidden = true;
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-      const ok = el('button', { class: 'btn btn-primary', text: 'Export…', attrs: { type: 'button', 'data-autofocus': true } });
+      const cancel = el('button', { class: 'btn', text: t('setup.cancel'), attrs: { type: 'button' } });
+      const ok = el('button', { class: 'btn btn-primary', text: t('setup.export'), attrs: { type: 'button', 'data-autofocus': true } });
       cancel.addEventListener('click', () => closeDialog());
       ok.addEventListener('click', async () => {
         const picked = [...boxes].filter(([, b]) => b.checked).map(([k]) => k);
         if (!picked.length) {
-          error.textContent = 'Tick at least one kind.';
+          error.textContent = t('setup.tick_at_least_one_kind');
           error.hidden = false;
           return;
         }
@@ -88,10 +89,10 @@ export function exportSetupLists(ctx) {
       return el(
         'div',
         { class: 'modal pk-sheet-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId } },
-        el('h2', { class: 'modal-title', text: 'Export Setup Lists', attrs: { id: titleId } }),
-        el('p', { class: 'modal-message', text: "Each kind of setup item as a table: one row per item with its whole definition and where it came from, to edit in a spreadsheet and import back. A charge's excluded amounts stay in the budget." }),
+        el('h2', { class: 'modal-title', text: t('setup.export_setup_lists'), attrs: { id: titleId } }),
+        el('p', { class: 'modal-message', text: t('setup.each_kind_of_setup_item') }),
         kinds,
-        el('div', { class: 'pk-formats' }, el('label', { class: 'rs-check' }, xlsx, el('span', { text: 'Spreadsheet (.xlsx), a sheet per kind' })), el('label', { class: 'rs-check' }, csv, el('span', { text: 'CSV files (one per kind)' }))),
+        el('div', { class: 'pk-formats' }, el('label', { class: 'rs-check' }, xlsx, el('span', { text: t('setup.spreadsheet_xlsx_a_sheet_per') })), el('label', { class: 'rs-check' }, csv, el('span', { text: t('setup.csv_files_one_per_kind') }))),
         error,
         el('div', { class: 'modal-actions' }, cancel, ok),
       );
@@ -130,8 +131,8 @@ export async function importSetupLists(ctx) {
   const mappingGrid = (c, index) => {
     const grid = el('div', { class: 'si-map' });
     for (const [key, title] of kindCols.get(c.kind) || []) {
-      const sel = el('select', { class: 'modal-input si-col', attrs: { 'aria-label': `${c.name}: column for ${title}` } });
-      sel.append(el('option', { text: '(none)', attrs: { value: '' } }));
+      const sel = el('select', { class: 'modal-input si-col', attrs: { 'aria-label': t('setup.column_for', { name: c.name, title }) } });
+      sel.append(el('option', { text: t('setup.none_paren'), attrs: { value: '' } }));
       c.titles.forEach((t, i) => sel.append(el('option', { text: t, attrs: { value: String(i) } })));
       const at = c.mapping.columns ? c.mapping.columns[key] : undefined;
       sel.value = at === undefined || at === null ? '' : String(at);
@@ -148,14 +149,14 @@ export async function importSetupLists(ctx) {
   const draw = () => {
     const parts = [];
     for (const [index, c] of choice) {
-      const use = el('input', { attrs: { type: 'checkbox', 'aria-label': `Import the sheet ${c.name}` } });
+      const use = el('input', { attrs: { type: 'checkbox', 'aria-label': t('setup.import_the_sheet', { name: c.name }) } });
       use.checked = c.use;
       use.addEventListener('change', () => {
         c.use = use.checked;
         draw();
       });
-      const kind = el('select', { class: 'modal-input', attrs: { 'aria-label': `What the sheet ${c.name} holds` } });
-      kind.append(el('option', { text: 'Choose…', attrs: { value: '' } }));
+      const kind = el('select', { class: 'modal-input', attrs: { 'aria-label': t('setup.what_the_sheet_holds', { name: c.name }) } });
+      kind.append(el('option', { text: t('setup.choose'), attrs: { value: '' } }));
       for (const [k, label] of SHEET_KINDS) kind.append(el('option', { text: label, attrs: { value: k } }));
       kind.value = c.kind;
       kind.addEventListener('change', async () => {
@@ -175,15 +176,15 @@ export async function importSetupLists(ctx) {
         }
         draw();
       });
-      const head = el('div', { class: 'pk-sheet-head' }, el('label', { class: 'rs-check' }, use, el('span', { text: `${c.name} (${c.rows} ${c.rows === 1 ? 'row' : 'rows'})` })), kind);
+      const head = el('div', { class: 'pk-sheet-head' }, el('label', { class: 'rs-check' }, use, el('span', { text: t('setup.sheet_rows', { name: c.name, count: c.rows }) })), kind);
       parts.push(head);
       if (c.use && c.kind) {
         const hr = c.mapping.header_row;
-        parts.push(el('p', { class: 'pk-sheet-note', text: hr === null || hr === undefined ? 'No row of titles: data from the first row.' : `Titles in row ${hr + 1}; data from row ${hr + 2}.` }));
+        parts.push(el('p', { class: 'pk-sheet-note', text: hr === null || hr === undefined ? t('setup.no_title_row') : t('setup.title_row', { title: hr + 1, data: hr + 2 }) }));
         parts.push(mappingGrid(c, index));
       }
     }
-    if (!choice.size) parts.push(el('p', { class: 'modal-message', text: 'The file has no sheets to read.' }));
+    if (!choice.size) parts.push(el('p', { class: 'modal-message', text: t('setup.the_file_has_no_sheets') }));
     body.replaceChildren(...parts);
     ok.disabled = ![...choice.values()].some((c) => c.use && c.kind);
   };
@@ -193,8 +194,8 @@ export async function importSetupLists(ctx) {
       const titleId = nextId('pk-lists-title');
       body = el('div', { class: 'si-scroll pk-sheets' });
       problems = el('div', { class: 'pk-problems', attrs: { 'aria-live': 'polite' } });
-      const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ok = el('button', { class: 'btn btn-primary', text: 'Check and Review…', attrs: { type: 'button' } });
+      const cancel = el('button', { class: 'btn', text: t('setup.cancel'), attrs: { type: 'button', 'data-autofocus': true } });
+      ok = el('button', { class: 'btn btn-primary', text: t('setup.check_and_review'), attrs: { type: 'button' } });
       cancel.addEventListener('click', () => closeDialog());
       ok.addEventListener('click', async () => {
         const choices = [...choice].filter(([, c]) => c.use && c.kind).map(([index, c]) => ({ index, kind: c.kind, mapping: { header_row: c.mapping.header_row ?? null, columns: c.mapping.columns || {} } }));
@@ -205,8 +206,8 @@ export async function importSetupLists(ctx) {
             const lines = problemLines(r.errors);
             const shown = lines.slice(0, 200);
             problems.replaceChildren(
-              el('p', { class: 'modal-error', text: `${lines.length} ${lines.length === 1 ? 'problem' : 'problems'} to fix in the sheet (nothing was imported):`, attrs: { role: 'alert' } }),
-              el('ul', { class: 'si-notes' }, ...shown.map((t) => el('li', { text: t })), lines.length > shown.length ? el('li', { class: 'si-more', text: `and ${lines.length - shown.length} more` }) : null),
+              el('p', { class: 'modal-error', text: t('setup.problems_to_fix', { count: lines.length }), attrs: { role: 'alert' } }),
+              el('ul', { class: 'si-notes' }, ...shown.map((line) => el('li', { text: line })), lines.length > shown.length ? el('li', { class: 'si-more', text: t('setup.and_more', { count: lines.length - shown.length }) }) : null),
             );
             ok.disabled = false;
             return;
@@ -222,8 +223,8 @@ export async function importSetupLists(ctx) {
       return el(
         'div',
         { class: 'modal si-dialog pk-lists-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId } },
-        el('h2', { class: 'modal-title', text: `Import setup lists: ${str(picked.file)}`, attrs: { id: titleId } }),
-        el('p', { class: 'modal-message', text: 'Say what each sheet holds and which column is which. Every row is checked first; then you choose what to bring in, as with Import Setup.' }),
+        el('h2', { class: 'modal-title', text: t('setup.import_lists_title', { file: str(picked.file) }), attrs: { id: titleId } }),
+        el('p', { class: 'modal-message', text: t('setup.say_what_each_sheet_holds') }),
         body,
         problems,
         el('div', { class: 'modal-actions' }, cancel, ok),

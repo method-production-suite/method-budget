@@ -11,6 +11,7 @@ import { el } from './dom.js';
 import { band, bandField } from './setupframe.js';
 import { orderedNames } from './order.js';
 import { obj, str, errText } from './util.js';
+import { t } from './i18n.js';
 
 /**
  * The Currency band for `budget`. `ctx`: { call(cmd, args) (resolves once
@@ -66,7 +67,7 @@ export function currencyBand(budget, ctx) {
   const totals = str(b.totals_currency);
   if (totals && totals !== base && !codes.includes(totals)) codes.push(totals);
   const totalsSel = el('select', { class: 'setup-input setup-select', data: { key: 'apply:band:totals' } });
-  for (const [v, text] of [['', base ? `${base} (base)` : 'Base currency'], ...codes.map((c) => [c, c])]) {
+  for (const [v, text] of [['', base ? t('setup.band.base_named', { base }) : t('setup.band.base_currency')], ...codes.map((c) => [c, c])]) {
     totalsSel.append(el('option', { text, attrs: { value: v } }));
   }
   totalsSel.value = totals;
@@ -79,7 +80,7 @@ export function currencyBand(budget, ctx) {
     );
   });
 
-  const row = band('Currency', bandField('Base currency', baseInput), bandField('Show totals in', totalsSel));
-  row.title = 'Everything is worked out in the base currency. Renaming it doesn’t convert any amounts or rates.';
+  const row = band(t('setup.tab.currencies'), bandField(t('setup.band.base_currency'), baseInput), bandField(t('setup.band.totals_in'), totalsSel));
+  row.title = t('setup.everything_is_worked_out_in');
   return row;
 }

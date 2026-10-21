@@ -656,7 +656,7 @@ fn the_first_role_starts_signing_and_raises_the_log_format_to_3() {
         }
     }
 
-    // A program that reads only format 2 (Method Budget 0.6.0) refuses a
+    // A program that reads only format 2 (Method Budget 0.4.0 to 0.7.0) refuses a
     // folder at 3 as newer than it reads, rather than taking in changes it
     // can't check; this one reads 3.
     assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_SIGNED);
@@ -907,7 +907,7 @@ fn a_key_in_a_persons_name_that_isnt_theirs_stops_their_programs() {
 // ---------------------------------------------------------------------------
 // The owner's key (docs/research/owner-key.md)
 
-/// A budget whose roles were set unsigned (before 0.7.0) and a key put in
+/// A budget whose roles were set unsigned (by a version before signing) and a key put in
 /// the owner's name by someone else before the owner's app did: the owner's
 /// computer starts it again. The new folder takes the old one's place with
 /// the budget as it stood, the owner's real key and everyone's roles; the

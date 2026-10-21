@@ -1902,7 +1902,7 @@ dependencies = [
 
 [[package]]
 name = "method-app"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "method-core",
  "method-format",
@@ -1918,7 +1918,7 @@ dependencies = [
 
 [[package]]
 name = "method-cli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "method-core",
  "method-format",
@@ -1927,11 +1927,11 @@ dependencies = [
 
 [[package]]
 name = "method-core"
-version = "0.6.0"
+version = "0.7.0"
 
 [[package]]
 name = "method-format"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.3.4",
@@ -1942,11 +1942,11 @@ dependencies = [
 
 [[package]]
 name = "method-release"
-version = "0.6.0"
+version = "0.7.0"
 
 [[package]]
 name = "method-session"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "method-core",
  "method-format",
@@ -1972,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "method-web"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "js-sys",
  "method-format",
@@ -4950,7 +4950,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "method-format",
  "method-release",

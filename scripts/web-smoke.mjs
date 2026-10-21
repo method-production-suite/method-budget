@@ -17,7 +17,10 @@
 // its column and row, cells say whether they are selected, the cursor cell's
 // id stays the same across a redraw, an edit is announced politely, and a
 // dialog is a named modal dialog that gives focus back when it closes. A bid
-// layout is worked out by the engine and drawn into report pages.
+// layout is worked out by the engine and drawn into report pages. The page's
+// words come from the English string table (decision 94): looked up with
+// names and plural forms, falling back to English, the language picked from
+// the system's.
 //
 // No npm packages: Node's own http server and Chrome's DevTools protocol over
 // a pipe (scripts/chrome-pipe.mjs, which also finds Chrome; CHROME= names
@@ -151,6 +154,49 @@ async function main() {
     const before = await until('the grand total', `(${GRAND}) || null`);
     console.log(`web-smoke: the topsheet draws (grand total ${(before / 100).toFixed(2)})`);
     if (requests.some((p) => p.startsWith('/charts/'))) fail(`charts were fetched before anyone asked: ${requests.join(', ')}`);
+
+    // 1a. The words come from the English table (decisions.md, entry 94):
+    // the page loads it from its own files, looks keys up with names filled
+    // in and plural forms picked by Intl.PluralRules, falls back to English
+    // for a key a language lacks (with a warning), and picks the system's
+    // language, English when there is no table for it.
+    if (!requests.includes('/i18n/en.js')) fail(`the English table wasn't loaded from the page's files: ${requests.filter((p) => p.startsWith('/i18n') || p.endsWith('i18n.js')).join(', ') || 'no request'}`);
+    const words = await evaluate(`import('./js/i18n.js').then((m) => {
+      const warned = [];
+      const tables = { en: { hi: 'Hello {name}', rows: { one: '{count} row', other: '{count} rows' }, only: 'English only' }, xx: { hi: 'Xello {name}', rows: { one: '{count} xrow', other: '{count} xrows' } } };
+      const tx = m.translator(tables, 'xx', { warn: (w) => warned.push(w) });
+      return {
+        hi: tx('hi', { name: 'Field Station' }),
+        one: tx('rows', { count: 1 }),
+        many: tx('rows', { count: 3 }),
+        fallback: tx('only'),
+        again: tx('only'),
+        missing: tx('nowhere.at_all'),
+        warned: warned.length,
+        picked: [m.pickLanguage(['pt-BR', 'en-GB']), m.pickLanguage(['xx-YY', 'en'], ['en', 'xx']), m.pickLanguage([]), m.pickLanguage(['fr'])],
+        language: m.LANGUAGE,
+        lang: document.documentElement.lang,
+        grand: m.t('footer.grand_total'),
+        selected: [m.t('footer.selected_rows', { count: 1 }), m.t('footer.selected_rows', { count: 3 })],
+      };
+    })`);
+    const wantWords = {
+      hi: 'Xello Field Station', one: '1 xrow', many: '3 xrows', fallback: 'English only', again: 'English only', missing: 'nowhere.at_all', warned: 2,
+      picked: ['en', 'xx', 'en', 'en'], language: 'en', lang: 'en', grand: 'Grand total', selected: ['Selected 1 row', 'Selected 3 rows'],
+    };
+    if (JSON.stringify(words) !== JSON.stringify(wantWords)) fail(`the string table: ${JSON.stringify(words)}, not ${JSON.stringify(wantWords)}`);
+    // The shortcut sheet is drawn from the table too: its title, the group
+    // headings and the first command's label.
+    const sheet = await evaluate(`import('./js/help.js').then((m) => {
+      m.openHelp();
+      const d = document.querySelector('.help');
+      const r = { title: d.querySelector('.help-title').textContent, groups: [...d.querySelectorAll('h3')].slice(0, 3).map((h) => h.textContent), first: d.querySelector('th').textContent };
+      m.closeHelp();
+      return r;
+    })`);
+    const wantSheet = { title: 'Keyboard shortcuts', groups: ['File', 'Edit', 'Cells'], first: 'New budget, or open a recent one (the start window)' };
+    if (JSON.stringify(sheet) !== JSON.stringify(wantSheet)) fail(`the shortcut sheet: ${JSON.stringify(sheet)}, not ${JSON.stringify(wantSheet)}`);
+    console.log(`web-smoke: the words come from the English table ("${words.grand}", "${words.selected[1]}", "${sheet.title}")`);
 
     // 1b. What a screen reader is given (decision 82).
     const ax = async () => (await send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored);
@@ -398,6 +444,67 @@ async function main() {
     const sub = await until('the sub-budget in front', `window.__METHOD_WEB__.invoke('smoke', 'get_view', {}).then((v) => v.budget.title.endsWith(' - Story and screenplay, revised') ? { title: v.budget.title, cats: v.report.categories.length, total: v.report.categories[0].total, charges: v.report.charges.length } : null)`, 10_000);
     if (sub.cats !== 1 || sub.total !== catTotal || sub.charges !== 0) fail(`the sub-budget from a row isn't the row alone with its total: ${JSON.stringify(sub)} (the row's total ${catTotal})`);
     console.log(`web-smoke: New Sub-Budget from This Category opens "${sub.title}" with the row's total (${(sub.total / 100).toFixed(2)})`);
+
+    // 4b2. The desktop's start window and New Budget form (start.js), drawn
+    // here with invented answers in place of the desktop's commands: their
+    // words come from the string table, plurals included.
+    const start = await evaluate(`(async () => {
+      const m = await import('./js/start.js');
+      const answers = {
+        start_list: {
+          pinned: [{ title: 'Smoke Pinned', file: 'smoke.mthd', folder: '/smoke', net_total: 1000000, currency: 'USD', modified: Date.now(), pinned: true, openable: true, shared: true, people: [{ name: 'Bo', place: 'account 2101', at: new Date().toISOString() }], bars: [{ label: 'Cast', share: 500 }] }],
+          recent: [],
+          projects: [{ name: 'Smoke Project', folder: '/smoke', token: 1, items: [] }],
+          fresh: true,
+        },
+        new_budget_charts: [{ id: 'feature', name: 'Smoke Chart', group: 'Feature', description: '', ours: true, accounts: 1, categories: 2 }],
+        new_budget_setup: { library: { name: 'Smoke Library', items: 3 }, packs: [{ title: 'Smoke Pack', file: 'p.json', place: 'bundled', items: 1, version: '2', effective: '2026-01-01', token: 5 }] },
+      };
+      const ctx = { invoke: async (cmd) => (cmd in answers ? answers[cmd] : null), apply: () => {}, toast: (e) => console.error(String(e)), focus: () => {} };
+      await m.showStart(ctx);
+      const box = document.querySelector('.st-dialog');
+      const home = box.textContent;
+      [...box.querySelectorAll('button')].find((b) => b.textContent.startsWith('New Budget…')).click();
+      await new Promise((r) => setTimeout(r, 200));
+      const form = box.textContent;
+      const attrs = [...box.querySelectorAll('[title],[aria-label],[placeholder]')].map((e) => [e.title, e.getAttribute('aria-label'), e.getAttribute('placeholder')].join(' ')).join(' ');
+      m.closeStart();
+      return { home, form, attrs };
+    })()`);
+    for (const want of ['Budgets', 'Pinned', 'Smoke Pinned', 'shared', 'Pin', 'Unpin', 'Projects', 'Bo in account 2101']) {
+      if (!start.home.includes(want) && !start.attrs.includes(want)) fail(`the start window doesn't show "${want}"`);
+    }
+    for (const want of ['New Budget', 'Chart of accounts', 'Smoke Chart', '1 account', 'Smoke Chart: 1 account in 2 categories.', 'Everything in my setup library (Smoke Library)', '3 items', 'version 2, from 2026-01-01, 1 item, comes with the app', 'Create Budget', 'Production type']) {
+      if (!start.form.includes(want)) fail(`New Budget doesn't show "${want}"`);
+    }
+    const startRaw = (start.home + start.form + start.attrs).match(/\\b(?:start|main|modal)\\.[a-z_.]+\\b/);
+    if (startRaw) fail(`the start window shows a key instead of words: ${startRaw[0]}`);
+    console.log('web-smoke: the start window and New Budget draw their words from the string table');
+
+    // 4c. Budget Setup (a frame in the browser) draws every tab, its words
+    // from the string table (decision 94): the tab names, and each list
+    // tab's table with its column heads.
+    await evaluate(`(document.getElementById('btn-setup').click(), true)`);
+    await until('the Budget Setup frame', `(() => { const f = document.querySelector('.mw-setup-frame'); return Boolean(f && f.contentDocument && f.contentDocument.querySelectorAll('.sw-tab').length > 5); })()`, 15_000);
+    const setupTabs = await evaluate(`(async () => {
+      const d = document.querySelector('.mw-setup-frame').contentDocument;
+      const names = [...d.querySelectorAll('.sw-tab')].map((b) => b.textContent);
+      const drawn = [];
+      for (const id of ['fringes', 'groups', 'globals', 'units', 'sets', 'locations', 'currencies', 'rates']) {
+        d.getElementById('sw-tab-' + id).click();
+        await new Promise((r) => setTimeout(r, 150));
+        const panel = d.getElementById('sw-panel') || d.body;
+        drawn.push(id + ':' + (panel.textContent.trim().length > 0));
+        // A key with no words shows as the key itself.
+        const raw = (d.body.innerText + [...d.querySelectorAll('[title],[aria-label],[placeholder]')].map((e) => [e.title, e.getAttribute('aria-label'), e.getAttribute('placeholder')].join(' ')).join(' ')).match(/\b(?:apply|setup|rates|main|find|start|footer|modal|help|menu|shortcut)\.[a-z_.]+\b/);
+        if (raw) drawn.push(id + ':key ' + raw[0] + ':false');
+      }
+      return { names, drawn, heads: [...d.querySelectorAll('.sw-head')].map((h) => h.textContent).filter(Boolean) };
+    })()`);
+    const wantTabs = ['Fringes', 'Groups', 'Globals', 'Units', 'Sets', 'Locations', 'Currency', 'Charges', 'Credits', 'Rate Tables', 'Info', 'Settings', 'Baseline'];
+    if (JSON.stringify(setupTabs.names) !== JSON.stringify(wantTabs)) fail(`Budget Setup's tabs: ${JSON.stringify(setupTabs.names)}`);
+    if (setupTabs.drawn.some((x) => x.endsWith(':false'))) fail(`Budget Setup tabs drew nothing: ${setupTabs.drawn.join(', ')}`);
+    console.log(`web-smoke: Budget Setup draws its ${setupTabs.names.length} tabs from the string table`);
 
     // 5. Nothing went wrong on the way.
     await new Promise((r) => setTimeout(r, 300));

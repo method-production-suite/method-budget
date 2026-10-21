@@ -1691,7 +1691,7 @@ its own, unshared, and says why) rather than skipping the roles and editing a st
 It is 3 from the owner's key on (decisions.md, entry 89): the computer writing the first
 `key`, `revoke` or signed change raises it before writing the segment, and every segment
 holding one has `format` 3. A program that reads only version 2 (Method Budget 0.4.0 to
-0.6.0) can't check signatures, so it must not take in changes once they are signed: it
+0.7.0) can't check signatures, so it must not take in changes once they are signed: it
 refuses the folder as newer than it reads, as above, rather than accepting a change written
 in someone else's name. A log without roles never reaches 3.
 
