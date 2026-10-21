@@ -4887,6 +4887,9 @@ remembered".
 - **What it leaves.** A member who joins only after a key was planted, and whose owner never
   opens the budget again, takes the planted key as the owner's. The owner's app finds the
   mismatch the moment it opens the budget, and offers Start Again.
+  Likewise, a computer that knew the budget only before the owner's key existed, or whose
+  budget file was moved or renamed, has nothing to carry and takes the new key as the first
+  it sees.
 - **Tests.** Engine: a remembered key keeps a rebuilt folder's owner key out and stops
   recording; the real folder raises nothing; a computer that remembers nothing takes it in;
   the owner's key before any role starts signing. Format: a planted key, Start Again with
