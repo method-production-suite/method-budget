@@ -17,7 +17,7 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-21. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-21 (afternoon). Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
@@ -56,6 +56,19 @@ this page goes ahead without waiting.
   signed budget rather than take in unsigned changes. On main since 2026-10-21; they ship in
   the release after 0.7.0 (above). Later (the owner): key rotation, and publishing a key
   from the command line.
+
+- **Invite links for shared budgets** (3.18; design docs/research/collaboration.md 9.1;
+  changes who can join, so it waits on the owner): today a new person joins by opening the
+  budget in the shared folder and asking for access (D96). An invite would let the owner,
+  a co-owner or an admin hand someone a role before they open it: a signed invite in the
+  change log (role, scope, expiry, used once) and a link carrying its secret; whoever
+  presents the secret with their new key gets that role, checked by every computer like
+  any grant. How the link reaches the app: (a) **File > Join from Link…**, paste the link
+  or code (no new dependency); (b) clickable `methodbudget://` links, which need Tauri's
+  deep-link plugin (and single-instance handling on Windows and Linux) plus a static
+  `methodbudget.com/join` page whose fragment never reaches the server; (c) both, (a)
+  first. **Recommend: (a) now, (b) later if people ask**, since a shared-folder invite is
+  pasted from a message anyway and (a) adds no crates. Not built: waiting on the owner.
 
 - **Which languages first** (3.14; D82, D94): the framework is built and English is
   the only language (docs/APP.md, "Languages"): one string table read by the page and
