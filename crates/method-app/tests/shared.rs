@@ -1139,10 +1139,17 @@ fn the_owner_starts_again_and_a_member_reopens_to_join() {
     let id = ids_in(&jordan, "50-01")[0];
     assert!(jordan.set_detail_field(id, "rate", "1234").is_err());
 
-    let merged = jordan.shared_mut().unwrap().reopen().unwrap();
-    assert_eq!(&merged, alex.budget());
+    // Jordan's computer had seen the planted key as Alex's, so the new
+    // budget's key (Alex's real one) is a changed key there: Jordan asks
+    // Alex, then trusts it (MReview on pull request #73).
+    jordan.shared_mut().unwrap().reopen().unwrap();
     let st = jordan.shared().unwrap().status(Instant::now());
     assert!(st.replaced.is_none());
+    assert!(st.owner_key_warning.is_some(), "{st:?}");
+    assert!(jordan.set_detail_field(id, "rate", "1234").is_err());
+    let merged = jordan.shared_mut().unwrap().trust_owner_key().unwrap();
+    assert_eq!(&merged, alex.budget());
+    let st = jordan.shared().unwrap().status(Instant::now());
     assert!(st.owner_key_warning.is_none());
     jordan.set_detail_field(id, "rate", "1234").unwrap();
     exchange(&mut alex, &mut jordan);

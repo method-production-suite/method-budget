@@ -1107,3 +1107,120 @@ fn the_first_owner_key_seen_is_remembered_outside_the_folder() {
     assert_eq!(log::remembered_owner_key(&elsewhere, &other.info), None);
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// Someone with the shared folder swaps in a log of their own, as if the
+/// owner had started again (MReview on pull request #73). A computer that
+/// knew the budget refuses a log with another owner, and holds a log in the
+/// owner's name with another key until the person trusts it, whether or not
+/// the old folder is still there.
+#[test]
+fn a_forged_replacement_is_refused_or_held() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("forged-replacement");
+    let keys = dir.join("owner-keys");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let alex_key = keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let (mut riley, _) = log::open_in(&path, actor(3), Ids::seeded(3), Some(&keys)).unwrap();
+    keyed(&mut riley.log, 3);
+    assert!(log::remember_owner_key(&mut riley, &keys, actor(3), T).unwrap());
+
+    // A log by another actor put in the folder's place.
+    let real = LogDir::for_budget(&path).root().to_path_buf();
+    let kept = dir.join("kept-aside");
+    fs::rename(&real, &kept).unwrap();
+    let mut forged = log::init(&path, actor(5), Ids::seeded(5), T).unwrap();
+    keyed(&mut forged.log, 5);
+    forged
+        .log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    log::flush(&forged.log, &forged.dir).unwrap();
+    match log::open_in(&path, actor(3), Ids::seeded(6), Some(&keys)) {
+        Err(e) => assert_eq!(e.0, log::NOT_SAME_OWNER),
+        Ok(_) => panic!("a log by another owner was opened"),
+    }
+
+    // A log in Alex's name, with someone else's key; the old folder gone.
+    fs::remove_dir_all(&real).unwrap();
+    fs::remove_dir_all(&kept).unwrap();
+    let mut forged = log::init(&path, actor(1), Ids::seeded(7), T).unwrap();
+    let theirs = keyed(&mut forged.log, 77);
+    forged
+        .log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    log::flush(&forged.log, &forged.dir).unwrap();
+    let (held, _) = log::open_in(&path, actor(3), Ids::seeded(8), Some(&keys)).unwrap();
+    assert_eq!(held.log.owner_key_pin(), Some(alex_key));
+    assert_eq!(held.log.owner_key_changed(), Some(theirs));
+    assert_eq!(held.log.key_of(actor(1)), None);
+    // A computer that never knew the budget can't tell.
+    let (fresh, _) =
+        log::open_in(&path, actor(4), Ids::seeded(9), Some(&dir.join("new-keys"))).unwrap();
+    assert_eq!(fresh.log.key_of(actor(1)), Some(theirs));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The owner's genuine Start Again: a computer that remembered the owner's
+/// real key joins the new budget without a word, and one that had seen the
+/// planted key is asked to trust the real one.
+#[test]
+fn a_genuine_start_again_joins_silently_where_the_real_key_was_known() {
+    use method_core::log::{Change, Op, Signer};
+
+    let dir = temp_dir("genuine-replacement");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let theirs = log::sign::KeyPair::from_seed([77; 32]);
+    let mut planted = Change {
+        actor: actor(1),
+        seq: alex.log.own_seq() + 1,
+        deps: alex.log.frontier().clone(),
+        lamport: alex.log.lamport() + 1,
+        time: T.into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    planted.sig = Some(theirs.sign(&planted));
+    alex.dir.write_segment(&[planted]).unwrap();
+    let real = log::sign::KeyPair::from_seed([1; 32]).public();
+
+    // Riley's computer saw the planted key; Sam's was told the real one.
+    let riley_keys = dir.join("riley-keys");
+    let (mut riley, _) = log::open_in(&path, actor(3), Ids::seeded(3), Some(&riley_keys)).unwrap();
+    keyed(&mut riley.log, 3);
+    assert!(log::remember_owner_key(&mut riley, &riley_keys, actor(3), T).unwrap());
+    let sam_keys = dir.join("sam-keys");
+    let (sam, _) = log::open_in(&path, actor(4), Ids::seeded(4), Some(&sam_keys)).unwrap();
+    log::trust_owner_key(&sam_keys, &path, &sam.info, real, T).unwrap();
+
+    let (mut owner, _) = log::open_in(&path, actor(1), Ids::seeded(11), None).unwrap();
+    keyed(&mut owner.log, 1);
+    let signer = std::sync::Arc::new(log::sign::KeyPair::from_seed([1; 32]));
+    let new = log::start_again(&owner, signer, None, Ids::seeded(12), T).unwrap();
+
+    let (sam, report) = log::open_in(&path, actor(4), Ids::seeded(5), Some(&sam_keys)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(sam.info.budget_id, new.info.budget_id);
+    assert_eq!(sam.log.owner_key_changed(), None);
+    assert_eq!(sam.log.key_of(actor(1)), Some(real));
+
+    let (riley, _) = log::open_in(&path, actor(3), Ids::seeded(6), Some(&riley_keys)).unwrap();
+    assert_eq!(riley.log.owner_key_changed(), Some(real));
+    log::trust_owner_key(&riley_keys, &path, &riley.info, real, T).unwrap();
+    let (riley, report) = log::open_in(&path, actor(3), Ids::seeded(7), Some(&riley_keys)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(riley.log.key_of(actor(1)), Some(real));
+    let _ = fs::remove_dir_all(&dir);
+}

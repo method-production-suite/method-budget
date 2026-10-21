@@ -4872,6 +4872,16 @@ remembered".
   computer only its own key is remembered. A budget started again has a new id, so its key is
   remembered afresh. **Trust the New Key** rewrites the file, for an owner who moved to a new
   computer without handing over.
+- **A replacement carries what a computer knew** (MReview on pull request #73). Everything
+  that marks a replacement lives in the shared folder, so a member could swap in a log of
+  their own and be remembered as the owner of the "new" budget. Each computer also keeps,
+  per budget file (`owner-keys/paths/<hash of the path>.json`), which budget it knew there,
+  its owner and the owner's key. Opening a log with another budget id there: another owner
+  is refused ("The change log beside this budget was started by someone other than its
+  owner..."); the owner's key it had seen is remembered for the new budget too, so the same
+  key joins without a word and a different one is held until Trust the New Key, whether or
+  not the old folder is still there. After a genuine Start Again over a planted key, the
+  computers that had seen the planted key trust the real one once, after asking the owner.
 - **Not built: option 2** (confirming the owner's key by phone or chat): a step per member
   that people skip. It can sit on top of the remembered key later without a format change.
 - **What it leaves.** A member who joins only after a key was planted, and whose owner never

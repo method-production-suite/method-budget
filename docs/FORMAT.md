@@ -1787,7 +1787,10 @@ sees it, outside the folder (the reference implementation keeps
 `~/.method/owner-keys/<budget id>.json`, `{ "owner", "key", "seen" }`, or under
 `$METHOD_OWNER_KEYS`), and from then on refuse and list a change by the owner that publishes
 or is signed with any other key. Such a reader writes nothing until the person trusts the new
-key. Nothing about it is written into the folder.
+key. Nothing about it is written into the folder. It also keeps, per budget file, which
+budget it knew there, its owner and the owner's key; a log with a new budget id beside that
+file whose genesis actor isn't that owner is refused, and the owner's key it knew is
+remembered for the new budget too (a different key is then held, as above).
 
 These three (the owner's first `grant`, the owner's first `key`, each `revoke`) judge changes
 outside their own future, so a reader that applied a change before one of them arrived

@@ -1945,7 +1945,8 @@ impl SharedDoc {
             .owner_keys
             .clone()
             .ok_or("This computer has nowhere to remember the owner\u{2019}s key.")?;
-        flog::trust_owner_key(&dir, &self.shared.info, key, &iso_now()).map_err(|e| e.0)?;
+        flog::trust_owner_key(&dir, &self.shared.path, &self.shared.info, key, &iso_now())
+            .map_err(|e| e.0)?;
         self.reopen()
     }
 

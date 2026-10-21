@@ -1921,7 +1921,12 @@ the folder is ever a different one, changes signed with it are left out on that 
 listed, the status panel says "The owner's key in this shared budget changed...", and nothing
 is changed or shared there; the command line and MCP server refuse with the same words.
 **Trust the New Key…** (it asks first) takes the new key as the owner's, for an owner who
-moved to a new computer, and reads the budget again.
+moved to a new computer, and reads the budget again. What a computer knew carries over when
+the budget is started again: a log in the folder started by anyone but the owner isn't
+opened as shared (someone with the folder may have replaced it), and a new owner key it
+hadn't seen asks for Trust the New Key… before anything is shared. After the owner starts
+again over a planted key, that is what the people who had seen the planted key see: they
+ask the owner, then trust the new key once.
 
 **Two changes with one number.** A change in someone's name at a number their real change
 also has (a forgery that arrived first, say) never keeps the real one out: every computer

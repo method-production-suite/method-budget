@@ -1263,9 +1263,12 @@ pub fn open_in(
     // Every signature is checked (decisions.md, entry 89).
     log.set_verifier(Arc::new(sign::Ed25519));
     // The owner's key as this computer first saw it, kept outside the
-    // folder (docs/research/owner-key.md, part 2).
-    if let Some(key) = owner_keys.and_then(|d| remembered_owner_key(d, &info)) {
-        log.pin_owner_key(key);
+    // folder (docs/research/owner-key.md, part 2), carried over when the
+    // folder now holds another budget than the one this computer knew here.
+    if let Some(d) = owner_keys {
+        if let Some(key) = carried_owner_key(d, path, &info)? {
+            log.pin_owner_key(key);
+        }
     }
     // The owner is whoever started sharing, as `budget.json` records,
     // whatever order the segments are read in.
@@ -1844,6 +1847,87 @@ pub const REPLACED_FILE: &str = "REPLACED";
 /// the one it saw first.
 pub const OWNER_KEY_CHANGED: &str = "The owner\u{2019}s key in this shared budget isn\u{2019}t the one this computer saw before, so nothing was written. Ask the owner before you go on.";
 
+/// What a computer is told when the log beside a budget it knew now names
+/// another owner: someone else made it, whatever its folder says.
+pub const NOT_SAME_OWNER: &str = "The change log beside this budget was started by someone other than its owner, so it wasn\u{2019}t opened as shared: someone with the shared folder may have replaced it. Ask the owner before you go on.";
+
+/// What this computer knew of the shared budget at one path: which budget,
+/// its owner, and the owner's key when it had seen one.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileKnownBudget {
+    budget_id: String,
+    owner: String,
+    key: Option<String>,
+    seen: String,
+}
+
+fn known_file(dir: &Path, path: &Path) -> PathBuf {
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let name = sha256_hex(path.to_string_lossy().as_bytes());
+    dir.join("paths").join(format!("{name}.json"))
+}
+
+fn known_budget(dir: &Path, path: &Path) -> Option<FileKnownBudget> {
+    let text = read_text(known_file(dir, path)).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn note_budget(
+    dir: &Path,
+    path: &Path,
+    info: &BudgetInfo,
+    key: Option<PublicKey>,
+    time: &str,
+) -> Result<(), LogFileError> {
+    let file = known_file(dir, path);
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent).map_err(|e| io_err(parent, e))?;
+    }
+    let f = FileKnownBudget {
+        budget_id: info.budget_id.clone(),
+        owner: info.genesis.actor.hex(),
+        key: key.map(|k| k.hex()),
+        seen: time.to_string(),
+    };
+    let mut text = serde_json::to_string_pretty(&f).expect("a known budget serializes");
+    text.push('\n');
+    write_sealed(&file, text.as_bytes())
+}
+
+/// The owner key to check the budget `info` describes against, as kept in
+/// `dir`. When the log beside `path` now holds another budget than the one
+/// this computer knew there (the owner started it again, or someone
+/// replaced it), what it knew is carried over (MReview on pull request #73):
+/// another owner is refused ([`NOT_SAME_OWNER`]); the owner's key it had
+/// seen is remembered for the new budget too, so the same key joins without
+/// a word and a different one is kept out until the person trusts it,
+/// whether or not the old folder is still there.
+fn carried_owner_key(
+    dir: &Path,
+    path: &Path,
+    info: &BudgetInfo,
+) -> Result<Option<PublicKey>, LogFileError> {
+    let pin = remembered_owner_key(dir, info);
+    let Some(known) = known_budget(dir, path) else {
+        return Ok(pin);
+    };
+    if known.budget_id == info.budget_id {
+        return Ok(pin);
+    }
+    if ActorId::parse(&known.owner) != Some(info.genesis.actor) {
+        return Err(LogFileError(NOT_SAME_OWNER.into()));
+    }
+    let key = pin.or_else(|| known.key.as_deref().and_then(PublicKey::parse));
+    if pin.is_none() {
+        if let Some(k) = key {
+            write_owner_key(dir, info, k, &known.seen)?;
+        }
+    }
+    note_budget(dir, path, info, key, &known.seen)?;
+    Ok(key)
+}
+
 /// One remembered owner key, as kept on this computer.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1922,17 +2006,31 @@ pub fn remember_owner_key(
     if shared.log.owner_key_pin().is_some() {
         return Ok(false);
     }
+    // Which budget is here and whose it is, so a replacement is told from
+    // a fresh budget (see `carried_owner_key`). An entry for another budget
+    // is moved on only by opening this one through it.
+    let known = known_budget(dir, &shared.path);
+    let ours = known
+        .as_ref()
+        .is_none_or(|k| k.budget_id == shared.info.budget_id);
     if let Some(key) = remembered_owner_key(dir, &shared.info) {
         shared.log.pin_owner_key(key);
+        if ours && known.as_ref().is_none_or(|k| k.key.is_none()) {
+            note_budget(dir, &shared.path, &shared.info, Some(key), time)?;
+        }
         return Ok(false);
     }
     let owner = shared.info.genesis.actor;
-    let Some(key) = shared.log.key_of(owner) else {
+    let key = shared
+        .log
+        .key_of(owner)
+        .filter(|k| person != owner || shared.log.signer_key() == Some(*k));
+    if ours && (known.is_none() || key.is_some()) {
+        note_budget(dir, &shared.path, &shared.info, key, time)?;
+    }
+    let Some(key) = key else {
         return Ok(false);
     };
-    if person == owner && shared.log.signer_key() != Some(key) {
-        return Ok(false);
-    }
     write_owner_key(dir, &shared.info, key, time)?;
     shared.log.pin_owner_key(key);
     Ok(true)
@@ -1944,11 +2042,13 @@ pub fn remember_owner_key(
 /// take in what the old key kept aside.
 pub fn trust_owner_key(
     dir: &Path,
+    path: &Path,
     info: &BudgetInfo,
     key: PublicKey,
     time: &str,
 ) -> Result<(), LogFileError> {
-    write_owner_key(dir, info, key, time)
+    write_owner_key(dir, info, key, time)?;
+    note_budget(dir, path, info, Some(key), time)
 }
 
 /// Whether the log folder beside this budget now belongs to another budget
