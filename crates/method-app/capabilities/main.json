@@ -230,6 +230,8 @@
     "allow-share-use-value",
     "allow-share-set-role",
     "allow-share-remove-person",
+    "allow-share-start-again",
+    "allow-share-reopen",
     "allow-library-view",
     "allow-library-create",
     "allow-library-choose",
