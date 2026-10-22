@@ -1197,23 +1197,22 @@ pub fn confirm_overwrite<R: Runtime>(
         }
         s.display_name()
     };
-    const REPLACE: &str = "Replace";
+    let replace = crate::i18n::tr("dialog.replace");
     let choice = window
         .dialog()
-        .message(format!(
-            "This budget was recovered after the app closed unexpectedly. Saving replaces \
-             {name} on disk with the recovered budget. The file as it is now is kept in \
-             File > Revert to Backup."
+        .message(crate::i18n::tr_with(
+            "dialog.recovered_save",
+            &[("name", &name)],
         ))
-        .title("Save recovered budget?")
+        .title(crate::i18n::tr("dialog.recovered_save_title"))
         .kind(MessageDialogKind::Warning)
         .buttons(MessageDialogButtons::OkCancelCustom(
-            "Cancel".into(),
-            REPLACE.into(),
+            crate::i18n::tr("dialog.cancel"),
+            replace.clone(),
         ))
         .parent(window)
         .blocking_show_with_result();
-    choice == MessageDialogResult::Custom(REPLACE.into())
+    choice == MessageDialogResult::Custom(replace)
 }
 
 #[cfg(test)]

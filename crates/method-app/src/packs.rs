@@ -385,8 +385,11 @@ pub async fn pack_export<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Export setup pack")
-        .add_filter(crate::app::FILTER_NAME, &[method_format::EXTENSION])
+        .set_title(crate::i18n::tr("dialog.export_setup_pack"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget"),
+            &[method_format::EXTENSION],
+        )
         .set_file_name(format!(
             "{}.{}",
             crate::app::safe_file_stem(&details.title),
@@ -427,7 +430,9 @@ pub async fn pack_import_pick<R: Runtime>(
 ) -> Result<Option<PackReview>, String> {
     let target = state.lock_doc(doc)?.id();
     let start = packs.user_dir.clone().filter(|d| d.is_dir());
-    let Some(path) = crate::app::pick_budget(&window, "Import setup pack", start)? else {
+    let Some(path) =
+        crate::app::pick_budget(&window, &crate::i18n::tr("dialog.import_setup_pack"), start)?
+    else {
         return Ok(None);
     };
     review_file(&state, &library, &sources, target, &path, &into).map(Some)

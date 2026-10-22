@@ -70,7 +70,9 @@ pub async fn import_setup_pick<R: Runtime>(
         let s = state.lock_doc(doc)?;
         (s.id(), s.path().and_then(|p| p.parent()).map(PathBuf::from))
     };
-    let Some(path) = crate::app::pick_budget(&window, "Import setup from", start)? else {
+    let Some(path) =
+        crate::app::pick_budget(&window, &crate::i18n::tr("dialog.import_setup_from"), start)?
+    else {
         return Ok(None);
     };
     let (label, budget) = read_source(&state.docs(), target, &path)?;

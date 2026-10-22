@@ -120,8 +120,11 @@ pub async fn rate_import_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import a rate table")
-        .add_filter("Spreadsheet", &["xlsx", "csv", "tsv", "txt"])
+        .set_title(crate::i18n::tr("dialog.import_a_rate_table"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_spreadsheet"),
+            &["xlsx", "csv", "tsv", "txt"],
+        )
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

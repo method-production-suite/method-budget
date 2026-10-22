@@ -341,7 +341,7 @@ pub async fn library_create<R: Runtime>(
     let Some(picked) = window
         .dialog()
         .file()
-        .set_title("Choose a folder for your library")
+        .set_title(crate::i18n::tr("dialog.choose_a_folder_for_your_library"))
         .set_parent(&window)
         .blocking_pick_folder()
     else {
@@ -374,7 +374,12 @@ pub async fn library_choose<R: Runtime>(
         .as_deref()
         .and_then(Path::parent)
         .map(PathBuf::from);
-    let Some(path) = crate::app::pick_budget(&window, "Choose your library", start)? else {
+    let Some(path) = crate::app::pick_budget(
+        &window,
+        &crate::i18n::tr("dialog.choose_your_library"),
+        start,
+    )?
+    else {
         return Ok(None);
     };
     read(&state.docs(), &path)?;

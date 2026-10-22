@@ -11,6 +11,12 @@
 //! `other`...). `{name}` in the words is filled in by [`tr_with`]. Only
 //! English exists, so Rust always uses it; the page picks the system's
 //! language from its tables, with English for anything missing.
+//!
+//! Words that arrive from the engine as data (an edit refused, a number
+//! that doesn't read) go through [`engine`]: method-session makes each from
+//! a stable code and its parameters (`method_session::messages`), and the
+//! table's entry for the code is the same English, so the person sees it in
+//! their language, or as the engine wrote it when the table has no entry.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -45,35 +51,100 @@ fn english() -> &'static BTreeMap<String, Value> {
     TABLE.get_or_init(|| parse_table(EN).expect("ui/i18n/en.js is a JSON object (tested)"))
 }
 
-/// The words for `key` (the `other` form of a plural entry). A missing key
-/// gives the key itself; the tests keep that from happening.
-pub fn tr(key: &str) -> String {
-    match english().get(key) {
-        Some(Value::String(s)) => s.clone(),
-        Some(Value::Object(forms)) => forms
-            .get("other")
-            .and_then(Value::as_str)
-            .unwrap_or(key)
-            .to_string(),
-        _ => {
-            debug_assert!(false, "i18n: {key} is not in ui/i18n/en.js");
-            key.to_string()
+/// The words for `key`: for a plural entry, the `one` form when `count` is
+/// 1 and the `other` form otherwise (English's rule). `None` when the table
+/// has no such entry.
+fn lookup(key: &str, count: Option<&str>) -> Option<String> {
+    match english().get(key)? {
+        Value::String(s) => Some(s.clone()),
+        Value::Object(forms) => {
+            let form = if count == Some("1") && forms.contains_key("one") {
+                "one"
+            } else {
+                "other"
+            };
+            forms.get(form).and_then(Value::as_str).map(str::to_string)
         }
+        _ => None,
     }
 }
 
-/// [`tr`] with `{name}` filled in from `params`.
+/// The words for `key` (the `other` form of a plural entry). A missing key
+/// gives the key itself; the tests keep that from happening.
+pub fn tr(key: &str) -> String {
+    lookup(key, None).unwrap_or_else(|| {
+        debug_assert!(false, "i18n: {key} is not in ui/i18n/en.js");
+        key.to_string()
+    })
+}
+
+/// [`tr`] with `{name}` filled in from `params`, in one pass (a value
+/// holding `{other}` is left as it is).
 pub fn tr_with(key: &str, params: &[(&str, &str)]) -> String {
-    let mut out = tr(key);
-    for (name, value) in params {
-        out = out.replace(&format!("{{{name}}}"), value);
-    }
-    out
+    fill(&tr(key), params)
+}
+
+/// The words for `key`, a count's entry, in the form for `count`, with
+/// `{count}` and `params` filled in.
+pub fn tr_count(key: &str, count: usize, params: &[(&str, &str)]) -> String {
+    let n = count.to_string();
+    let words = lookup(key, Some(&n)).unwrap_or_else(|| {
+        debug_assert!(false, "i18n: {key} is not in ui/i18n/en.js");
+        key.to_string()
+    });
+    let mut all = vec![("count", n.as_str())];
+    all.extend_from_slice(params);
+    fill(&words, &all)
+}
+
+/// An engine message in the person's language: when `text` is one of the
+/// engine's messages (`method_session::messages::recognize`), the table's
+/// words for its code with its parameters filled in, a noun or reason
+/// inside it translated the same way; otherwise, or when the table has no
+/// entry for the code, `text` as it is. In English the result is `text`.
+pub fn engine(text: &str) -> String {
+    use method_session::messages::{recognize, NESTED};
+    let Some(m) = recognize(text) else {
+        return text.to_string();
+    };
+    let count = m
+        .params
+        .iter()
+        .find(|(n, _)| *n == "count")
+        .map(|(_, v)| v.as_str());
+    let Some(words) = lookup(m.code, count) else {
+        return text.to_string();
+    };
+    let params: Vec<(&str, String)> = m
+        .params
+        .iter()
+        .map(|(n, v)| {
+            (
+                *n,
+                if NESTED.contains(n) {
+                    engine(v)
+                } else {
+                    v.clone()
+                },
+            )
+        })
+        .collect();
+    fill(&words, &params)
+}
+
+/// [`engine`] over an error, for a command's result.
+pub fn engine_err<T>(r: Result<T, String>) -> Result<T, String> {
+    r.map_err(|e| engine(&e))
+}
+
+fn fill<V: AsRef<str>>(words: &str, params: &[(&str, V)]) -> String {
+    method_session::messages::fill(words, params)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use method_session::messages::{msg, MESSAGES};
     use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
@@ -384,12 +455,15 @@ mod tests {
         (keyed, loose)
     }
 
-    /// The keys Rust looks up: every `tr("key"` and `tr_with("key"` in src/,
-    /// and each menu item's `menu.<id>`.
+    /// The keys Rust looks up: every `tr("key"`, `tr_with("key"` and
+    /// `tr_count("key"` in src/,
+    /// each menu item's `menu.<id>`, and every engine message's code
+    /// (looked up by [`engine`]).
     fn keys_in_rust() -> BTreeSet<String> {
         let mut keys: BTreeSet<String> = crate::menu::item_ids()
             .into_iter()
             .map(|id| format!("menu.{id}"))
+            .chain(MESSAGES.iter().map(|m| m.code.to_string()))
             .collect();
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         for e in std::fs::read_dir(src).unwrap() {
@@ -398,7 +472,8 @@ mod tests {
                 continue;
             }
             let rs = std::fs::read_to_string(&p).unwrap();
-            for needle in ["tr(\"", "tr_with(\""] {
+            // The key may be on the next line, as rustfmt breaks a long call.
+            for needle in ["tr(", "tr_with(", "tr_count("] {
                 let mut from = 0;
                 while let Some(at) = rs[from..].find(needle) {
                     let start = from + at;
@@ -406,8 +481,11 @@ mod tests {
                     if rs[..start].chars().next_back().is_some_and(is_ident) {
                         continue;
                     }
-                    let end = rs[from..].find('"').unwrap();
-                    keys.insert(rs[from..from + end].to_string());
+                    let Some(rest) = rs[from..].trim_start().strip_prefix('"') else {
+                        continue;
+                    };
+                    let end = rest.find('"').unwrap();
+                    keys.insert(rest[..end].to_string());
                 }
             }
         }
@@ -593,5 +671,98 @@ mod tests {
         assert_eq!(tr_with(key, &[("name", "X")]), words.replace("{name}", "X"));
         assert!(parse_table("export default { \"a\": \"b\" };").is_ok());
         assert!(parse_table("{}").is_err());
+    }
+
+    /// The table's entry for each engine message is the engine's English,
+    /// so what the person reads doesn't change.
+    #[test]
+    fn engine_messages_are_in_the_table_as_the_engine_writes_them() {
+        let table = parse_table(EN).unwrap();
+        for m in MESSAGES {
+            let entry = table.get(m.code);
+            match (m.one, entry) {
+                (None, Some(Value::String(s))) => assert_eq!(s, m.other, "{}", m.code),
+                (Some(one), Some(Value::Object(forms))) => {
+                    assert_eq!(
+                        forms.get("one").and_then(Value::as_str),
+                        Some(one),
+                        "{}",
+                        m.code
+                    );
+                    assert_eq!(
+                        forms.get("other").and_then(Value::as_str),
+                        Some(m.other),
+                        "{}",
+                        m.code
+                    );
+                }
+                (_, e) => panic!("{}: the table has {e:?}", m.code),
+            }
+        }
+    }
+
+    #[test]
+    fn engine_messages_come_through_the_table_unchanged_in_english() {
+        let samples = [
+            msg("engine.edit.account_gone", &[("code", &"1100")]),
+            msg(
+                "engine.edit.cant_be_negative",
+                &[("what", &msg("engine.what.row_cap", &[("row", &3)]))],
+            ),
+            msg(
+                "engine.edit.lines_use_currency",
+                &[("count", &1), ("code", &"EUR")],
+            ),
+            msg(
+                "engine.edit.lines_use_currency",
+                &[("count", &4), ("code", &"EUR")],
+            ),
+            msg(
+                "engine.edit.formula_refused",
+                &[
+                    ("what", &"Amt"),
+                    ("value", &"1/0"),
+                    ("why", &"it divides by zero"),
+                ],
+            ),
+            "Not an engine message.".to_string(),
+        ];
+        for text in samples {
+            assert_eq!(engine(&text), text);
+        }
+        assert_eq!(engine_err::<()>(Err("x".into())), Err("x".to_string()));
+    }
+
+    /// Dialog words method-session also writes (for the browser build) are
+    /// the table's words for them.
+    #[test]
+    fn dialog_words_match_the_engine() {
+        use method_format::export::Format;
+        use method_session::export::dialog_text;
+        for f in [Format::Xlsx, Format::Csv, Format::Tsv] {
+            let (title, filter, _) = dialog_text(f, "x");
+            assert_eq!(
+                crate::export::dialog_words(f),
+                (title.into(), filter.into())
+            );
+        }
+        for (purpose, key) in [
+            ("diff", "dialog.merge_pick_diff"),
+            ("copy", "dialog.merge_pick_copy"),
+            ("base", "dialog.merge_pick_base"),
+        ] {
+            assert_eq!(
+                method_session::diffmerge::pick_title(purpose).unwrap(),
+                tr(key)
+            );
+        }
+        assert_eq!(
+            method_session::open_any::ALL_FILTER,
+            tr("dialog.filter_all_openable")
+        );
+        assert_eq!(
+            tr_count("dialog.unsaved_many", 2, &[("list", "a\nb")]),
+            "2 budgets have unsaved changes:\n\na\nb\n\nSave them before closing? If you don't, they will be lost."
+        );
     }
 }

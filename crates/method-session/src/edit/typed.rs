@@ -17,6 +17,7 @@ use super::{
     optional_money, parse_dec, percent, picked_names, put_fringe, ChargeInput, CreditCapInput,
     CreditInput, CreditSourceInput, CurrencyInput, EditError, FringeInput,
 };
+use crate::messages::{msg, word};
 
 /// Adds or replaces a fringe; a flat fringe's unit that isn't one of the
 /// budget's units is not found.
@@ -24,7 +25,10 @@ pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> Result<(), Edi
     if f.kind == "flat" {
         if let Some(u) = f.unit.as_deref().and_then(optional) {
             if !b.units.contains_key(&u) {
-                return Err(EditError::NotFound(format!("there is no unit {u}")));
+                return Err(EditError::NotFound(msg(
+                    "engine.edit.no_such",
+                    &[("what", &word("engine.what.unit")), ("name", &u)],
+                )));
             }
         }
     }
@@ -39,8 +43,9 @@ pub fn add_category(
 ) -> Result<usize, EditError> {
     let code = category_code(&b.account_coding, code)?;
     if category_exists(b, &code, None) {
-        return Err(EditError::Refused(format!(
-            "category {code} already exists"
+        return Err(EditError::Refused(msg(
+            "engine.edit.category_exists",
+            &[("code", &code)],
         )));
     }
     let row = TopsheetRow::Category(Category {
@@ -57,7 +62,7 @@ pub fn add_production_total(
     name: &str,
     at: Option<usize>,
 ) -> Result<usize, EditError> {
-    let name = optional(name).ok_or("production total name is empty")?;
+    let name = optional(name).ok_or_else(|| word("engine.edit.production_total_name_empty"))?;
     Ok(insert_at(
         b,
         at,
@@ -72,19 +77,16 @@ pub fn update_topsheet_row(
     name: &str,
 ) -> Result<(), EditError> {
     let new_code = match (b.topsheet.get(index), code) {
-        (None, _) => {
-            return Err(EditError::NotFound(
-                "that topsheet row no longer exists".into(),
-            ))
-        }
+        (None, _) => return Err(EditError::NotFound(word("engine.edit.topsheet_row_gone"))),
         // The number as it is stays as it is, even one the pattern can't
         // read (a chart's own numbers may not follow it).
         (Some(TopsheetRow::Category(c)), Some(typed)) if typed.trim() == c.code => None,
         (Some(TopsheetRow::Category(_)), Some(typed)) => {
             let code = category_code(&b.account_coding, typed)?;
             if category_exists(b, &code, Some(index)) {
-                return Err(EditError::Refused(format!(
-                    "category {code} already exists"
+                return Err(EditError::Refused(msg(
+                    "engine.edit.category_exists",
+                    &[("code", &code)],
                 )));
             }
             Some(code)
@@ -99,7 +101,8 @@ pub fn update_topsheet_row(
             c.name = name.trim().to_string();
         }
         TopsheetRow::ProductionTotal(p) => {
-            p.name = optional(name).ok_or("production total name is empty")?;
+            p.name =
+                optional(name).ok_or_else(|| word("engine.edit.production_total_name_empty"))?;
         }
     }
     Ok(())
@@ -107,9 +110,7 @@ pub fn update_topsheet_row(
 
 pub fn delete_topsheet_row(b: &mut Budget, index: usize) -> Result<(), EditError> {
     if index >= b.topsheet.len() {
-        return Err(EditError::NotFound(
-            "that topsheet row no longer exists".into(),
-        ));
+        return Err(EditError::NotFound(word("engine.edit.topsheet_row_gone")));
     }
     b.topsheet.remove(index);
     b.fringe_row.row_removed(index);
@@ -125,12 +126,17 @@ pub fn add_account(
 ) -> Result<String, EditError> {
     let code = account_code(&b.account_coding, code)?;
     if account_exists(b, &code, None) {
-        return Err(EditError::Refused(format!("account {code} already exists")));
+        return Err(EditError::Refused(msg(
+            "engine.edit.account_exists",
+            &[("code", &code)],
+        )));
     }
     let cat = b
         .categories_mut()
         .find(|c| c.code == category)
-        .ok_or_else(|| EditError::NotFound(format!("category {category} no longer exists")))?;
+        .ok_or_else(|| {
+            EditError::NotFound(msg("engine.edit.category_gone", &[("code", &category)]))
+        })?;
     let at = match after {
         None => cat.accounts.len(),
         Some(a) => {
@@ -138,7 +144,10 @@ pub fn add_account(
                 .iter()
                 .position(|x| x.code == a)
                 .ok_or_else(|| {
-                    EditError::NotFound(format!("account {a} is not in category {category}"))
+                    EditError::NotFound(msg(
+                        "engine.edit.account_not_in_category",
+                        &[("code", &a), ("category", &category)],
+                    ))
                 })?
                 + 1
         }
@@ -169,8 +178,9 @@ pub fn update_account(
         account_code(&b.account_coding, new_code)?
     };
     if new_code != code && account_exists(b, &new_code, Some(code)) {
-        return Err(EditError::Refused(format!(
-            "account {new_code} already exists"
+        return Err(EditError::Refused(msg(
+            "engine.edit.account_exists",
+            &[("code", &new_code)],
         )));
     }
     let acct = account_mut(b, code).map_err(EditError::NotFound)?;
@@ -186,26 +196,32 @@ pub fn delete_account(b: &mut Budget, code: &str) -> Result<(), EditError> {
             return Ok(());
         }
     }
-    Err(EditError::NotFound(format!(
-        "account {code} no longer exists"
+    Err(EditError::NotFound(msg(
+        "engine.edit.account_gone",
+        &[("code", &code)],
     )))
 }
 
 pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> Result<(), EditError> {
     let name = name.trim();
     if !is_ident(name) {
-        return Err(EditError::Invalid(format!(
-            "`{name}` can't be a global name: use letters, digits and _, with at least one letter or _"
+        return Err(EditError::Invalid(msg(
+            "engine.edit.global_name",
+            &[("name", &name)],
         )));
     }
     let formula = formula.trim();
     if formula.is_empty() {
-        return Err(EditError::Invalid(format!("global {name} needs a value")));
+        return Err(EditError::Invalid(msg(
+            "engine.edit.global_needs_value",
+            &[("name", &name)],
+        )));
     }
     // Refused as the reference product refuses it (decisions.md, entry 60).
     if let Some(why) = method_core::edit::refused_global(b, name, formula) {
-        return Err(EditError::Refused(format!(
-            "global {name} can't be {formula}: {why}"
+        return Err(EditError::Refused(msg(
+            "engine.edit.global_refused",
+            &[("name", &name), ("formula", &formula), ("why", &why)],
         )));
     }
     b.globals
@@ -215,8 +231,9 @@ pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> Result<(), EditE
 
 pub fn delete_group(b: &mut Budget, name: &str) -> Result<(), EditError> {
     if !b.groups.contains_key(name) {
-        return Err(EditError::NotFound(format!(
-            "group {name} no longer exists"
+        return Err(EditError::NotFound(msg(
+            "engine.edit.group_gone",
+            &[("name", &name)],
         )));
     }
     check_group_delete(b, name)?;
@@ -242,24 +259,25 @@ pub fn check_group_delete(b: &Budget, name: &str) -> Result<(), EditError> {
             .any(|r| matches!(&r.source, CreditSource::Group { group, .. } if group == name))
     });
     match used_by {
-        Some(c) => Err(EditError::Refused(format!(
-            "group {name} is used by the credit {}; change the credit first",
-            c.name
+        Some(c) => Err(EditError::Refused(msg(
+            "engine.edit.group_used_by_credit",
+            &[("name", &name), ("credit", &c.name)],
         ))),
         None => Ok(()),
     }
 }
 
 pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> Result<(), EditError> {
-    let code = check_name(code, "currency")?;
+    let code = check_name(code, &word("engine.what.currency"))?;
     if code == b.base_currency {
-        return Err(EditError::Refused(format!("{code} is the base currency")));
+        return Err(EditError::Refused(msg(
+            "engine.edit.base_currency",
+            &[("code", &code)],
+        )));
     }
-    let rate = parse_dec(&c.rate, "rate")?;
+    let rate = parse_dec(&c.rate, &word("engine.what.rate"))?;
     if rate <= Dec::ZERO {
-        return Err(EditError::Invalid(
-            "an exchange rate must be more than 0".into(),
-        ));
+        return Err(EditError::Invalid(word("engine.edit.exchange_rate_zero")));
     }
     let old = b
         .currencies
@@ -268,12 +286,8 @@ pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> Result<(),
         .unwrap_or_default();
     let separators = match c.separators.as_deref() {
         None => old.separators,
-        Some(s) => method_core::Separators::parse(s).ok_or_else(|| {
-            format!(
-                "separators should be 1,234.56 or 1.234,56, not `{}`",
-                s.trim()
-            )
-        })?,
+        Some(s) => method_core::Separators::parse(s)
+            .ok_or_else(|| msg("engine.edit.separators", &[("text", &s.trim())]))?,
     };
     b.currencies.insert(
         code,
@@ -292,8 +306,9 @@ pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> Result<(),
 
 pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> Result<(), EditError> {
     if !b.currencies.contains_key(code) {
-        return Err(EditError::NotFound(format!(
-            "currency {code} no longer exists"
+        return Err(EditError::NotFound(msg(
+            "engine.edit.currency_gone",
+            &[("code", &code)],
         )));
     }
     if move_lines {
@@ -311,9 +326,9 @@ pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> Res
         .filter(|d| d.currency.as_deref() == Some(code))
         .count();
     if lines > 0 {
-        let s = if lines == 1 { "line uses" } else { "lines use" };
-        return Err(EditError::Refused(format!(
-            "{lines} {s} {code}; change them first"
+        return Err(EditError::Refused(msg(
+            "engine.edit.lines_use_currency",
+            &[("count", &lines), ("code", &code)],
         )));
     }
     check_currency_delete(b, code)?;
@@ -326,8 +341,9 @@ pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> Res
 /// totals are shown in it, or a charge is.
 pub fn check_currency_delete(b: &Budget, code: &str) -> Result<(), EditError> {
     if b.totals_currency.as_deref() == Some(code) {
-        return Err(EditError::Refused(format!(
-            "totals are shown in {code}; change that first"
+        return Err(EditError::Refused(msg(
+            "engine.edit.totals_in_currency",
+            &[("code", &code)],
         )));
     }
     let charged = b
@@ -335,8 +351,9 @@ pub fn check_currency_delete(b: &Budget, code: &str) -> Result<(), EditError> {
         .iter()
         .any(|c| matches!(&c.kind, ChargeKind::Flat { currency: Some(cur), .. } if cur == code));
     if charged {
-        return Err(EditError::Refused(format!(
-            "a charge is in {code}; change it first"
+        return Err(EditError::Refused(msg(
+            "engine.edit.charge_in_currency",
+            &[("code", &code)],
         )));
     }
     Ok(())
@@ -367,45 +384,55 @@ pub fn build_charge(
 ) -> Result<Charge, EditError> {
     let old = match index {
         Some(i) => {
-            check_index(b.charges.len(), i, "charge").map_err(EditError::NotFound)?;
+            check_index(b.charges.len(), i, &word("engine.what.charge"))
+                .map_err(EditError::NotFound)?;
             Some(b.charges[i].clone())
         }
         None => None,
     };
     let name = c.name.trim();
     if name.is_empty() {
-        return Err(EditError::Invalid("charge name is empty".into()));
+        return Err(EditError::Invalid(word("engine.edit.charge_name_empty")));
     }
     if b.charges
         .iter()
         .enumerate()
         .any(|(i, x)| Some(i) != index && x.name == name)
     {
-        return Err(EditError::Refused(format!(
-            "there is already a charge named {name}"
+        return Err(EditError::Refused(msg(
+            "engine.edit.charge_exists",
+            &[("name", &name)],
         )));
     }
     let kind = match c.kind.as_str() {
-        "percent" => {
-            ChargeKind::Percent(percent(c.percent.as_deref().unwrap_or(""), "the percent")?)
-        }
+        "percent" => ChargeKind::Percent(percent(
+            c.percent.as_deref().unwrap_or(""),
+            &word("engine.what.the_percent"),
+        )?),
         "flat" => {
             let text = c.amount.as_deref().unwrap_or("").trim();
             if text.is_empty() {
-                return Err(EditError::Invalid("a flat charge needs an amount".into()));
+                return Err(EditError::Invalid(word(
+                    "engine.edit.flat_charge_needs_amount",
+                )));
             }
             ChargeKind::Flat {
-                amount: money_at_least_zero(text, "the amount")?,
+                amount: money_at_least_zero(text, &word("engine.what.the_amount"))?,
                 currency: amount_currency(b, c.currency.as_deref()).map_err(EditError::NotFound)?,
             }
         }
-        other => return Err(EditError::Invalid(format!("unknown charge kind `{other}`"))),
+        other => {
+            return Err(EditError::Invalid(msg(
+                "engine.edit.unknown_charge_kind",
+                &[("kind", &other)],
+            )))
+        }
     };
     let mut excluded_amounts = Vec::with_capacity(c.excluded_amounts.len());
     for x in &c.excluded_amounts {
         excluded_amounts.push((
             x.description.trim().to_string(),
-            money_at_least_zero(&x.amount, "an excluded amount")?,
+            money_at_least_zero(&x.amount, &word("engine.what.an_excluded_amount"))?,
         ));
     }
     let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
@@ -425,21 +452,21 @@ pub fn build_charge(
             &c.excluded_groups,
             &groups,
             old.as_ref().map(|o| &o.excluded_groups),
-            "group",
+            &word("engine.what.group"),
         )
         .map_err(EditError::NotFound)?,
         excluded_categories: picked_names(
             &c.excluded_categories,
             &categories,
             old.as_ref().map(|o| &o.excluded_categories),
-            "category",
+            &word("engine.what.category"),
         )
         .map_err(EditError::NotFound)?,
         excluded_accounts: picked_names(
             &c.excluded_accounts,
             &accounts,
             old.as_ref().map(|o| &o.excluded_accounts),
-            "account",
+            &word("engine.what.account"),
         )
         .map_err(EditError::NotFound)?,
         label_percent: c
@@ -458,32 +485,32 @@ pub fn set_credit(
 ) -> Result<usize, EditError> {
     let old = match index {
         Some(i) => {
-            check_index(b.credits.len(), i, "credit").map_err(EditError::NotFound)?;
+            check_index(b.credits.len(), i, &word("engine.what.credit"))
+                .map_err(EditError::NotFound)?;
             Some(b.credits[i].clone())
         }
         None => None,
     };
     let name = c.name.trim();
     if name.is_empty() {
-        return Err(EditError::Invalid("credit name is empty".into()));
+        return Err(EditError::Invalid(word("engine.edit.credit_name_empty")));
     }
     if b.credits
         .iter()
         .enumerate()
         .any(|(i, x)| Some(i) != index && x.name == name)
     {
-        return Err(EditError::Refused(format!(
-            "there is already a credit named {name}"
+        return Err(EditError::Refused(msg(
+            "engine.edit.credit_exists",
+            &[("name", &name)],
         )));
     }
     let discount_percent = match c.discount_percent.as_deref().map(str::trim) {
         None | Some("") => Dec::ZERO,
         Some(t) => {
-            let d = percent(t, "the discount")?;
+            let d = percent(t, &word("engine.what.the_discount"))?;
             if d > Dec::from_int(100) {
-                return Err(EditError::Invalid(
-                    "the discount can't be more than 100%".into(),
-                ));
+                return Err(EditError::Invalid(word("engine.edit.discount_over_100")));
             }
             d
         }
@@ -533,35 +560,46 @@ pub fn set_credit(
         .map(str::to_string);
     let shared_amount = match (&shared_cap, c.shared_cap_amount.as_deref().map(str::trim)) {
         (None, Some(a)) if !a.is_empty() => {
-            return Err(EditError::Invalid(
-                "a shared cap amount needs a shared cap name".into(),
-            ))
+            return Err(EditError::Invalid(word(
+                "engine.edit.shared_cap_needs_name",
+            )))
         }
         (None, _) => None,
         (Some(n), None | Some("")) => {
             if !b.shared_caps.contains_key(n) {
-                return Err(EditError::Invalid(format!(
-                    "the shared cap {n} is new, so it needs an amount"
+                return Err(EditError::Invalid(msg(
+                    "engine.edit.shared_cap_needs_amount",
+                    &[("name", &n)],
                 )));
             }
             None
         }
-        (Some(n), Some(a)) => Some((n.clone(), money_at_least_zero(a, "the shared cap")?)),
+        (Some(n), Some(a)) => Some((
+            n.clone(),
+            money_at_least_zero(a, &word("engine.what.the_shared_cap"))?,
+        )),
     };
     let mut rows = Vec::with_capacity(c.rows.len());
     for (i, r) in c.rows.iter().enumerate() {
         let n = i + 1;
         let source = match &r.source {
-            CreditSourceInput::Flat { amount } => {
-                CreditSource::Flat(money_at_least_zero(amount, &format!("row {n}'s amount"))?)
-            }
+            CreditSourceInput::Flat { amount } => CreditSource::Flat(money_at_least_zero(
+                amount,
+                &msg("engine.what.row_amount", &[("row", &n)]),
+            )?),
             CreditSourceInput::Group { group } => {
                 let g = group.trim();
                 if g.is_empty() {
-                    return Err(EditError::Invalid(format!("row {n} needs a group")));
+                    return Err(EditError::Invalid(msg(
+                        "engine.edit.row_needs_group",
+                        &[("row", &n)],
+                    )));
                 }
                 if !groups.contains(g) && !old_groups.contains(g) {
-                    return Err(EditError::NotFound(format!("there is no group `{g}`")));
+                    return Err(EditError::NotFound(msg(
+                        "engine.edit.credit_no_group",
+                        &[("name", &g)],
+                    )));
                 }
                 CreditSource::Group {
                     group: g.to_string(),
@@ -570,10 +608,16 @@ pub fn set_credit(
             CreditSourceInput::Category { category } => {
                 let c = category.trim();
                 if c.is_empty() {
-                    return Err(EditError::Invalid(format!("row {n} needs a category")));
+                    return Err(EditError::Invalid(msg(
+                        "engine.edit.row_needs_category",
+                        &[("row", &n)],
+                    )));
                 }
                 if !categories.contains(c) && !old_categories.contains(c) {
-                    return Err(EditError::NotFound(format!("there is no category `{c}`")));
+                    return Err(EditError::NotFound(msg(
+                        "engine.edit.credit_no_category",
+                        &[("code", &c)],
+                    )));
                 }
                 CreditSource::Category {
                     category: c.to_string(),
@@ -582,10 +626,16 @@ pub fn set_credit(
             CreditSourceInput::Account { account } => {
                 let a = account.trim();
                 if a.is_empty() {
-                    return Err(EditError::Invalid(format!("row {n} needs an account")));
+                    return Err(EditError::Invalid(msg(
+                        "engine.edit.row_needs_account",
+                        &[("row", &n)],
+                    )));
                 }
                 if !accounts.contains(a) && !old_accounts.contains(a) {
-                    return Err(EditError::NotFound(format!("there is no account `{a}`")));
+                    return Err(EditError::NotFound(msg(
+                        "engine.edit.credit_no_account",
+                        &[("code", &a)],
+                    )));
                 }
                 CreditSource::Account {
                     account: a.to_string(),
@@ -594,17 +644,18 @@ pub fn set_credit(
         };
         let cap = match &r.cap {
             CreditCapInput::None => CreditCap::None,
-            CreditCapInput::QualifiedSpend { amount } => {
-                CreditCap::QualifiedSpend(money_at_least_zero(amount, &format!("row {n}'s cap"))?)
-            }
-            CreditCapInput::Credit { amount } => {
-                CreditCap::Credit(money_at_least_zero(amount, &format!("row {n}'s cap"))?)
-            }
+            CreditCapInput::QualifiedSpend { amount } => CreditCap::QualifiedSpend(
+                money_at_least_zero(amount, &msg("engine.what.row_cap", &[("row", &n)]))?,
+            ),
+            CreditCapInput::Credit { amount } => CreditCap::Credit(money_at_least_zero(
+                amount,
+                &msg("engine.what.row_cap", &[("row", &n)]),
+            )?),
         };
         rows.push(CreditRow {
             description: r.description.trim().to_string(),
             source,
-            percent: percent(&r.percent, &format!("row {n}'s percent"))?,
+            percent: percent(&r.percent, &msg("engine.what.row_percent", &[("row", &n)]))?,
             cap,
         });
     }
@@ -612,19 +663,32 @@ pub fn set_credit(
         name: name.to_string(),
         account: optional_account(b, c.account.as_deref())?,
         applied: c.applied,
-        cap: optional_money(c.cap.as_deref(), "the cap")?,
+        cap: optional_money(c.cap.as_deref(), &word("engine.what.the_cap"))?,
         discount_percent,
-        excluded_fringes: picked_names(&c.excluded_fringes, &fringes, Some(&old_fringes), "fringe")
-            .map_err(EditError::NotFound)?,
-        locations: picked_names(&c.locations, &locations, Some(&old_locations), "location")
-            .map_err(EditError::NotFound)?,
+        excluded_fringes: picked_names(
+            &c.excluded_fringes,
+            &fringes,
+            Some(&old_fringes),
+            &word("engine.what.fringe"),
+        )
+        .map_err(EditError::NotFound)?,
+        locations: picked_names(
+            &c.locations,
+            &locations,
+            Some(&old_locations),
+            &word("engine.what.location"),
+        )
+        .map_err(EditError::NotFound)?,
         minimum_spend: match c.minimum_spend.as_deref().map(str::trim) {
             None | Some("") => None,
-            Some(t) => Some(money_at_least_zero(t, "the minimum spend")?),
+            Some(t) => Some(money_at_least_zero(
+                t,
+                &word("engine.what.the_minimum_spend"),
+            )?),
         },
         broker_fee: match c.broker_fee.as_deref().map(str::trim) {
             None | Some("") => 0,
-            Some(t) => money_at_least_zero(t, "the broker's fee")?,
+            Some(t) => money_at_least_zero(t, &word("engine.what.the_brokers_fee"))?,
         },
         shared_cap,
         rows,

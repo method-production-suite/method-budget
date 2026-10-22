@@ -27,9 +27,9 @@ pub const MAX_CELLS: usize = 100_000;
 /// set.
 pub fn set_cells(b: &mut Budget, edits: &[CellEdit]) -> EditResult<usize> {
     if edits.len() > MAX_CELLS {
-        return Err(format!(
-            "that's {} cells; at most {MAX_CELLS} can change at once",
-            edits.len()
+        return Err(crate::messages::msg(
+            "engine.edit.too_many_cells",
+            &[("count", &edits.len()), ("max", &MAX_CELLS)],
         ));
     }
     // Check every field name before touching anything.

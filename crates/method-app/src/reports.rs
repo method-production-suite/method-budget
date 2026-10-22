@@ -96,8 +96,8 @@ mod platform {
             let picked = window
                 .dialog()
                 .file()
-                .set_title("Save report as PDF")
-                .add_filter("PDF", &["pdf"])
+                .set_title(crate::i18n::tr("dialog.save_report_as_pdf"))
+                .add_filter(crate::i18n::tr("dialog.filter_pdf"), &["pdf"])
                 .set_file_name(pdf_file_name(&title))
                 .set_parent(&window)
                 .blocking_save_file();

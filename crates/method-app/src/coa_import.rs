@@ -53,9 +53,9 @@ pub async fn coa_import_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import chart of accounts")
+        .set_title(crate::i18n::tr("dialog.import_chart_of_accounts"))
         .add_filter(
-            "Chart of accounts",
+            crate::i18n::tr("dialog.filter_chart_of_accounts"),
             &["xlsx", "csv", "tsv", "txt", method_format::EXTENSION],
         )
         .set_parent(&window);

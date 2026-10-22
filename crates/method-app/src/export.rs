@@ -7,7 +7,7 @@
 //! format's. Each file is written atomically (`safety::write_atomically`),
 //! and an export never replaces a budget that is open in a tab.
 
-use method_format::export::OutFile;
+use method_format::export::{Format, OutFile};
 use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
@@ -17,6 +17,17 @@ use crate::safety::{write_atomically, Access};
 use crate::session::DocsFiles;
 
 pub use method_session::export::*;
+
+/// The Save dialog's title and filter name for `format`, from the page's
+/// table (the same English as [`dialog_text`]'s).
+pub fn dialog_words(format: Format) -> (String, String) {
+    use crate::i18n::tr;
+    match format {
+        Format::Xlsx => (tr("dialog.export_xlsx"), tr("dialog.filter_xlsx")),
+        Format::Csv => (tr("dialog.export_csv"), tr("dialog.filter_csv_files")),
+        Format::Tsv => (tr("dialog.export_tsv"), tr("dialog.filter_tab_delimited")),
+    }
+}
 
 /// Writes `files`, refusing (before writing any) to replace a budget open in
 /// a tab. Returns the names of the files written.
@@ -56,7 +67,8 @@ pub async fn export_budget<R: Runtime>(
         let mut s = state.lock_doc(doc)?;
         prepare(&mut s)?
     };
-    let (title, filter, name) = dialog_text(format, &prepared.stem);
+    let (_, _, name) = dialog_text(format, &prepared.stem);
+    let (title, filter) = dialog_words(format);
     let mut dialog = window
         .dialog()
         .file()

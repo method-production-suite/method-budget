@@ -47,8 +47,8 @@ pub async fn schedule_days_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import schedule days")
-        .add_filter("Schedule days", &["json"])
+        .set_title(crate::i18n::tr("dialog.import_schedule_days"))
+        .add_filter(crate::i18n::tr("dialog.filter_schedule_days"), &["json"])
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

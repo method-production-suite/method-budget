@@ -18,6 +18,8 @@ use method_core::{
 };
 use serde::Deserialize;
 
+use crate::messages::{msg, word};
+
 pub mod typed;
 
 pub type EditResult<T = ()> = Result<T, String>;
@@ -111,7 +113,7 @@ impl Field {
             "set" => Field::Set,
             "location" => Field::Location,
             "person" => Field::Person,
-            other => return Err(format!("unknown field `{other}`")),
+            other => return Err(msg("engine.edit.unknown_field", &[("field", &other)])),
         })
     }
 
@@ -135,17 +137,31 @@ pub fn parse_kind(s: &str) -> EditResult<RowKind> {
         "subtotal" => Ok(RowKind::Subtotal),
         "adjustment" => Ok(RowKind::Adjustment),
         "separator" => Ok(RowKind::Separator),
-        other => Err(format!("unknown row kind `{other}`")),
+        other => Err(msg("engine.edit.unknown_row_kind", &[("kind", &other)])),
     }
 }
 
-fn kind_label(k: RowKind) -> &'static str {
-    match k {
-        RowKind::Line => "lines",
-        RowKind::Subtotal => "subtotal rows",
-        RowKind::Adjustment => "adjustment rows",
-        RowKind::Separator => "separator rows",
-    }
+fn kind_label(k: RowKind) -> String {
+    word(match k {
+        RowKind::Line => "engine.what.lines",
+        RowKind::Subtotal => "engine.what.subtotal_rows",
+        RowKind::Adjustment => "engine.what.adjustment_rows",
+        RowKind::Separator => "engine.what.separator_rows",
+    })
+}
+
+/// The noun for a kind of setup item.
+fn kind_word(kind: method_core::SetupKind) -> String {
+    use method_core::SetupKind as K;
+    word(match kind {
+        K::Global => "engine.what.global",
+        K::Fringe => "engine.what.fringe",
+        K::Group => "engine.what.group",
+        K::Unit => "engine.what.unit",
+        K::Set => "engine.what.set",
+        K::Location => "engine.what.location",
+        K::Currency => "engine.what.currency",
+    })
 }
 
 /// A comma-separated list of names as a set, ignoring blanks.
@@ -183,7 +199,7 @@ pub fn parse_money(s: &str) -> EditResult<i64> {
 /// [`parse_money`], with digits past the cent rounded or refused.
 pub fn parse_money_as(s: &str, sub: SubCents) -> EditResult<i64> {
     let t = s.trim();
-    let not_amount = |why: &str| format!("`{t}` is not an amount: {why}");
+    let not_amount = |why: &str| msg("engine.edit.not_an_amount", &[("text", &t), ("why", &why)]);
     let (paren, inner) = match t.strip_prefix('(').and_then(|r| r.strip_suffix(')')) {
         Some(inner) => (true, inner.trim()),
         None => (false, t),
@@ -196,7 +212,7 @@ pub fn parse_money_as(s: &str, sub: SubCents) -> EditResult<i64> {
         ),
     };
     if paren && minus {
-        return Err(not_amount("use a minus sign or parentheses, not both"));
+        return Err(not_amount(&word("engine.edit.amount_sign_twice")));
     }
     let rest = rest.strip_prefix('$').unwrap_or(rest);
     let cleaned: String = rest
@@ -204,35 +220,40 @@ pub fn parse_money_as(s: &str, sub: SubCents) -> EditResult<i64> {
         .filter(|c| *c != ',' && !c.is_whitespace())
         .collect();
     if cleaned.starts_with(['-', '+']) {
-        return Err(not_amount("put the sign before the $"));
+        return Err(not_amount(&word("engine.edit.amount_sign_after")));
     }
     let d: Dec = cleaned.parse().map_err(|e| not_amount(&format!("{e}")))?;
     let d = if paren || minus {
         d.checked_neg()
-            .ok_or_else(|| format!("`{t}` is too large"))?
+            .ok_or_else(|| msg("engine.edit.too_large", &[("text", &t)]))?
     } else {
         d
     };
-    let c = d.to_cents().ok_or_else(|| format!("`{t}` is too large"))?;
+    let c = d
+        .to_cents()
+        .ok_or_else(|| msg("engine.edit.too_large", &[("text", &t)]))?;
     if sub == SubCents::Refuse && Dec::from_cents(c) != d {
-        return Err(format!("`{t}` has more than two decimal places"));
+        return Err(msg("engine.edit.past_cents", &[("text", &t)]));
     }
     Ok(c)
 }
 
 fn parse_dec(s: &str, what: &str) -> EditResult<Dec> {
-    s.trim()
-        .parse()
-        .map_err(|e| format!("{what} `{}` is not a number: {e}", s.trim()))
+    s.trim().parse().map_err(|e| {
+        msg(
+            "engine.edit.not_a_number",
+            &[("what", &what), ("text", &s.trim()), ("why", &e)],
+        )
+    })
 }
 
 fn check_name(name: &str, what: &str) -> EditResult<String> {
     let n = name.trim();
     if n.is_empty() {
-        return Err(format!("{what} name is empty"));
+        return Err(msg("engine.edit.name_empty", &[("what", &what)]));
     }
     if n.contains(',') {
-        return Err(format!("{what} names can't contain commas"));
+        return Err(msg("engine.edit.name_comma", &[("what", &what)]));
     }
     Ok(n.to_string())
 }
@@ -280,7 +301,7 @@ pub fn rows_by_id<'a>(b: &'a mut Budget, want: &BTreeSet<RowId>) -> HashMap<RowI
 
 /// The error for a row that is gone.
 pub fn row_gone(id: RowId) -> String {
-    format!("row {id} no longer exists")
+    msg("engine.edit.row_gone", &[("id", &id)])
 }
 
 /// Refuses a field the row's kind doesn't use (a subtotal's rate, say).
@@ -288,7 +309,10 @@ pub fn check_field(d: &Detail, field: Field) -> EditResult {
     if field.applies_to(d.kind) {
         Ok(())
     } else {
-        Err(format!("{} don't use this column", kind_label(d.kind)))
+        Err(msg(
+            "engine.edit.rows_dont_use_column",
+            &[("what", &kind_label(d.kind))],
+        ))
     }
 }
 
@@ -323,19 +347,22 @@ fn check_entry(b: &Budget, field: Field, value: &str) -> EditResult {
     let name = value.trim();
     let known = match field {
         Field::Unit | Field::Unit2 | Field::Unit3 | Field::Unit4 => {
-            Some(("unit", b.units.contains_key(name)))
+            Some(("engine.what.unit", b.units.contains_key(name)))
         }
         Field::Currency => Some((
-            "currency",
+            "engine.what.currency",
             name == b.base_currency || b.currencies.contains_key(name),
         )),
-        Field::Set => Some(("set", b.sets.contains_key(name))),
-        Field::Location => Some(("location", b.locations.contains_key(name))),
+        Field::Set => Some(("engine.what.set", b.sets.contains_key(name))),
+        Field::Location => Some(("engine.what.location", b.locations.contains_key(name))),
         _ => None,
     };
     if let Some((what, exists)) = known {
         if !name.is_empty() && !exists {
-            return Err(format!("there is no {what} {name}"));
+            return Err(msg(
+                "engine.edit.no_such",
+                &[("what", &word(what)), ("name", &name)],
+            ));
         }
         return Ok(());
     }
@@ -343,24 +370,27 @@ fn check_entry(b: &Budget, field: Field, value: &str) -> EditResult {
         return Ok(());
     }
     match method_core::edit::refused_formula(b, value) {
-        Some(why) => Err(format!(
-            "{} can't be {}: {why}",
-            field_label(field),
-            value.trim()
+        Some(why) => Err(msg(
+            "engine.edit.formula_refused",
+            &[
+                ("what", &field_label(field)),
+                ("value", &value.trim()),
+                ("why", &why),
+            ],
         )),
         None => Ok(()),
     }
 }
 
 /// How the grid names a formula column.
-fn field_label(field: Field) -> &'static str {
-    match field {
-        Field::Amount => "Amt",
-        Field::X => "X",
-        Field::Rate => "Rate",
-        Field::X4 => "4X",
-        _ => "This cell",
-    }
+fn field_label(field: Field) -> String {
+    word(match field {
+        Field::Amount => "engine.what.amt",
+        Field::X => "engine.what.x",
+        Field::Rate => "engine.what.rate_column",
+        Field::X4 => "engine.what.x4",
+        _ => "engine.what.this_cell",
+    })
 }
 
 /// Sets a field, and an empty Unit from the global an Amt names
@@ -429,7 +459,7 @@ pub fn set_rows_field(b: &mut Budget, ids: &[RowId], field: Field, value: &str) 
         }
     }
     if applied == 0 && !ids.is_empty() {
-        return Err("none of the selected rows use this column".into());
+        return Err(word("engine.edit.no_row_uses_column"));
     }
     Ok(())
 }
@@ -438,7 +468,7 @@ fn account_mut<'a>(b: &'a mut Budget, code: &str) -> EditResult<&'a mut Account>
     b.categories_mut()
         .flat_map(|c| &mut c.accounts)
         .find(|a| a.code == code)
-        .ok_or_else(|| format!("account {code} no longer exists"))
+        .ok_or_else(|| msg("engine.edit.account_gone", &[("code", &code)]))
 }
 
 /// Inserts a row of `kind` after row `after` (or at the end of the account
@@ -462,7 +492,12 @@ pub fn add_detail(
             acct.details
                 .iter()
                 .position(|d| d.id == after)
-                .ok_or_else(|| format!("row {after} is not in account {account}"))?
+                .ok_or_else(|| {
+                    msg(
+                        "engine.edit.row_not_in_account",
+                        &[("id", &after), ("code", &account)],
+                    )
+                })?
                 + 1
         }
     };
@@ -521,7 +556,7 @@ pub fn delete_details(b: &mut Budget, ids: &[RowId]) -> EditResult<usize> {
         removed += before - acct.details.len();
     }
     if removed == 0 {
-        return Err("those rows no longer exist".into());
+        return Err(word("engine.edit.rows_gone"));
     }
     Ok(removed)
 }
@@ -534,7 +569,7 @@ pub fn delete_details(b: &mut Budget, ids: &[RowId]) -> EditResult<usize> {
 /// the budget's own pattern is invalid.
 fn category_code(coding: &AccountCoding, typed: &str) -> EditResult<String> {
     if coding.validate().is_err() {
-        return optional(typed).ok_or_else(|| "category number is empty".to_string());
+        return optional(typed).ok_or_else(|| word("engine.edit.category_number_empty"));
     }
     let code = coding.parse(typed).map_err(|e| e.to_string())?;
     Ok(code.category)
@@ -542,7 +577,7 @@ fn category_code(coding: &AccountCoding, typed: &str) -> EditResult<String> {
 
 fn account_code(coding: &AccountCoding, typed: &str) -> EditResult<String> {
     if coding.validate().is_err() {
-        return optional(typed).ok_or_else(|| "account number is empty".to_string());
+        return optional(typed).ok_or_else(|| word("engine.edit.account_number_empty"));
     }
     coding.normalize(typed).map_err(|e| e.to_string())
 }
@@ -642,7 +677,7 @@ pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> EditResult {
 /// any formula still using it gets flagged.
 pub fn delete_global(b: &mut Budget, name: &str) -> EditResult {
     if !b.globals.contains_key(name) {
-        return Err(format!("global {name} no longer exists"));
+        return Err(msg("engine.edit.global_gone", &[("name", &name)]));
     }
     if method_core::delete_global(b, name).is_err() {
         b.globals.remove(name);
@@ -695,14 +730,15 @@ pub fn check_short_code(
     if code.is_empty() {
         return Ok(None);
     }
-    let what = kind.name();
+    let what = kind_word(kind);
     if code.contains(',') {
-        return Err("short codes can't contain commas".into());
+        return Err(word("engine.edit.short_code_comma"));
     }
     let len = code.chars().count();
     if len > MAX_SHORT_CODE_CHARS {
-        return Err(format!(
-            "that short code is {len} characters; short codes can be at most {MAX_SHORT_CODE_CHARS}"
+        return Err(msg(
+            "engine.edit.short_code_long",
+            &[("count", &len), ("max", &MAX_SHORT_CODE_CHARS)],
         ));
     }
     let others: Vec<(&String, Option<&String>)> = match kind {
@@ -716,19 +752,23 @@ pub fn check_short_code(
             .iter()
             .map(|(n, g)| (n, g.short_code.as_ref()))
             .collect(),
-        _ => return Err(format!("a {what} has no short code")),
+        _ => return Err(msg("engine.edit.no_short_code", &[("what", &what)])),
     };
     for (other, their) in others {
         if other == name {
             continue;
         }
         if their.is_some_and(|c| c.to_lowercase() == code.to_lowercase()) {
-            return Err(format!(
-                "{code} is already the short code of the {what} {other}"
+            return Err(msg(
+                "engine.edit.short_code_taken",
+                &[("code", &code), ("what", &what), ("name", other)],
             ));
         }
         if other == code {
-            return Err(format!("{code} is the name of another {what}"));
+            return Err(msg(
+                "engine.edit.short_code_is_name",
+                &[("code", &code), ("what", &what)],
+            ));
         }
     }
     Ok(Some(code.to_string()))
@@ -745,9 +785,19 @@ pub fn set_short_code(
     let slot = match kind {
         method_core::SetupKind::Fringe => b.fringes.get_mut(name).map(|f| &mut f.short_code),
         method_core::SetupKind::Group => b.groups.get_mut(name).map(|g| &mut g.short_code),
-        _ => return Err(format!("a {} has no short code", kind.name())),
+        _ => {
+            return Err(msg(
+                "engine.edit.no_short_code",
+                &[("what", &kind_word(kind))],
+            ))
+        }
     };
-    let slot = slot.ok_or_else(|| format!("{} {name} no longer exists", kind.name()))?;
+    let slot = slot.ok_or_else(|| {
+        msg(
+            "engine.edit.item_gone",
+            &[("what", &kind_word(kind)), ("name", &name)],
+        )
+    })?;
     *slot = code;
     Ok(())
 }
@@ -760,13 +810,13 @@ pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
 
 /// [`set_fringe`] once its unit is known to exist.
 fn put_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
-    let name = check_name(name, "fringe")?;
+    let name = check_name(name, &word("engine.what.fringe"))?;
     let cutoff = match f.cutoff.as_deref().map(str::trim) {
         None | Some("") => None,
         Some(text) => {
             let c = parse_money(text)?;
             if c < 0 {
-                return Err("a cutoff can't be negative".into());
+                return Err(word("engine.edit.negative_cutoff"));
             }
             Some(c)
         }
@@ -777,14 +827,14 @@ fn put_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
             let basis = match f.basis.as_deref().map(str::trim) {
                 None | Some("") => FlatBasis::Amount,
                 Some(text) => FlatBasis::parse(text)
-                    .ok_or_else(|| format!("unknown flat fringe basis `{text}`"))?,
+                    .ok_or_else(|| msg("engine.edit.unknown_flat_basis", &[("basis", &text)]))?,
             };
             let max_hours_per_day = match f.max_hours_per_day.as_deref().map(str::trim) {
                 None | Some("") => None,
                 Some(text) => {
-                    let h = parse_dec(text, "max hours per day")?;
+                    let h = parse_dec(text, &word("engine.what.max_hours_per_day"))?;
                     if h <= Dec::ZERO {
-                        return Err("max hours per day must be more than 0".into());
+                        return Err(word("engine.edit.max_hours_zero"));
                     }
                     Some(h)
                 }
@@ -798,7 +848,7 @@ fn put_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
                 cutoff,
             }
         }
-        other => return Err(format!("unknown fringe kind `{other}`")),
+        other => return Err(msg("engine.edit.unknown_fringe_kind", &[("kind", &other)])),
     };
     let short_code = match f.short_code.as_deref() {
         Some(typed) => check_short_code(b, method_core::SetupKind::Fringe, &name, typed)?,
@@ -819,7 +869,7 @@ fn put_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
 /// Deletes a fringe and takes it off every row that used it.
 pub fn delete_fringe(b: &mut Budget, name: &str) -> EditResult {
     if b.fringes.remove(name).is_none() {
-        return Err(format!("fringe {name} no longer exists"));
+        return Err(msg("engine.edit.fringe_gone", &[("name", &name)]));
     }
     for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
         for d in &mut acct.details {
@@ -844,7 +894,7 @@ pub struct GroupInput {
 }
 
 pub fn set_group(b: &mut Budget, name: &str, g: &GroupInput) -> EditResult {
-    let name = check_name(name, "group")?;
+    let name = check_name(name, &word("engine.what.group"))?;
     // Color has its own command (rowstyle::set_group_color); keep it here.
     let color = b.groups.get(&name).and_then(|old| old.color.clone());
     let short_code = match g.short_code.as_deref() {
@@ -867,13 +917,13 @@ pub fn set_group(b: &mut Budget, name: &str, g: &GroupInput) -> EditResult {
 /// `conflict` or `fringes_in_totals`, to `include` or `exclude`.
 pub fn set_group_rule(b: &mut Budget, rule: &str, value: &str) -> EditResult {
     let v = method_core::Inclusion::parse(value)
-        .ok_or_else(|| format!("`{value}` is not include or exclude"))?;
+        .ok_or_else(|| msg("engine.edit.not_include_exclude", &[("value", &value)]))?;
     let r = &mut b.group_rules;
     match rule {
         "ungrouped_lines" => r.ungrouped_lines = v,
         "conflict" => r.conflict = v,
         "fringes_in_totals" => r.fringes_in_totals = v,
-        _ => return Err(format!("`{rule}` is not a group rule")),
+        _ => return Err(msg("engine.edit.not_group_rule", &[("value", &rule)])),
     }
     Ok(())
 }
@@ -882,7 +932,7 @@ pub fn set_group_rule(b: &mut Budget, rule: &str, value: &str) -> EditResult {
 /// `binary` or `exact`.
 pub fn set_arithmetic(b: &mut Budget, value: &str) -> EditResult {
     b.arithmetic = method_core::Arithmetic::parse(value)
-        .ok_or_else(|| format!("`{value}` is not binary or exact"))?;
+        .ok_or_else(|| msg("engine.edit.not_binary_exact", &[("value", &value)]))?;
     Ok(())
 }
 
@@ -896,12 +946,8 @@ pub fn set_round_account_totals(b: &mut Budget, on: bool) -> EditResult {
 /// Sets what every percent fringe's cutoff is multiplied by (decisions.md,
 /// entry 60): `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
 pub fn set_cutoff_factor(b: &mut Budget, value: &str) -> EditResult {
-    b.cutoff_factor = method_core::CutoffFactor::parse(value).ok_or_else(|| {
-        format!(
-            "`{}` is not a cutoff factor: use 1.0, 1.5, 2.0, 2.5 or 3.0",
-            value.trim()
-        )
-    })?;
+    b.cutoff_factor = method_core::CutoffFactor::parse(value)
+        .ok_or_else(|| msg("engine.edit.not_cutoff_factor", &[("value", &value.trim())]))?;
     Ok(())
 }
 
@@ -941,8 +987,9 @@ pub fn set_fringe_row(b: &mut Budget, r: &FringeRowInput) -> EditResult {
             .chars()
             .find(|c| !c.is_ascii_alphanumeric() && !method_core::coding::SEPARATORS.contains(c))
         {
-            return Err(format!(
-                "the fringe row's account number can only use letters, digits and separators, not {c:?}"
+            return Err(msg(
+                "engine.edit.fringe_row_account_char",
+                &[("char", &format!("{c:?}"))],
             ));
         }
     }
@@ -951,12 +998,13 @@ pub fn set_fringe_row(b: &mut Budget, r: &FringeRowInput) -> EditResult {
         .as_ref()
         .is_some_and(|d| d.chars().count() > MAX_FRINGE_ROW_CHARS)
     {
-        return Err(format!(
-            "the fringe row's description is longer than {MAX_FRINGE_ROW_CHARS} characters"
+        return Err(msg(
+            "engine.edit.fringe_row_description_long",
+            &[("max", &MAX_FRINGE_ROW_CHARS)],
         ));
     }
     if r.position.is_some_and(|p| p > b.topsheet.len()) {
-        return Err("that topsheet row no longer exists".into());
+        return Err(word("engine.edit.topsheet_row_gone"));
     }
     b.fringe_row = method_core::FringeRow {
         account,
@@ -970,7 +1018,7 @@ pub fn set_fringe_row(b: &mut Budget, r: &FringeRowInput) -> EditResult {
 /// total (decisions.md, entry 56): `keep` or `drop`.
 pub fn set_trailing_level_fringes(b: &mut Budget, value: &str) -> EditResult {
     b.trailing_level_fringes = method_core::TrailingFringes::parse(value)
-        .ok_or_else(|| format!("`{value}` is not keep or drop"))?;
+        .ok_or_else(|| msg("engine.edit.not_keep_drop", &[("value", &value)]))?;
     Ok(())
 }
 
@@ -991,13 +1039,13 @@ pub struct UnitInput {
 }
 
 pub fn set_unit(b: &mut Budget, name: &str, u: &UnitInput) -> EditResult {
-    let name = check_name(name, "unit")?;
+    let name = check_name(name, &word("engine.what.unit"))?;
     let hours = match u.hours.as_deref().map(str::trim) {
         None | Some("") => None,
         Some(text) => {
-            let h = parse_dec(text, "hours")?;
+            let h = parse_dec(text, &word("engine.what.hours"))?;
             if h < Dec::ZERO {
-                return Err("hours can't be negative".into());
+                return Err(word("engine.edit.hours_negative"));
             }
             Some(h)
         }
@@ -1025,7 +1073,7 @@ pub fn delete_unit(b: &mut Budget, name: &str) -> EditResult {
 /// one change.
 pub fn delete_unit_with(b: &mut Budget, name: &str, clear_lines: bool) -> EditResult {
     if b.units.remove(name).is_none() {
-        return Err(format!("unit {name} no longer exists"));
+        return Err(msg("engine.edit.unit_gone", &[("name", &name)]));
     }
     if clear_lines {
         for d in b
@@ -1099,7 +1147,7 @@ pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> Edi
 fn money_at_least_zero(s: &str, what: &str) -> EditResult<i64> {
     let c = parse_money(s)?;
     if c < 0 {
-        return Err(format!("{what} can't be negative"));
+        return Err(msg("engine.edit.cant_be_negative", &[("what", &what)]));
     }
     Ok(c)
 }
@@ -1115,11 +1163,11 @@ fn optional_money(s: Option<&str>, what: &str) -> EditResult<Option<i64>> {
 /// A percentage that must not be negative.
 fn percent(s: &str, what: &str) -> EditResult<Dec> {
     if s.trim().is_empty() {
-        return Err(format!("{what} needs a value"));
+        return Err(msg("engine.edit.needs_value", &[("what", &what)]));
     }
     let p = parse_dec(s, what)?;
     if p < Dec::ZERO {
-        return Err(format!("{what} can't be negative"));
+        return Err(msg("engine.edit.cant_be_negative", &[("what", &what)]));
     }
     Ok(p)
 }
@@ -1135,7 +1183,7 @@ fn picked_names(
     let mut out = BTreeSet::new();
     for n in names.iter().map(|n| n.trim()).filter(|n| !n.is_empty()) {
         if !known.contains(n) && !kept.is_some_and(|k| k.contains(n)) {
-            return Err(format!("there is no {what} {n}"));
+            return Err(msg("engine.edit.no_such", &[("what", &what), ("name", &n)]));
         }
         out.insert(n.to_string());
     }
@@ -1158,9 +1206,7 @@ fn amount_currency(b: &Budget, typed: Option<&str>) -> EditResult<Option<String>
         None | Some("") => Ok(None),
         Some(c) if c == b.base_currency => Ok(None),
         Some(c) if b.currencies.contains_key(c) => Ok(Some(c.to_string())),
-        Some(c) => Err(format!(
-            "there is no exchange rate for {c}; add it under Currencies first"
-        )),
+        Some(c) => Err(msg("engine.edit.no_exchange_rate_listed", &[("code", &c)])),
     }
 }
 
@@ -1168,7 +1214,7 @@ fn check_index(len: usize, index: usize, what: &str) -> EditResult {
     if index < len {
         Ok(())
     } else {
-        Err(format!("that {what} no longer exists"))
+        Err(msg("engine.edit.that_item_gone", &[("what", &what)]))
     }
 }
 
@@ -1176,7 +1222,7 @@ fn check_index(len: usize, index: usize, what: &str) -> EditResult {
 fn move_item<T>(list: &mut Vec<T>, index: usize, to: usize, what: &str) -> EditResult {
     check_index(list.len(), index, what)?;
     if to >= list.len() {
-        return Err(format!("can't move the {what} there"));
+        return Err(msg("engine.edit.cant_move", &[("what", &what)]));
     }
     let item = list.remove(index);
     list.insert(to, item);
@@ -1243,14 +1289,14 @@ pub fn build_charge(b: &Budget, index: Option<usize>, c: &ChargeInput) -> EditRe
 }
 
 pub fn delete_charge(b: &mut Budget, index: usize) -> EditResult {
-    check_index(b.charges.len(), index, "charge")?;
+    check_index(b.charges.len(), index, &word("engine.what.charge"))?;
     b.charges.remove(index);
     Ok(())
 }
 
 /// Charges apply in order, so their order matters.
 pub fn move_charge(b: &mut Budget, index: usize, to: usize) -> EditResult {
-    move_item(&mut b.charges, index, to, "charge")
+    move_item(&mut b.charges, index, to, &word("engine.what.charge"))
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1337,7 +1383,7 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
 }
 
 pub fn delete_credit(b: &mut Budget, index: usize) -> EditResult {
-    check_index(b.credits.len(), index, "credit")?;
+    check_index(b.credits.len(), index, &word("engine.what.credit"))?;
     b.credits.remove(index);
     typed::drop_unshared_caps(b);
     Ok(())
@@ -1354,7 +1400,7 @@ pub struct SetInput {
 }
 
 pub fn set_set(b: &mut Budget, name: &str, s: &SetInput) -> EditResult {
-    let name = check_name(name, "set")?;
+    let name = check_name(name, &word("engine.what.set"))?;
     b.sets.insert(
         name,
         SetDef {
@@ -1367,7 +1413,7 @@ pub fn set_set(b: &mut Budget, name: &str, s: &SetInput) -> EditResult {
 /// Deletes a set and takes it off every row that used it.
 pub fn delete_set(b: &mut Budget, name: &str) -> EditResult {
     if b.sets.remove(name).is_none() {
-        return Err(format!("set {name} no longer exists"));
+        return Err(msg("engine.edit.set_gone", &[("name", &name)]));
     }
     for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
         for d in &mut acct.details {
@@ -1393,7 +1439,7 @@ pub struct LocationInput {
 }
 
 pub fn set_location(b: &mut Budget, name: &str, l: &LocationInput) -> EditResult {
-    let name = check_name(name, "location")?;
+    let name = check_name(name, &word("engine.what.location"))?;
     b.locations.insert(
         name,
         Location {
@@ -1409,7 +1455,7 @@ pub fn set_location(b: &mut Budget, name: &str, l: &LocationInput) -> EditResult
 /// Deletes a location and takes it off every row that used it.
 pub fn delete_location(b: &mut Budget, name: &str) -> EditResult {
     if b.locations.remove(name).is_none() {
-        return Err(format!("location {name} no longer exists"));
+        return Err(msg("engine.edit.location_gone", &[("name", &name)]));
     }
     for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
         for d in &mut acct.details {
@@ -1433,7 +1479,7 @@ pub struct InfoInput {
 /// A real calendar date written `YYYY-MM-DD`.
 pub fn check_date(s: &str) -> EditResult<String> {
     let t = s.trim();
-    let bad = || format!("`{t}` is not a date; write it as YYYY-MM-DD, like 2027-03-01");
+    let bad = || msg("engine.edit.not_a_date", &[("text", &t)]);
     let bytes = t.as_bytes();
     let shape = bytes.len() == 10
         && bytes[4] == b'-'
@@ -1465,13 +1511,13 @@ pub fn check_date(s: &str) -> EditResult<String> {
 pub fn set_info(b: &mut Budget, name: &str, v: &InfoInput) -> EditResult {
     let name = name.trim();
     if name.is_empty() {
-        return Err("the field needs a label".into());
+        return Err(word("engine.edit.field_needs_label"));
     }
     let value = match v.kind.as_str() {
         "text" => InfoValue::Text(v.value.trim().to_string()),
         "number" => InfoValue::Number(parse_dec(&v.value, name)?),
         "date" => InfoValue::Date(check_date(&v.value)?),
-        other => return Err(format!("unknown field kind `{other}`")),
+        other => return Err(msg("engine.edit.unknown_field_kind", &[("kind", &other)])),
     };
     b.info.insert(name.to_string(), value);
     Ok(())
@@ -1481,7 +1527,7 @@ pub fn delete_info(b: &mut Budget, name: &str) -> EditResult {
     b.info
         .remove(name)
         .map(|_| ())
-        .ok_or_else(|| format!("field {name} no longer exists"))
+        .ok_or_else(|| msg("engine.edit.field_gone", &[("name", &name)]))
 }
 
 /// Where fringe totals post. `suffix` is for `category` only; when it is
@@ -1500,16 +1546,22 @@ pub fn set_fringe_posting(b: &mut Budget, mode: &str, suffix: Option<&str>) -> E
                 },
             };
             if suffix.is_empty() {
-                return Err("enter the fringe account suffix, like 99".into());
+                return Err(word("engine.edit.fringe_suffix_empty"));
             }
             if let Some(c) = suffix.chars().find(|c| !c.is_ascii_alphanumeric()) {
-                return Err(format!(
-                    "the suffix can only use letters and digits, not {c:?}"
+                return Err(msg(
+                    "engine.edit.fringe_suffix_char",
+                    &[("char", &format!("{c:?}"))],
                 ));
             }
             FringePosting::Category { suffix }
         }
-        other => return Err(format!("unknown fringe posting `{other}`")),
+        other => {
+            return Err(msg(
+                "engine.edit.unknown_fringe_posting",
+                &[("mode", &other)],
+            ))
+        }
     };
     Ok(())
 }
@@ -1523,7 +1575,7 @@ pub fn set_account_coding(b: &mut Budget, widths: [u8; 4], separator: Option<&st
             let mut chars = s.chars();
             match (chars.next(), chars.next()) {
                 (Some(c), None) => Some(c),
-                _ => return Err("the separator is one character, or none".into()),
+                _ => return Err(word("engine.edit.separator_one_char")),
             }
         }
     };
@@ -1542,11 +1594,9 @@ pub fn set_account_coding(b: &mut Budget, widths: [u8; 4], separator: Option<&st
 /// Renames the base currency. Rates are not converted: they keep meaning
 /// "base units per one unit of that currency".
 pub fn set_base_currency(b: &mut Budget, code: &str) -> EditResult {
-    let code = check_name(code, "currency")?;
+    let code = check_name(code, &word("engine.what.currency"))?;
     if b.currencies.contains_key(&code) {
-        return Err(format!(
-            "{code} is in the currency list; delete it there first"
-        ));
+        return Err(msg("engine.edit.base_currency_listed", &[("code", &code)]));
     }
     if b.totals_currency.as_deref() == Some(code.as_str()) {
         b.totals_currency = None;
@@ -1562,7 +1612,7 @@ pub fn set_totals_currency(b: &mut Budget, code: Option<&str>) -> EditResult {
         None | Some("") => None,
         Some(c) if c == b.base_currency => None,
         Some(c) if b.currencies.contains_key(c) => Some(c.to_string()),
-        Some(c) => return Err(format!("there is no exchange rate for {c}; add it first")),
+        Some(c) => return Err(msg("engine.edit.no_exchange_rate", &[("code", &c)])),
     };
     Ok(())
 }
@@ -1572,27 +1622,28 @@ pub fn set_totals_currency(b: &mut Budget, code: Option<&str>) -> EditResult {
 /// missing or partial.
 /// Why the original totals can't change: they are frozen (decisions.md,
 /// entry 61).
-const FROZEN: &str = "the original totals are frozen; unfreeze them first";
+const FROZEN: &str = "engine.edit.totals_frozen";
 
 pub fn lock_baseline(b: &mut Budget) -> EditResult {
     if b.baseline.as_ref().is_some_and(|x| x.frozen) {
-        return Err(FROZEN.into());
+        return Err(word(FROZEN));
     }
     let report = recalc(b, &RecalcOptions::default())
-        .map_err(|e| format!("fix this first, then lock the totals: {e}"))?;
-    let baseline = Baseline::capture(&report).ok_or("the totals are too large to keep")?;
+        .map_err(|e| msg("engine.edit.lock_needs_fix", &[("why", &e)]))?;
+    let baseline =
+        Baseline::capture(&report).ok_or_else(|| word("engine.edit.totals_too_large"))?;
     b.baseline = Some(baseline);
     Ok(())
 }
 
 pub fn clear_baseline(b: &mut Budget) -> EditResult {
     if b.baseline.as_ref().is_some_and(|x| x.frozen) {
-        return Err(FROZEN.into());
+        return Err(word(FROZEN));
     }
     b.baseline
         .take()
         .map(|_| ())
-        .ok_or_else(|| "there are no original totals to clear".to_string())
+        .ok_or_else(|| word("engine.edit.no_baseline_to_clear"))
 }
 
 /// Freezes the original totals, or unfreezes them: while frozen they can't
@@ -1602,7 +1653,7 @@ pub fn set_baseline_frozen(b: &mut Budget, frozen: bool) -> EditResult {
     let base = b
         .baseline
         .as_mut()
-        .ok_or("there are no original totals to freeze")?;
+        .ok_or_else(|| word("engine.edit.no_baseline_to_freeze"))?;
     base.frozen = frozen;
     Ok(())
 }

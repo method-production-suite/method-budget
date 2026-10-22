@@ -64,8 +64,11 @@ pub async fn share_copy_save<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Save a copy for sharing")
-        .add_filter(crate::app::FILTER_NAME, &[method_format::EXTENSION])
+        .set_title(crate::i18n::tr("dialog.save_a_copy_for_sharing"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget"),
+            &[method_format::EXTENSION],
+        )
         .set_file_name(format!("{stem}.{}", method_format::EXTENSION))
         .set_parent(&window);
     if let Some(dir) = dir {

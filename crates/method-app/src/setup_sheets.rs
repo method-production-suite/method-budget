@@ -47,11 +47,22 @@ pub async fn setup_sheet_export<R: Runtime>(
         )
     };
     let ext = ex.ext();
+    let (title, filter) = if ext == "xlsx" {
+        (
+            crate::i18n::tr("dialog.export_setup_lists_xlsx"),
+            crate::i18n::tr("dialog.filter_xlsx"),
+        )
+    } else {
+        (
+            crate::i18n::tr("dialog.export_setup_lists_csv"),
+            crate::i18n::tr("dialog.filter_csv"),
+        )
+    };
     let mut dialog = window
         .dialog()
         .file()
-        .set_title(ex.title())
-        .add_filter(ex.filter(), &[ext])
+        .set_title(title)
+        .add_filter(filter, &[ext])
         .set_file_name(format!("{}.{ext}", ex.stem))
         .set_parent(&window);
     if let Some(dir) = dir {
@@ -83,8 +94,11 @@ pub async fn setup_sheet_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import setup lists")
-        .add_filter("Spreadsheet", &["xlsx", "csv", "tsv", "txt"])
+        .set_title(crate::i18n::tr("dialog.import_setup_lists"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_spreadsheet"),
+            &["xlsx", "csv", "tsv", "txt"],
+        )
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

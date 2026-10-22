@@ -65,7 +65,12 @@ pub async fn template_new<R: Runtime>(
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
-    let Some(path) = crate::app::pick_budget(&window, "New budget from template", start)? else {
+    let Some(path) = crate::app::pick_budget(
+        &window,
+        &crate::i18n::tr("dialog.new_budget_from_template"),
+        start,
+    )?
+    else {
         return Ok(None);
     };
     let template = read(&state, &path)?;
@@ -103,8 +108,11 @@ pub async fn template_save<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Save as template")
-        .add_filter(crate::app::FILTER_NAME, &[method_format::EXTENSION])
+        .set_title(crate::i18n::tr("dialog.save_as_template"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget"),
+            &[method_format::EXTENSION],
+        )
         .set_file_name(format!("{suggested}.{}", method_format::EXTENSION))
         .set_parent(&window);
     if let Some(dir) = dir {

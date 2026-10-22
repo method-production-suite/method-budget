@@ -4937,6 +4937,35 @@ the framework is built and adding a language is a table.
   Budget Setup's helper kit no longer names `plural`, which the first pass had stopped
   importing, and `crates/xtask/src/target.rs`, which `main` names but was never added,
   is in the tree.
+- **Fifth pass: engine messages, first slice, and the native dialogs** (193 more entries,
+  4,064 in all). The edits' refusals and validation errors, the toasts a person sees most,
+  now have stable codes. `method-session/src/messages.rs` keeps the engine's catalog:
+  each message is a code (`engine.edit.account_gone`) and its English with `{name}`
+  parameters, and a count's message has a form for one and one for more. The source makes
+  the message with `msg(code, params)`, so `EditResult` stays `Result<T, String>` and the
+  command line, the MCP server and the browser build print exactly the English they did;
+  method-session and method-core still read no table. In the app, `i18n::engine()` in
+  `src/i18n.rs` hands an error to `messages::recognize()`, which finds the message it was
+  made from (the one with the most fixed words when several fit) and its parameters, and
+  fills the table's words for the code; a parameter named `what` or `why` is a message
+  itself and is recognized in turn, so "row 3's cap can't be negative" is two entries. With
+  no entry, or text that isn't the engine's, the person sees the text as it came. The
+  table's entry for each code is the engine's English (tested), so nothing a person reads
+  changed. Converted: every message in `edit.rs` and `edit/typed.rs`, and the cell batch's
+  limit in `batch.rs`: 97 messages and 34 nouns they name (`engine.what.fringe`, "the
+  cap", "row {row}'s amount", the grid's column names). The app's edit commands pass their
+  errors through it (`app.rs`'s `apply()`, adding a row, the charge preview). The native
+  dialogs read the table through `tr()`: every file dialog's title and file-type names,
+  the unsaved-changes question on close and quit with its buttons, Couldn't save, and the
+  recovered budget's Replace question (62 `dialog.*` entries; the close question's count
+  is a plural entry, picked by a new `tr_count()`). Dialog words method-session also
+  writes for the browser build (the export and merge titles, the Open dialog's first
+  filter) are tested equal to the table's. Tests: the catalog is sorted, well formed and
+  every code in it is made somewhere and every code made is in it; every message, made
+  with sample values, is recognized as itself with those values; the table holds each
+  code with the engine's English and counts the codes as used; and `engine()` gives the
+  English back unchanged. `tr_with` now fills in one pass, so a value holding `{name}`
+  stays as it is.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -4950,10 +4979,19 @@ the framework is built and adding a language is a table.
   the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
-- **Not built** (3.14 stays partial): engine messages with stable codes (the words that
-  arrive from Rust as data, such as import problems, Explain's steps and conflict text,
-  are shown as they come), the native dialogs, room for longer words and a right-to-left
-  check, a language override in the preferences, and the languages themselves, which wait
+- **Not built** (3.14 stays partial): the rest of the engine's messages. Words that
+  arrive from Rust as data outside the edits are still English as they come: method-core's
+  own reasons (a formula refused, an account number the pattern can't read, a calculation
+  error), which reach the edits' messages as their `{why}` or whole; the other
+  method-session modules (Find and Replace, pasting, presets, apply, actuals, Review,
+  What Changed and Merge, imports and their problems, Explain's steps, setup lists,
+  schedule days, the history's "That step is no longer in the history." and the undo
+  labels); method-format's import problems and its export file-type names; and the
+  desktop's own errors (file reads and writes, sharing's refusals in `src/shared.rs`, the
+  window titles "Tools" and "Budget Setup", and "(edited)" in the main window's title).
+  A data value named as a noun in a message (an information field's label in "{what}
+  `{text}` is not a number") is shown as typed. Also not built: room for longer words and
+  a right-to-left check, a language override in the preferences, and the languages themselves, which wait
   on the owner's choice. A few things stay inline on purpose: key names in shortcut text
   (`dom.js`, as in `shortcuts.js`), the "Untitled" file name that matches Rust's, and
   separators such as " · " and ", " that join list items; a few long tooltips are still

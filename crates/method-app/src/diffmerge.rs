@@ -78,7 +78,12 @@ pub async fn merge_pick_file<R: Runtime>(
     files: State<'_, CompareFiles>,
     purpose: String,
 ) -> Result<Option<Picked>, String> {
-    let title = pick_title(&purpose)?;
+    pick_title(&purpose)?;
+    let title = &match purpose.as_str() {
+        "diff" => crate::i18n::tr("dialog.merge_pick_diff"),
+        "copy" => crate::i18n::tr("dialog.merge_pick_copy"),
+        _ => crate::i18n::tr("dialog.merge_pick_base"),
+    };
     let start = state
         .lock()
         .path()

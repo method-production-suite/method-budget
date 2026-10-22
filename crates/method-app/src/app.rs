@@ -29,8 +29,6 @@ use method_session::commands;
 pub(crate) const APP_NAME: &str = "Method Budget";
 /// The product's website (the About box links it).
 pub(crate) const WEBSITE: &str = "https://methodbudget.com";
-/// The file type's name in Open and Save dialogs (with [`method_format::EXTENSIONS`]).
-pub(crate) const FILTER_NAME: &str = "Method Budget file";
 
 type CmdResult<T = View> = Result<T, String>;
 
@@ -72,7 +70,8 @@ pub(crate) fn apply<R: Runtime, T>(
     f: impl FnOnce(&mut Session) -> edit::EditResult<T>,
 ) -> CmdResult {
     let mut s = state.lock_doc(doc)?;
-    f(&mut s)?;
+    // An edit refused shows in the person's language (src/i18n.rs).
+    crate::i18n::engine_err(f(&mut s))?;
     Ok(finish(window, &mut s, None))
 }
 
@@ -146,17 +145,23 @@ pub async fn open_budget<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Open")
+        .set_title(crate::i18n::tr("dialog.open"))
         .add_filter(
-            crate::open_any::ALL_FILTER,
+            crate::i18n::tr("dialog.filter_all_openable"),
             &crate::open_any::open_extensions(),
         )
-        .add_filter(FILTER_NAME, method_format::EXTENSIONS)
         .add_filter(
-            "Budget export",
+            crate::i18n::tr("dialog.filter_budget"),
+            method_format::EXTENSIONS,
+        )
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget_export"),
             method_format::import::exchange::READABLE_EXTENSIONS,
         )
-        .add_filter("Spreadsheet", crate::open_any::SHEET_EXTENSIONS)
+        .add_filter(
+            crate::i18n::tr("dialog.filter_spreadsheet"),
+            crate::open_any::SHEET_EXTENSIONS,
+        )
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
@@ -180,7 +185,10 @@ pub(crate) fn pick_budget<R: Runtime>(
         .dialog()
         .file()
         .set_title(title)
-        .add_filter(FILTER_NAME, method_format::EXTENSIONS)
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget"),
+            method_format::EXTENSIONS,
+        )
         .set_parent(window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
@@ -238,14 +246,17 @@ fn save_doc<R: Runtime>(
         _ => {
             let title = match dialog_title {
                 Some(t) => t.to_string(),
-                None if save_as => "Save budget as".to_string(),
-                None => "Save budget".to_string(),
+                None if save_as => crate::i18n::tr("dialog.save_budget_as"),
+                None => crate::i18n::tr("dialog.save_budget"),
             };
             let mut dialog = window
                 .dialog()
                 .file()
                 .set_title(title)
-                .add_filter(FILTER_NAME, &[method_format::EXTENSION])
+                .add_filter(
+                    crate::i18n::tr("dialog.filter_budget"),
+                    &[method_format::EXTENSION],
+                )
                 .set_file_name(start.1)
                 .set_parent(window);
             if let Some(dir) = start.0 {
@@ -475,7 +486,7 @@ pub fn add_detail<R: Runtime>(
     kind: String,
 ) -> CmdResult {
     let mut s = state.lock_doc(doc)?;
-    let id = s.add_detail(&account_code, after, &kind)?;
+    let id = crate::i18n::engine_err(s.add_detail(&account_code, after, &kind))?;
     Ok(finish(&window, &mut s, Some(id)))
 }
 
@@ -746,7 +757,7 @@ pub fn charge_preview_in(
     index: Option<usize>,
     charge: &ChargeInput,
 ) -> CmdResult<crate::report_dto::ChargeDto> {
-    commands::preview_charge(s, index, charge)
+    crate::i18n::engine_err(commands::preview_charge(s, index, charge))
 }
 
 #[tauri::command]
@@ -1017,21 +1028,26 @@ pub fn set_cells<R: Runtime>(
 
 /// The question when budgets `names` have unsaved changes: the message, and
 /// the labels of the save, discard and cancel buttons.
-pub(crate) fn close_question(names: &[String]) -> (String, [&'static str; 3]) {
+pub(crate) fn close_question(names: &[String]) -> (String, [String; 3]) {
+    use crate::i18n::{tr, tr_count, tr_with};
     if let [one] = names {
         return (
-            format!("\"{one}\" has unsaved changes. Save them before closing? If you don't, they will be lost."),
-            ["Save", "Discard", "Cancel"],
+            tr_with("dialog.unsaved_one", &[("name", one)]),
+            [tr("dialog.save"), tr("dialog.discard"), tr("dialog.cancel")],
         );
     }
     let list: Vec<String> = names.iter().map(|n| format!("\u{2022} {n}")).collect();
     (
-        format!(
-            "{} budgets have unsaved changes:\n\n{}\n\nSave them before closing? If you don't, they will be lost.",
+        tr_count(
+            "dialog.unsaved_many",
             names.len(),
-            list.join("\n")
+            &[("list", &list.join("\n"))],
         ),
-        ["Save All", "Discard All", "Cancel"],
+        [
+            tr("dialog.save_all"),
+            tr("dialog.discard_all"),
+            tr("dialog.cancel"),
+        ],
     )
 }
 
@@ -1060,15 +1076,15 @@ pub(crate) fn confirm_close<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() 
     let mut dialog = app
         .dialog()
         .message(message)
-        .title("Unsaved changes")
+        .title(crate::i18n::tr("dialog.unsaved_changes"))
         .kind(MessageDialogKind::Warning)
         // Saving comes first, so it is the default (Enter); Escape and
         // closing the alert cancel. Only an explicit click on the discard
         // button throws work away.
         .buttons(MessageDialogButtons::YesNoCancelCustom(
-            save.into(),
-            discard.into(),
-            cancel.into(),
+            save.clone(),
+            discard.clone(),
+            cancel,
         ));
     if let Some(w) = app.get_webview_window(crate::tools::MAIN) {
         dialog = dialog.parent(&w);
@@ -1105,15 +1121,18 @@ fn save_all<R: Runtime>(app: &AppHandle<R>, ids: &[DocId]) -> bool {
         let Some(label) = state.docs().get(id).map(Session::tab_label) else {
             continue; // closed meanwhile
         };
-        let title = format!("Save \"{label}\"");
+        let title = crate::i18n::tr_with("dialog.save_named", &[("name", &label)]);
         match save_doc(&window, &state, id, false, Some(&title)) {
             Ok(Some(true)) => crate::safety_app::tell_saved(app, id),
             Ok(_) => return false,
             Err(e) => {
                 window
                     .dialog()
-                    .message(format!("{e}\n\nNothing was closed."))
-                    .title("Couldn't save")
+                    .message(crate::i18n::tr_with(
+                        "dialog.save_failed_nothing_closed",
+                        &[("error", &e)],
+                    ))
+                    .title(crate::i18n::tr("dialog.couldnt_save"))
                     .kind(MessageDialogKind::Error)
                     .parent(&window)
                     .blocking_show();

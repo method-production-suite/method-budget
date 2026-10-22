@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 3,850 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 4,060 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1274,6 +1274,18 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   by whole tag and then by language ("pt-BR" takes "pt"), with English when no table
   matches. A key a language lacks falls back to the English words, with a warning in the
   console. The menu bar is English until a second table exists.
+- **The engine's messages**: an edit refused or a value that doesn't read ("account 1100
+  no longer exists", "`12.345` has more than two decimal places") comes from method-session
+  as English made from a stable code and its parameters (`method_session::messages`;
+  decision 94, fifth pass). The command line, the MCP server and the browser build show
+  that English. The desktop's edit commands hand it to `i18n::engine()` (`src/i18n.rs`),
+  which recognizes the code and parameters and shows the table's words for the code
+  (`engine.edit.*`, with the nouns they name under `engine.what.*`), or the text as it came
+  when the table has no entry. Each entry is the engine's English, so a translation only
+  changes what a person reads.
+- **Native dialogs**: the file dialogs' titles and file-type names, the unsaved-changes
+  question on close and quit with its buttons, Couldn't save and the recovered budget's
+  Replace question come from the table (`dialog.*`) through `tr()` in Rust.
 - **Adding a language**: copy `ui/i18n/en.js` to `ui/i18n/<code>.js`, translate the
   values (keeping the keys, the `{names}` and the plural forms the language needs), import
   it in `ui/js/i18n.js` and add it to `TABLES`. Nothing else changes.
@@ -1287,9 +1299,12 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   and `fillPage()` puts them in at boot; a test fails on a word there with no key, or
   English that differs from the table's. `scripts/web-smoke.mjs` checks the lookup, the plurals, the fallback and the
   choice of language in the browser, and that the shortcut sheet, the start window, New
-  Budget and every Budget Setup tab draw their words from the table.
+  Budget and every Budget Setup tab draw their words from the table. The engine's catalog
+  is tested too: every code made is in it and every message in it is made, each message
+  is recognized back with its parameters, and the table's entry for each code is the
+  engine's English.
 
-Converted: the whole page. The start window and New Budget, the Help menu and About, the
+Converted: the whole page, the edits' messages and the native dialogs. The start window and New Budget, the Help menu and About, the
 shortcut list and sheet, the menu bar, Budget Setup's tabs, Find and Replace, the main
 window's dialogs, toolbar tips and messages, the status bar, the common dialog buttons,
 sharing, its banners and the Activity tab, the printed reports and the report setup, the
@@ -1298,9 +1313,12 @@ setup packs, Review, Compare, presets, Explain, Overtime, Actuals, Comments), th
 strips and split view, the grid's right-click menu, levels, quick entry and row colors,
 What Changed and Merge, backups and recovery, and the import dialogs (Import Setup and
 templates, spreadsheets, charts of accounts, budget exports, schedule days, actuals).
-Still English: the words that come from Rust as data (the engine's messages, import
-problems, Explain's steps), the native dialogs, key names in shortcut text, and the
-"Untitled" file name; docs/research/accessibility-audit.md, "Localization", lists them.
+Still English: the other words that come from Rust as data (method-core's reasons inside
+an edit's message, such as why a formula is refused; Find and Replace, pasting, presets,
+imports and their problems, Explain's steps, Review, What Changed and Merge, undo labels,
+sharing's refusals, file errors), the window titles of Tools and Budget Setup and the
+main window's "(edited)", key names in shortcut text, and the "Untitled" file name;
+docs/research/accessibility-audit.md, "Localization", lists them.
 
 ### The Help menu
 
