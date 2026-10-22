@@ -1759,7 +1759,7 @@ pub async fn start_add_project<R: Runtime>(
     let picked = window
         .dialog()
         .file()
-        .set_title("Add a project folder")
+        .set_title(crate::i18n::tr("dialog.add_a_project_folder"))
         .set_parent(&window)
         .blocking_pick_folder();
     let Some(picked) = picked else {
@@ -1824,7 +1824,12 @@ pub async fn new_budget_pick_template<R: Runtime>(
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
-    let Some(path) = crate::app::pick_budget(&window, "Start from a budget file", from)? else {
+    let Some(path) = crate::app::pick_budget(
+        &window,
+        &crate::i18n::tr("dialog.start_from_a_budget_file"),
+        from,
+    )?
+    else {
         return Ok(None);
     };
     let b = crate::templates::read(&state, &path)?;
@@ -1875,7 +1880,7 @@ pub async fn new_budget_pick_folder<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Save the new budget in")
+        .set_title(crate::i18n::tr("dialog.save_the_new_budget_in"))
         .set_parent(&window);
     if let Some(dir) = current.and_then(|t| start.folder(t).ok()) {
         dialog = dialog.set_directory(dir);

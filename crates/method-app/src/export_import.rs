@@ -56,8 +56,11 @@ pub async fn export_import_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import budget export")
-        .add_filter("Budget export", exchange::READABLE_EXTENSIONS)
+        .set_title(crate::i18n::tr("dialog.import_budget_export"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget_export"),
+            exchange::READABLE_EXTENSIONS,
+        )
         .set_parent(&window);
     for f in exchange::READABLE {
         dialog = dialog.add_filter(f.label(), f.extensions());

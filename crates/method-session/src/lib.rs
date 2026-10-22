@@ -32,6 +32,7 @@ pub mod history;
 pub mod host;
 pub mod import_setup;
 pub mod library;
+pub mod messages;
 pub mod moverows;
 pub mod new_budget;
 pub mod notes;

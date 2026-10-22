@@ -55,8 +55,11 @@ pub async fn actuals_pick<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Import actuals")
-        .add_filter("Spreadsheet", &["xlsx", "csv", "tsv", "txt"])
+        .set_title(crate::i18n::tr("dialog.import_actuals"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_spreadsheet"),
+            &["xlsx", "csv", "tsv", "txt"],
+        )
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

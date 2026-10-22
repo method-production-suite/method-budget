@@ -238,7 +238,7 @@ pub async fn share_pick_folder<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Choose the shared folder")
+        .set_title(crate::i18n::tr("dialog.choose_the_shared_folder"))
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
@@ -545,7 +545,7 @@ pub async fn share_join_from_link<R: Runtime>(
         None => {
             let Some(path) = crate::app::pick_budget(
                 &window,
-                &format!("Choose \u{201c}{}\u{201d} in your shared folder", l.file),
+                &crate::i18n::tr_with("dialog.choose_shared_file", &[("name", &l.file)]),
                 None,
             )?
             else {

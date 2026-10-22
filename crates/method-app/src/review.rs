@@ -179,7 +179,12 @@ pub async fn review_open_budget<R: Runtime>(
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
-    let Some(path) = crate::app::pick_budget(&window, "Open for review", start_dir)? else {
+    let Some(path) = crate::app::pick_budget(
+        &window,
+        &crate::i18n::tr("dialog.open_for_review"),
+        start_dir,
+    )?
+    else {
         return Ok(None);
     };
     let safety = window.state::<Safety>();
@@ -216,8 +221,8 @@ pub async fn review_open<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Open review comments")
-        .add_filter("Review file", &["json"])
+        .set_title(crate::i18n::tr("dialog.open_review_comments"))
+        .add_filter(crate::i18n::tr("dialog.filter_review_file"), &["json"])
         .set_file_name(suggested)
         .set_parent(&window);
     if let Some(dir) = dir {
@@ -370,8 +375,8 @@ pub async fn review_save<R: Runtime>(
             let mut dialog = window
                 .dialog()
                 .file()
-                .set_title("Save review file")
-                .add_filter("Review file", &["json"])
+                .set_title(crate::i18n::tr("dialog.save_review_file"))
+                .add_filter(crate::i18n::tr("dialog.filter_review_file"), &["json"])
                 .set_file_name(file)
                 .set_parent(&window);
             if let Some(dir) = dir {

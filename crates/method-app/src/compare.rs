@@ -85,8 +85,11 @@ pub async fn compare_pick_files<R: Runtime>(
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Compare with budgets")
-        .add_filter(crate::app::FILTER_NAME, method_format::EXTENSIONS)
+        .set_title(crate::i18n::tr("dialog.compare_with_budgets"))
+        .add_filter(
+            crate::i18n::tr("dialog.filter_budget"),
+            method_format::EXTENSIONS,
+        )
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
