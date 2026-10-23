@@ -27,6 +27,7 @@ use method_core::{Budget, Detail, RowId, TopsheetRow};
 use serde::Serialize;
 
 use crate::edit::{row_gone, EditResult};
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::view::View;
 
@@ -34,7 +35,7 @@ fn direction(by: i32) -> EditResult<isize> {
     match by {
         -1 => Ok(-1),
         1 => Ok(1),
-        _ => Err("rows move one place at a time (by -1 or 1)".into()),
+        _ => Err(word("engine.move.one_place")),
     }
 }
 
@@ -113,7 +114,7 @@ pub fn shift_rows(b: &mut Budget, ids: &[RowId], by: i32) -> EditResult<Moved<Ro
     let by = direction(by)?;
     let want: BTreeSet<RowId> = ids.iter().copied().collect();
     let Some(&first) = want.iter().next() else {
-        return Err("select one or more rows first".into());
+        return Err(word("engine.move.select_rows"));
     };
     // Which account: the one holding the first row, and it must hold all.
     let mut home = None;
@@ -123,7 +124,7 @@ pub fn shift_rows(b: &mut Budget, ids: &[RowId], by: i32) -> EditResult<Moved<Ro
             continue;
         }
         if here != want.len() {
-            return Err("rows move within their own account: select rows in one account".into());
+            return Err(word("engine.move.rows_one_account"));
         }
         home = Some(k);
         break;
@@ -213,21 +214,19 @@ pub fn shift_accounts(b: &mut Budget, codes: &[String], by: i32) -> EditResult<M
     let by = direction(by)?;
     let want: BTreeSet<&str> = codes.iter().map(String::as_str).collect();
     let Some(&first) = want.iter().next() else {
-        return Err("select one or more accounts first".into());
+        return Err(word("engine.move.select_accounts"));
     };
     let cat = b
         .categories_mut()
         .find(|c| c.accounts.iter().any(|a| a.code == first))
-        .ok_or_else(|| format!("account {first} no longer exists"))?;
+        .ok_or_else(|| msg("engine.edit.account_gone", &[("code", &first)]))?;
     let selected: Vec<bool> = cat
         .accounts
         .iter()
         .map(|a| want.contains(a.code.as_str()))
         .collect();
     if selected.iter().filter(|&&s| s).count() != want.len() {
-        return Err(
-            "accounts move within their own category: select accounts in one category".into(),
-        );
+        return Err(word("engine.move.accounts_one_category"));
     }
     let order = reorder(&selected, &[], by);
     let places = (0..order.len()).filter(|&to| selected[order[to]]).collect();
@@ -251,10 +250,10 @@ pub fn shift_topsheet_rows(b: &mut Budget, indexes: &[usize], by: i32) -> EditRe
     let by = direction(by)?;
     let want: BTreeSet<usize> = indexes.iter().copied().collect();
     if want.is_empty() {
-        return Err("select one or more topsheet rows first".into());
+        return Err(word("engine.move.select_topsheet_rows"));
     }
     if want.iter().any(|&i| i >= b.topsheet.len()) {
-        return Err("that topsheet row no longer exists".into());
+        return Err(word("engine.edit.topsheet_row_gone"));
     }
     let selected: Vec<bool> = (0..b.topsheet.len()).map(|i| want.contains(&i)).collect();
     let order = reorder(&selected, &[], by);

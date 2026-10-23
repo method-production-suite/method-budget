@@ -4966,6 +4966,57 @@ the framework is built and adding a language is a table.
   code with the engine's English and counts the codes as used; and `engine()` gives the
   English back unchanged. `tr_with` now fills in one pass, so a value holding `{name}`
   stays as it is.
+- **Sixth pass: engine messages, second slice, sharing's refusals and the window titles**
+  (305 more entries, 4,369 in all; the catalog has 362 codes). The method-session modules
+  outside the edits now make their messages with `msg()` too, by area: Find and Replace
+  18 (`engine.find.*`), presets and line blocks 19, apply (fringes, groups, sets,
+  locations, currencies, fringe ranges, the panel's reason a range can't be made) 16,
+  pasting and copying 13 (`engine.paste.*`, the base-currency note a count message),
+  moving rows, accounts and topsheet rows 6, setup lists 2, Explain's refusal 2, the
+  session's read-only, review and shared refusals with "That step is no longer in the
+  history." 6 (`engine.session.*`; the constants `READ_ONLY`, `REVIEWING`,
+  `HELD_READ_ONLY`, `SHARED_STAYS` and `NO_REVIEW` became functions of the same names in
+  lower case), tabs and panes 7 (`engine.docs.*`), Review and its settle summary 25,
+  What Changed and Merge 18 (refusals, the base question, the sides' labels), actuals 9,
+  the imports (spreadsheet, chart of accounts, budget export, schedule days, Open's
+  "isn't a budget") 29 plus 18 for schedule days' notes, problems and summary, and 12
+  count phrases (`engine.phrase.*`: "3 comments", "added 2 accounts") that summaries are
+  built from, with 17 more nouns (the actuals columns, the kinds of preset, a note, a
+  formula, a sub-account). method-core's own reasons are in the catalog under
+  `engine.core.*` (14): its errors still write their English through `Display`, so
+  method-core reads no table and builds for the browser and the command line as before,
+  and `method-session/src/core_reasons.rs` makes each one (a formula's divide by zero,
+  unknown global and number too large, a number that doesn't read, every numbering
+  pattern error) and tests it is recognized as its code, so a change to method-core's
+  words fails a test. The desktop passes the errors of every command these modules serve
+  through `i18n::engine()` (`engine_err`, and `apply()` now also for a closed budget), and
+  the engine's words inside what they return through a small `Localize` trait
+  (`engine_dto`): the apply panel's reason, the comments' "why not", the settle and import
+  summaries, the paste and line-block previews' notes, schedule days' notes and problems,
+  What Changed's and Merge's side labels and base question, and the actuals' "too large"
+  in the view; only those fields, never the budget's own text.
+  Ambiguity, and how it is kept down: the more generic templates made recognition by
+  "most fixed words" riskier, so (1) a count phrase is only looked for inside a nested
+  parameter (`recognize_nested()`), never as a whole message, since "{count} accounts"
+  would fit any text ending that way; (2) a summary is several messages joined by a space
+  or a list of phrases joined by ", ", which `engine()` translates piece by piece (whole
+  first, then split at ". ", then, inside a parameter, at ", "), instead of one template
+  per mix; (3) where two messages read the same, one code serves both
+  (`engine.import.imported` for actuals and spreadsheets, `engine.import.cant_read` for
+  every "Couldn't read {file}: {why}."), and where one is a longer form of another the
+  longer has more fixed words and wins (`goes_too_of` over `goes_too`, `not_text` over
+  `cant_read`, tested); (4) method-core's formula parse errors ("... at position 4") and
+  calculation errors ("account 1100 line 2: divide by zero") are left out of the catalog,
+  because their templates would win over the message they sit in ("Amt can't be 1/0:
+  ..."). The desktop's own words read the table directly: sharing's refusals, its file
+  write errors and invite-link reasons in `src/shared.rs` (70 `shared.*` entries through
+  `tr()` and `tr_with()`), and the window titles: "Tools", "Budget Setup" and the main
+  window's "{name} - Method Budget" with its "(edited)" form (`window.*`). Tests: the
+  round trip covers every new code (a phrase through `recognize_nested()`, and never
+  recognized alone); overlaps go to the longer template; method-core's errors are
+  recognized as their codes; `engine()` keeps summaries, lists and partly-engine text
+  unchanged in English, and finds the pieces of a summary. Nothing a person reads in
+  English changed, and the command line and MCP print the same words.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -4979,16 +5030,25 @@ the framework is built and adding a language is a table.
   the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
-- **Not built** (3.14 stays partial): the rest of the engine's messages. Words that
-  arrive from Rust as data outside the edits are still English as they come: method-core's
-  own reasons (a formula refused, an account number the pattern can't read, a calculation
-  error), which reach the edits' messages as their `{why}` or whole; the other
-  method-session modules (Find and Replace, pasting, presets, apply, actuals, Review,
-  What Changed and Merge, imports and their problems, Explain's steps, setup lists,
-  schedule days, the history's "That step is no longer in the history." and the undo
-  labels); method-format's import problems and its export file-type names; and the
-  desktop's own errors (file reads and writes, sharing's refusals in `src/shared.rs`, the
-  window titles "Tools" and "Budget Setup", and "(edited)" in the main window's title).
+- **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
+  they come: the undo labels ("Paste 3 rows", "Save tag preset Crew") in the Edit menu
+  and the History tab, about 185 places in method-session; Explain's steps and the
+  totals' explanations; What Changed's change sentences and Merge's conflict sentences,
+  which method-core's `diff` and `merge` write; method-core's formula parse errors and
+  calculation errors (kept out on purpose, above), and its other errors (renumbering,
+  rates, overtime, versions, what-if); method-format's import problems (a row skipped, a
+  warning, an export's review notes) and its export file-type names; a spreadsheet's or
+  actuals import's column names that come from method-format (`{what}` in "The {what}
+  column is past the sheet's last column." for the spreadsheet and chart imports); the
+  lists inside a few messages (the setup items a tag preset misses, "fringe Crew, set
+  Stage"; a schedule figure's keys); a schedule figure's label and a comment's place, which
+  are written into the budget or the review file; Import Setup's done message; the
+  rest of `src/shared.rs`: the Activity tab's reasons a change was left out, role names
+  and the undo note "Nothing to put back"; the other method-session modules not listed
+  above (notes, versions, library, packs, rates, overtime, compare, reports, row styles,
+  rename and renumber, quick add, export, setup sheets, new budget, sharing's session
+  part); and errors that pass through no converted command (a few file errors in
+  `src/safety_app.rs`, `src/start.rs` and the updater).
   A data value named as a noun in a message (an information field's label in "{what}
   `{text}` is not a number") is shown as typed. Also not built: room for longer words and
   a right-to-left check, a language override in the preferences, and the languages themselves, which wait

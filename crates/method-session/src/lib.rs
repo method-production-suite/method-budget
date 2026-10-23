@@ -19,6 +19,7 @@ pub mod coa_import;
 pub mod collab;
 pub mod commands;
 pub mod compare;
+pub mod core_reasons;
 pub mod diagnose;
 pub mod diffmerge;
 pub mod display;

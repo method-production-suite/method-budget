@@ -45,7 +45,9 @@ pub const TOOLS: &str = "tools";
 /// The page the tools window loads: the app's own page, drawing only the panel.
 pub const TOOLS_PAGE: &str = "index.html?panel=1";
 /// The tools window's title.
-pub const TOOLS_TITLE: &str = "Tools";
+pub fn tools_title() -> String {
+    crate::i18n::tr("window.tools_title")
+}
 
 pub const VIEW_CHANGED: &str = "view-changed";
 pub const TOOLS_CLOSED: &str = "tools-closed";
@@ -268,7 +270,7 @@ pub async fn tools_window<R: Runtime>(
     }
     let ((width, height), at) = placement(geometry, &screen_areas(&app));
     let mut builder = WebviewWindowBuilder::new(&app, TOOLS, WebviewUrl::App(TOOLS_PAGE.into()))
-        .title(TOOLS_TITLE)
+        .title(tools_title())
         .inner_size(width, height)
         .min_inner_size(MIN_SIZE.0, MIN_SIZE.1);
     builder = match at {

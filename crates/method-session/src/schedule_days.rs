@@ -46,7 +46,7 @@ use method_format::import::schedule::{self, ScheduleDays, SHOOT_DAYS_GLOBAL};
 use serde::{Deserialize, Serialize};
 
 use crate::docs::{AppState, DocId};
-use crate::history::count;
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// The setup source kind globals are kept under.
@@ -96,7 +96,7 @@ impl ScheduleSources {
         g.1.as_ref()
             .filter(|s| s.token == token)
             .map(|s| (s.file.clone(), Arc::clone(&s.days)))
-            .ok_or_else(|| "Another file was picked since. Import again.".to_string())
+            .ok_or_else(|| word("engine.import.picked_since"))
     }
 }
 
@@ -281,13 +281,10 @@ enum Found {
 /// note) by its words.
 fn find_recorded(days: &ScheduleDays, figs: &[Figure], r: &Recorded) -> Found {
     let at = |key: &str| figs.iter().position(|f| f.key == key);
-    let gone = || Found::Gone("Not in this schedule file any more.".to_string());
+    let gone = || Found::Gone(word("engine.days.gone"));
     let Some(key) = &r.key else {
         return match figs.iter().position(|f| f.label == r.label) {
-            Some(i) => Found::Same(
-                i,
-                Some("Found by its description only (set before keys were recorded); setting it again records its key.".into()),
-            ),
+            Some(i) => Found::Same(i, Some(word("engine.days.found_by_words"))),
             None => gone(),
         };
     };
@@ -325,15 +322,20 @@ fn find_recorded(days: &ScheduleDays, figs: &[Figure], r: &Recorded) -> Found {
         schedule::Found::IdOnly(e) => match index(e) {
             Some(i) => Found::Doubt(
                 i,
-                format!(
-                    "Set from {} {} before; the schedule's element with that id is now named and numbered differently. Tick it to keep the link.",
-                    k.category.trim(),
-                    [k.board_id.as_deref().unwrap_or(""), k.name.trim()]
-                        .iter()
-                        .filter(|s| !s.is_empty())
-                        .copied()
-                        .collect::<Vec<_>>()
-                        .join(" ")
+                msg(
+                    "engine.days.renamed",
+                    &[
+                        ("category", &k.category.trim()),
+                        (
+                            "element",
+                            &[k.board_id.as_deref().unwrap_or(""), k.name.trim()]
+                                .iter()
+                                .filter(|s| !s.is_empty())
+                                .copied()
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        ),
+                    ],
                 ),
             ),
             None => gone(),
@@ -497,10 +499,9 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
             }
             Found::Ambiguous(at) => {
                 let keys: Vec<&str> = at.iter().map(|&i| figs[i].key.as_str()).collect();
-                let note = format!(
-                    "{} was set from a figure that now matches more than one figure in this file ({}): pick the right one to keep it linked.",
-                    r.global,
-                    keys.join(", ")
+                let note = msg(
+                    "engine.days.ambiguous",
+                    &[("global", &r.global), ("keys", &keys.join(", "))],
                 );
                 for &i in &at {
                     claims[i].push(r.global.clone());
@@ -523,9 +524,9 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
             add_note(
                 &mut notes,
                 i,
-                format!(
-                    "{} were all set from this figure before; only {kept} is offered here, the others are left as they are.",
-                    globals.join(", ")
+                msg(
+                    "engine.days.claimed",
+                    &[("globals", &globals.join(", ")), ("kept", &kept)],
                 ),
             );
         }
@@ -543,7 +544,7 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
         });
         linked.push(Some(r.global));
         doubt.push(None);
-        notes.push(Some(format!("{why} Tick it to set the global to 0.")));
+        notes.push(Some(format!("{why} {}", word("engine.days.tick_for_zero"))));
     }
     let values = recalc(b, &RecalcOptions::default())
         .ok()
@@ -593,7 +594,7 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
     let mut problems = Vec::new();
     for key in chosen.keys() {
         if !figs.iter().any(|f| f.key == *key) {
-            problems.push(format!("The file has no figure {key}."));
+            problems.push(msg("engine.days.no_figure", &[("key", key)]));
         }
     }
     let mut rows = Vec::with_capacity(figs.len());
@@ -619,16 +620,24 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
         let mut problem = None;
         if pick.is_some() {
             if !method_core::expr::is_ident(&global) {
-                problem = Some(format!(
-                    "{global:?} can't be a global name: use letters, digits and _, with at least one letter or _."
+                let name = format!("{global:?}");
+                problem = Some(msg("engine.days.bad_global", &[("name", &name)]));
+                problems.push(msg(
+                    "engine.days.bad_global_of",
+                    &[("label", &f.label), ("name", &name)],
                 ));
             } else if let Some(other) = used.get(&global) {
-                problem = Some(format!("{other} goes to {global} too."));
+                problem = Some(msg(
+                    "engine.days.goes_too",
+                    &[("other", other), ("global", &global)],
+                ));
+
+                problems.push(msg(
+                    "engine.days.goes_too_of",
+                    &[("label", &f.label), ("other", other), ("global", &global)],
+                ));
             }
             used.insert(global.clone(), f.label.clone());
-            if let Some(p) = &problem {
-                problems.push(format!("{}: {p}", f.label));
-            }
         }
         rows.push(FigureRow {
             key: f.key.clone(),
@@ -697,8 +706,9 @@ pub fn picks_with(
     let has = |k: &str| start.figures.iter().any(|f| f.key == k);
     for k in add.iter().map(|(k, _)| k).chain(skip) {
         if !has(k) {
-            return Err(format!(
-                "the file has no figure {k:?} (keys are total, unit:NAME, set:NAME, location:NAME, week:YYYY-MM-DD and element:ID, as the review lists them)"
+            return Err(msg(
+                "engine.days.no_such_key",
+                &[("key", &format!("{k:?}"))],
             ));
         }
     }
@@ -740,20 +750,21 @@ impl Applied {
     pub fn message(&self) -> String {
         let set = self.added.len() + self.updated.len();
         if set == 0 {
-            return format!(
-                "The globals already match the schedule; {} now linked to it.",
-                count(self.same.len(), "global is", "globals are")
-            );
+            return msg("engine.days.all_match", &[("count", &self.same.len())]);
         }
-        let mut s = format!("Set {} from the schedule", count(set, "global", "globals"));
-        if !self.added.is_empty() {
-            s.push_str(&format!(" ({} new)", self.added.len()));
-        }
-        s.push('.');
+        let mut s = if self.added.is_empty() {
+            msg("engine.days.set", &[("count", &set)])
+        } else {
+            msg(
+                "engine.days.set_new",
+                &[("count", &set), ("new", &self.added.len())],
+            )
+        };
         if !self.same.is_empty() {
-            s.push_str(&format!(
-                " {} already matched.",
-                count(self.same.len(), "global", "globals")
+            s.push(' ');
+            s.push_str(&msg(
+                "engine.days.already_matched",
+                &[("count", &self.same.len())],
             ));
         }
         s
@@ -816,7 +827,7 @@ pub fn apply(
         }
     }
     if done.added.is_empty() && done.updated.is_empty() && done.same.is_empty() {
-        return Err("Nothing is picked to set.".into());
+        return Err(word("engine.days.nothing_picked"));
     }
     *b = next;
     Ok(done)
@@ -825,11 +836,10 @@ pub fn apply(
 /// Reads a picked schedule days file, `bytes` from a file named `file`.
 pub fn read(file: &str, bytes: &[u8]) -> Result<ScheduleDays, String> {
     if !schedule::looks_like(bytes) {
-        return Err(format!(
-            "Couldn't read {file}: it isn't a schedule days file (Method Schedule writes one with File > Export for Budget)."
-        ));
+        return Err(msg("engine.days.not_a_days_file", &[("file", &file)]));
     }
-    schedule::read(bytes).map_err(|e| format!("Couldn't read {file}: {e}."))
+    schedule::read(bytes)
+        .map_err(|e| msg("engine.import.cant_read", &[("file", &file), ("why", &e)]))
 }
 
 /// The undo step's name.

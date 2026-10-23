@@ -407,7 +407,7 @@ pub fn resolve(
     match choice {
         // A read-only shared copy has nothing of its own to keep: saving it
         // would only write the stale copy over the newer file.
-        Resolve::KeepMine if s.is_read_only() => return Err(crate::sharing::READ_ONLY.into()),
+        Resolve::KeepMine if s.is_read_only() => return Err(crate::sharing::read_only()),
         Resolve::KeepMine => {
             backups.back_up(&path, None).map_err(backup_failed)?;
             s.backed_up(&path);
@@ -1967,7 +1967,7 @@ mod tests {
         // Keep Mine is refused: it would write the stale copy over the newer one.
         assert_eq!(
             resolve(&state, &safety, None, Resolve::KeepMine),
-            Err(crate::sharing::READ_ONLY.to_string())
+            Err(crate::sharing::read_only())
         );
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
@@ -1980,7 +1980,7 @@ mod tests {
         // Still read-only to the user's edits.
         assert_eq!(
             s.edit("Test edit", |b| edit::set_title(b, "Mine")),
-            Err(crate::sharing::READ_ONLY.to_string())
+            Err(crate::sharing::read_only())
         );
         // Undo brings the copy as it was back.
         assert!(s.undo());

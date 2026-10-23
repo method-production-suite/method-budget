@@ -23,24 +23,37 @@ use method_core::{
 use crate::collab::SharedLog;
 use crate::diagnose::{lenient_recalc_with, Outcome};
 use crate::edit::{self, EditResult};
+use crate::messages::word;
 use crate::report_dto::SelectionDto;
 use crate::safety::{self, DiskStamp};
 use crate::view::{Focus, FullView, View, ViewState};
 
 /// What Save As is told in a shared budget.
-pub const SHARED_STAYS: &str = "A shared budget stays in its shared folder. To give someone a copy, use File > Save a Copy for Sharing.";
+pub fn shared_stays() -> String {
+    word("engine.session.shared_stays")
+}
 
 /// What an edit to a copy saved for sharing is told.
-pub const READ_ONLY: &str =
-    "This is a copy saved for sharing, so it opens read-only. Make an editable copy to change it.";
+pub fn read_only() -> String {
+    word("engine.session.read_only")
+}
 
 /// What an edit is told while the host shows budgets read-only
 /// (`Host::set_read_only`).
-pub const HELD_READ_ONLY: &str = "This budget is open read-only here, so it can't be changed.";
+pub fn held_read_only() -> String {
+    word("engine.session.held_read_only")
+}
 
 /// What an edit is told while the budget is open for review
 /// (src/review.rs).
-pub const REVIEWING: &str = "This budget is open for review, so it can't be changed. Comments go in the review file beside it.";
+pub fn reviewing() -> String {
+    word("engine.session.reviewing")
+}
+
+/// What a jump to a step the history no longer has is told.
+fn step_gone() -> String {
+    word("engine.session.step_gone")
+}
 
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
@@ -324,7 +337,7 @@ pub struct Session {
     /// `.mthd`; decisions.md, entry 67).
     save_hint: Option<PathBuf>,
     /// The host shows this budget read-only (a partner's viewer): every
-    /// edit, undo and redo is refused ([`HELD_READ_ONLY`]).
+    /// edit, undo and redo is refused ([`held_read_only`]).
     held: bool,
     /// The banner of a budget converted from an export ("Converted from
     /// <file>..."; decisions.md, entry 67): every view carries it until the
@@ -841,24 +854,24 @@ impl Session {
 
     /// Shows this budget read-only for the host (a partner's viewer), or
     /// lets it be changed again: while on, every edit, undo, redo and
-    /// history jump is refused ([`HELD_READ_ONLY`]). Set through
+    /// history jump is refused ([`held_read_only`]). Set through
     /// [`crate::docs::Docs::set_read_only`], which covers every tab.
     pub fn set_held_read_only(&mut self, on: bool) {
         self.held = on;
     }
 
-    /// Refused while the host shows budgets read-only ([`HELD_READ_ONLY`]),
-    /// for a copy saved for sharing ([`READ_ONLY`]) and in a shared budget
+    /// Refused while the host shows budgets read-only ([`held_read_only`]),
+    /// for a copy saved for sharing ([`read_only`]) and in a shared budget
     /// this person may only read ([`SharedLog::refusal`]).
     pub fn check_writable(&self) -> EditResult {
         if self.held {
-            return Err(HELD_READ_ONLY.into());
+            return Err(held_read_only());
         }
         if self.is_reviewing() {
-            return Err(REVIEWING.into());
+            return Err(reviewing());
         }
         if self.is_read_only() {
-            return Err(READ_ONLY.into());
+            return Err(read_only());
         }
         if let Some(why) = self.shared.as_ref().and_then(|sh| sh.refusal()) {
             return Err(why);
@@ -883,7 +896,7 @@ impl Session {
     }
 
     /// The budget is open for review: comments only, every edit, undo and
-    /// redo refused ([`REVIEWING`]).
+    /// redo refused ([`reviewing`]).
     pub fn is_reviewing(&self) -> bool {
         self.review
             .as_ref()
@@ -1109,14 +1122,14 @@ impl Session {
     /// when there is no such position.
     pub fn jump_to(&mut self, pos: usize) -> Result<(), String> {
         if self.held {
-            return Err(HELD_READ_ONLY.into());
+            return Err(held_read_only());
         }
         if self.is_reviewing() {
-            return Err(REVIEWING.into());
+            return Err(reviewing());
         }
         if let Some(sh) = &self.shared {
             if pos > sh.history_len() {
-                return Err("That step is no longer in the history.".into());
+                return Err(step_gone());
             }
             let mut notes = Vec::new();
             while self
@@ -1141,7 +1154,7 @@ impl Session {
             return Ok(());
         }
         if pos > self.history_len() {
-            return Err("That step is no longer in the history.".into());
+            return Err(step_gone());
         }
         if pos == self.undo.len() {
             return Ok(());
@@ -1158,13 +1171,11 @@ impl Session {
     /// gives what it started from), so nothing but the copy is made.
     pub fn budget_at(&mut self, pos: usize) -> Result<Budget, String> {
         if self.shared.is_some() {
-            return Err(
-                "While a budget is shared, versions are saved from the budget as it is now.".into(),
-            );
+            return Err(word("engine.session.shared_versions_now"));
         }
         let n = self.history_len();
         if pos > n {
-            return Err("That step is no longer in the history.".into());
+            return Err(step_gone());
         }
         let here = self.undo.len();
         if pos == here {

@@ -99,22 +99,51 @@ pub fn tr_count(key: &str, count: usize, params: &[(&str, &str)]) -> String {
 
 /// An engine message in the person's language: when `text` is one of the
 /// engine's messages (`method_session::messages::recognize`), the table's
-/// words for its code with its parameters filled in, a noun or reason
-/// inside it translated the same way; otherwise, or when the table has no
-/// entry for the code, `text` as it is. In English the result is `text`.
+/// words for its code with its parameters filled in, a noun, reason or
+/// count phrase inside it translated the same way; otherwise, or when the
+/// table has no entry for the code, `text` as it is. A summary of several
+/// messages joined by a space ("Merged 2 comments as notes. 1 was in the
+/// budget already.") is translated sentence by sentence. In English the
+/// result is `text`.
 pub fn engine(text: &str) -> String {
-    use method_session::messages::{recognize, NESTED};
-    let Some(m) = recognize(text) else {
-        return text.to_string();
-    };
+    translated(text, false).unwrap_or_else(|| text.to_string())
+}
+
+/// `text` translated when it is a message, or messages joined by a space
+/// (each sentence ending ". "); `None` when some part isn't one. `nested`:
+/// `text` is a parameter's value, which may also be a count phrase or a
+/// list of them joined by ", ".
+fn translated(text: &str, nested: bool) -> Option<String> {
+    if let Some(t) = one_message(text, nested) {
+        return Some(t);
+    }
+    for (at, _) in text.match_indices(". ") {
+        let (head, tail) = (&text[..=at], &text[at + 2..]);
+        if let (Some(h), Some(t)) = (one_message(head, nested), translated(tail, nested)) {
+            return Some(format!("{h} {t}"));
+        }
+    }
+    if nested && text.contains(", ") {
+        let parts: Option<Vec<String>> = text.split(", ").map(|p| one_message(p, true)).collect();
+        return parts.map(|p| p.join(", "));
+    }
+    None
+}
+
+/// One message in the table's words, or `None` when `text` isn't one.
+fn one_message(text: &str, nested: bool) -> Option<String> {
+    use method_session::messages::{recognize, recognize_nested, NESTED};
+    let m = if nested {
+        recognize_nested(text)
+    } else {
+        recognize(text)
+    }?;
     let count = m
         .params
         .iter()
         .find(|(n, _)| *n == "count")
         .map(|(_, v)| v.as_str());
-    let Some(words) = lookup(m.code, count) else {
-        return text.to_string();
-    };
+    let words = lookup(m.code, count)?;
     let params: Vec<(&str, String)> = m
         .params
         .iter()
@@ -122,19 +151,120 @@ pub fn engine(text: &str) -> String {
             (
                 *n,
                 if NESTED.contains(n) {
-                    engine(v)
+                    translated(v, true).unwrap_or_else(|| v.clone())
                 } else {
                     v.clone()
                 },
             )
         })
         .collect();
-    fill(&words, &params)
+    Some(fill(&words, &params))
 }
 
 /// [`engine`] over an error, for a command's result.
 pub fn engine_err<T>(r: Result<T, String>) -> Result<T, String> {
     r.map_err(|e| engine(&e))
+}
+
+/// [`engine`] over a command's error and over the engine's words in what
+/// it returns ([`Localize`]).
+pub fn engine_dto<T: Localize>(r: Result<T, String>) -> Result<T, String> {
+    engine_err(r).map(|mut t| {
+        t.localize();
+        t
+    })
+}
+
+/// What a command returns with engine words in it (a summary, a reason, a
+/// review's notes), put through [`engine`]. Only the fields the engine
+/// writes: the budget's own text (names, notes, descriptions) is left as
+/// it is.
+pub trait Localize {
+    fn localize(&mut self);
+}
+
+impl Localize for String {
+    fn localize(&mut self) {
+        *self = engine(self);
+    }
+}
+
+impl<T: Localize> Localize for Option<T> {
+    fn localize(&mut self) {
+        if let Some(t) = self {
+            t.localize();
+        }
+    }
+}
+
+impl<T: Localize> Localize for Vec<T> {
+    fn localize(&mut self) {
+        for t in self {
+            t.localize();
+        }
+    }
+}
+
+impl Localize for method_session::apply::ApplySummary {
+    fn localize(&mut self) {
+        self.range_blocked.localize();
+    }
+}
+
+impl Localize for method_session::review::ReviewList {
+    fn localize(&mut self) {
+        for e in &mut self.entries {
+            e.why_not.localize();
+        }
+    }
+}
+
+impl Localize for method_session::schedule_days::Review {
+    fn localize(&mut self) {
+        self.notes.localize();
+        self.problems.localize();
+        for f in &mut self.figures {
+            f.problem.localize();
+            f.note.localize();
+        }
+    }
+}
+
+impl Localize for method_session::sheet_import::PreviewDto {
+    fn localize(&mut self) {
+        self.notes.localize();
+    }
+}
+
+impl Localize for method_session::clipboard::Preview {
+    fn localize(&mut self) {
+        self.notes.localize();
+    }
+}
+
+impl Localize for method_session::diffmerge::WhatChangedDto {
+    fn localize(&mut self) {
+        self.from.label.localize();
+        self.to.label.localize();
+    }
+}
+
+impl Localize for method_session::diffmerge::MergeDto {
+    fn localize(&mut self) {
+        self.copy.label.localize();
+        if let Some(b) = &mut self.base {
+            b.label.localize();
+        }
+        self.needs_base.localize();
+    }
+}
+
+impl Localize for crate::view::View {
+    fn localize(&mut self) {
+        if let Some(c) = &mut self.cost {
+            c.error.localize();
+        }
+    }
 }
 
 fn fill<V: AsRef<str>>(words: &str, params: &[(&str, V)]) -> String {
@@ -731,6 +861,59 @@ mod tests {
             assert_eq!(engine(&text), text);
         }
         assert_eq!(engine_err::<()>(Err("x".into())), Err("x".to_string()));
+    }
+
+    /// Summaries made of several messages (sentences joined by a space, a
+    /// list of count phrases) are found piece by piece, and come back
+    /// unchanged in English; text that is only partly the engine's is left
+    /// as it is.
+    #[test]
+    fn summaries_are_translated_piece_by_piece() {
+        let both = msg(
+            "engine.review.settled_both",
+            &[
+                ("merged", &msg("engine.phrase.comments", &[("count", &2)])),
+                (
+                    "dismissed",
+                    &msg("engine.phrase.comments", &[("count", &1)]),
+                ),
+            ],
+        );
+        let settled = format!(
+            "{both} {}",
+            msg("engine.review.settled_already", &[("count", &1)])
+        );
+        assert_eq!(
+            settled,
+            "Merged 2 comments as notes and dismissed 1 comment. 1 was in the budget already."
+        );
+        assert!(translated(&settled, false).is_some());
+        let added = [
+            msg("engine.phrase.new_accounts", &[("count", &1)]),
+            msg("engine.phrase.new_setup_items", &[("count", &3)]),
+        ]
+        .join(", ");
+        let imported = msg(
+            "engine.import.imported_adding",
+            &[
+                ("what", &msg("engine.phrase.lines", &[("count", &4)])),
+                ("accounts", &msg("engine.phrase.accounts", &[("count", &2)])),
+                ("added", &added),
+            ],
+        );
+        assert_eq!(
+            imported,
+            "Imported 4 lines into 2 accounts (1 new account, 3 new setup items)."
+        );
+        assert!(translated(&imported, false).is_some());
+        assert!(translated("3 accounts", true).is_some());
+        assert!(translated("3 accounts", false).is_none());
+        let half = "Nothing changed. Something else.".to_string();
+        assert!(translated(&half, false).is_none());
+        for text in [settled, imported, half] {
+            assert_eq!(engine(&text), text);
+        }
+        assert_eq!(engine("3 accounts"), "3 accounts");
     }
 
     /// Dialog words method-session also writes (for the browser build) are

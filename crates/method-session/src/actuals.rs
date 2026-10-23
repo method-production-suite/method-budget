@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::edit::EditResult;
 use crate::history::count;
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::sheet_import::{clip, read_book};
 use crate::view::View;
@@ -199,7 +200,7 @@ pub fn cost_dto(
             unassigned_codes: Vec::new(),
             total: FiguresDto::from(&CostFigures::default()),
             lines: BTreeMap::new(),
-            error: Some("The actuals add up to more than the app can hold.".into()),
+            error: Some(word("engine.actuals.too_large")),
         },
     }
 }
@@ -344,7 +345,7 @@ impl ActualsSources {
         g.1.as_ref()
             .filter(|s| s.token == token)
             .map(|s| (s.file.clone(), Arc::clone(&s.book)))
-            .ok_or_else(|| "Another file was picked since. Import again.".to_string())
+            .ok_or_else(|| word("engine.import.picked_since"))
     }
 }
 
@@ -568,13 +569,13 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
     let t = book
         .tables
         .get(req.sheet)
-        .ok_or("That sheet isn't in the file.")?;
+        .ok_or_else(|| word("engine.import.no_such_sheet"))?;
     let header_row = if req.detect_header {
         ia::detect_header(t)
     } else {
         if let Some(h) = req.header_row {
             if h >= t.rows.len().max(1) {
-                return Err("The header row is past the end of the sheet.".into());
+                return Err(word("engine.import.header_past_end"));
             }
         }
         req.header_row
@@ -591,11 +592,12 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
     let width = t.width();
     let mut columns = BTreeMap::new();
     for (key, &col) in &req.mapping {
-        let f = Field::parse(key).ok_or_else(|| format!("unknown field `{key}`"))?;
+        let f =
+            Field::parse(key).ok_or_else(|| msg("engine.edit.unknown_field", &[("field", key)]))?;
         if col >= width {
-            return Err(format!(
-                "The {} column is past the sheet's last column.",
-                f.name()
+            return Err(msg(
+                "engine.import.column_past_end",
+                &[("what", &field_word(f))],
             ));
         }
         columns.insert(f, col);
@@ -612,19 +614,22 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
 fn options(req: &Request) -> Result<Options, String> {
     let date_order = match req.date_order.as_str() {
         "" => None,
-        s => Some(DateOrder::parse(s).ok_or_else(|| format!("unknown date order `{s}`"))?),
+        s => Some(
+            DateOrder::parse(s)
+                .ok_or_else(|| msg("engine.actuals.unknown_date_order", &[("order", &s)]))?,
+        ),
     };
     let mut codes = BTreeMap::new();
     for (key, c) in &req.codes {
         if key.chars().count() > 64 || c.account.chars().count() > 64 {
-            return Err("An account number is too long.".into());
+            return Err(word("engine.actuals.account_number_long"));
         }
         let choice = match c.choice.as_str() {
             "keep" => CodeChoice::Keep,
             "skip" => CodeChoice::Skip,
             "map" if c.account.trim().is_empty() => CodeChoice::Keep,
             "map" => CodeChoice::Map(c.account.trim().to_string()),
-            other => return Err(format!("unknown choice `{other}`")),
+            other => return Err(msg("engine.paste.unknown_choice", &[("choice", &other)])),
         };
         codes.insert(key.clone(), choice);
     }
@@ -805,24 +810,48 @@ pub fn preview_dto(b: &Budget, book: &Book, req: &Request) -> Result<PreviewDto,
     })
 }
 
-/// The sentence an import ends with.
+/// The column a mapped field names, as the page labels it.
+fn field_word(f: Field) -> String {
+    word(match f {
+        Field::Date => "engine.what.column_date",
+        Field::Account => "engine.what.column_account",
+        Field::Amount => "engine.what.column_amount",
+        Field::Debit => "engine.what.column_debit",
+        Field::Credit => "engine.what.column_credit",
+        Field::Vendor => "engine.what.column_vendor",
+        Field::Description => "engine.what.column_description",
+        Field::Reference => "engine.what.column_reference",
+        Field::Tags => "engine.what.column_tags",
+    })
+}
+
+/// The sentences an import ends with.
 pub fn message(p: &ia::Plan) -> String {
     let unassigned = p.transactions.iter().filter(|t| !t.assigned).count();
-    let mut s = format!(
-        "Imported {} into {}",
-        count(p.transactions.len(), "transaction", "transactions"),
-        count(p.accounts.len(), "account", "accounts")
+    let transactions = msg(
+        "engine.phrase.transactions",
+        &[("count", &p.transactions.len())],
     );
-    if unassigned > 0 {
-        s.push_str(&format!(" ({unassigned} unassigned)"));
-    }
-    s.push('.');
+    let accounts = msg("engine.phrase.accounts", &[("count", &p.accounts.len())]);
+    let mut s = if unassigned > 0 {
+        msg(
+            "engine.import.imported_unassigned",
+            &[
+                ("what", &transactions),
+                ("accounts", &accounts),
+                ("unassigned", &unassigned),
+            ],
+        )
+    } else {
+        msg(
+            "engine.import.imported",
+            &[("what", &transactions), ("accounts", &accounts)],
+        )
+    };
     let skipped = p.skipped.len() + p.duplicates.iter().filter(|d| d.skipped).count();
     if skipped > 0 {
-        s.push_str(&format!(
-            " {} skipped.",
-            count(skipped, "row was", "rows were")
-        ));
+        s.push(' ');
+        s.push_str(&msg("engine.import.skipped", &[("count", &skipped)]));
     }
     s
 }
@@ -908,7 +937,10 @@ pub struct ListDto {
 fn filter_of(f: &FilterInput) -> Result<Filter, String> {
     for d in [&f.from, &f.to] {
         if !d.trim().is_empty() && !actuals::is_iso_date(d.trim()) {
-            return Err(format!("{d:?} isn't a date written YYYY-MM-DD."));
+            return Err(msg(
+                "engine.actuals.not_a_date",
+                &[("text", &format!("{d:?}"))],
+            ));
         }
     }
     Ok(Filter {
@@ -1030,9 +1062,12 @@ pub fn parse_money(s: &str) -> Result<Cents, String> {
     match parse_number_text(s, false) {
         Ok(Some(d)) => d
             .to_cents()
-            .ok_or_else(|| "The amount is too large.".to_string()),
-        Ok(None) => Err("Type an amount.".into()),
-        Err(_) => Err(format!("{:?} isn't an amount.", s.trim())),
+            .ok_or_else(|| word("engine.actuals.amount_too_large")),
+        Ok(None) => Err(word("engine.actuals.type_amount")),
+        Err(_) => Err(msg(
+            "engine.actuals.not_an_amount",
+            &[("text", &format!("{:?}", s.trim()))],
+        )),
     }
 }
 
@@ -1092,11 +1127,16 @@ pub fn method_of(kind: &str, value: &str) -> Result<Option<EtcMethod>, String> {
             let t = value.trim().trim_end_matches('%');
             let p = match parse_number_text(t, false) {
                 Ok(Some(p)) => p,
-                _ => return Err(format!("{:?} isn't a percent.", value.trim())),
+                _ => {
+                    return Err(msg(
+                        "engine.actuals.not_a_percent",
+                        &[("text", &format!("{:?}", value.trim()))],
+                    ))
+                }
             };
             Ok(Some(EtcMethod::PercentComplete(p)))
         }
-        other => Err(format!("unknown method `{other}`")),
+        other => Err(msg("engine.actuals.unknown_method", &[("method", &other)])),
     }
 }
 

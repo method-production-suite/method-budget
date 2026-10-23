@@ -33,7 +33,7 @@ use method_format::import::{read_file, Book, FileKind, Table, MAX_FILE_BYTES};
 use serde::{Deserialize, Serialize};
 
 use crate::docs::{AppState, DocId};
-use crate::history::count;
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::templates::{strip, UNTITLED};
 use crate::view::View;
@@ -90,7 +90,7 @@ impl SheetSources {
         g.1.as_ref()
             .filter(|s| s.token == token)
             .map(|s| (s.file.clone(), Arc::clone(&s.book)))
-            .ok_or_else(|| "Another file was picked since. Import again.".to_string())
+            .ok_or_else(|| word("engine.import.picked_since"))
     }
 }
 
@@ -347,13 +347,13 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
     let t = book
         .tables
         .get(req.sheet)
-        .ok_or("That sheet isn't in the file.")?;
+        .ok_or_else(|| word("engine.import.no_such_sheet"))?;
     let header_row = if req.detect_header {
         mapping::detect_header(t)
     } else {
         if let Some(h) = req.header_row {
             if h >= t.rows.len().max(1) {
-                return Err("The header row is past the end of the sheet.".into());
+                return Err(word("engine.import.header_past_end"));
             }
         }
         req.header_row
@@ -370,12 +370,10 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
     let width = t.width();
     let mut columns = BTreeMap::new();
     for (key, &col) in &req.mapping {
-        let f = Field::parse(key).ok_or_else(|| format!("unknown field `{key}`"))?;
+        let f =
+            Field::parse(key).ok_or_else(|| msg("engine.edit.unknown_field", &[("field", key)]))?;
         if col >= width {
-            return Err(format!(
-                "The {} column is past the sheet's last column.",
-                f.name()
-            ));
+            return Err(msg("engine.import.column_past_end", &[("what", &f.name())]));
         }
         columns.insert(f, col);
     }
@@ -391,7 +389,7 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, Mapping), St
 fn options(req: &Request) -> Result<Options, String> {
     let default_account = req.default_account.trim().to_string();
     if default_account.chars().count() > MAX_ACCOUNT_CHARS {
-        return Err("The default account number is too long.".into());
+        return Err(word("engine.import.default_account_long"));
     }
     Ok(Options {
         create_accounts: req.create_accounts,
@@ -420,14 +418,10 @@ fn plan_notes(plan: &Plan) -> Vec<String> {
             .map(|s| s.iter().cloned().collect::<Vec<_>>().join(", "))
     };
     if let Some(names) = list(SetupKind::Fringe) {
-        out.push(format!(
-            "New fringes start at 0%: {names}. Set their rates in Fringes."
-        ));
+        out.push(msg("engine.import.new_fringes", &[("names", &names)]));
     }
     if let Some(names) = list(SetupKind::Currency) {
-        out.push(format!(
-            "New currencies start at a rate of 1: {names}. Set their rates in Currencies."
-        ));
+        out.push(msg("engine.import.new_currencies", &[("names", &names)]));
     }
     out
 }
@@ -584,29 +578,47 @@ pub fn preview_dto(b: &Budget, book: &Book, req: &Request) -> Result<PreviewDto,
 pub fn message(plan: &Plan, applied: &merge::Applied) -> String {
     let accounts: std::collections::BTreeSet<&str> =
         plan.lines.iter().map(|l| l.account.as_str()).collect();
-    let mut s = format!(
-        "Imported {} into {}",
-        count(plan.lines.len(), "line", "lines"),
-        count(accounts.len(), "account", "accounts")
-    );
+    let lines = msg("engine.phrase.lines", &[("count", &plan.lines.len())]);
+    let accounts = msg("engine.phrase.accounts", &[("count", &accounts.len())]);
     let mut added = Vec::new();
     if applied.accounts > 0 {
-        added.push(count(applied.accounts, "new account", "new accounts"));
+        added.push(msg(
+            "engine.phrase.new_accounts",
+            &[("count", &applied.accounts)],
+        ));
     }
     if applied.categories > 0 {
-        added.push(count(applied.categories, "new category", "new categories"));
+        added.push(msg(
+            "engine.phrase.new_categories",
+            &[("count", &applied.categories)],
+        ));
     }
     if applied.setup > 0 {
-        added.push(count(applied.setup, "new setup item", "new setup items"));
+        added.push(msg(
+            "engine.phrase.new_setup_items",
+            &[("count", &applied.setup)],
+        ));
     }
-    if !added.is_empty() {
-        s.push_str(&format!(" ({})", added.join(", ")));
-    }
-    s.push('.');
+    let mut s = if added.is_empty() {
+        msg(
+            "engine.import.imported",
+            &[("what", &lines), ("accounts", &accounts)],
+        )
+    } else {
+        msg(
+            "engine.import.imported_adding",
+            &[
+                ("what", &lines),
+                ("accounts", &accounts),
+                ("added", &added.join(", ")),
+            ],
+        )
+    };
     if !plan.skipped.is_empty() {
-        s.push_str(&format!(
-            " {} skipped.",
-            count(plan.skipped.len(), "row was", "rows were")
+        s.push(' ');
+        s.push_str(&msg(
+            "engine.import.skipped",
+            &[("count", &plan.skipped.len())],
         ));
     }
     s
@@ -634,9 +646,9 @@ pub fn import_new(b: &Budget, book: &Book, req: &Request) -> Result<(Session, St
 /// (more than [`MAX_FILE_BYTES`]).
 pub fn check_size(len: usize) -> Result<(), String> {
     if len > MAX_FILE_BYTES {
-        return Err(format!(
-            "The file is too large to import (more than {} MB).",
-            MAX_FILE_BYTES >> 20
+        return Err(msg(
+            "engine.import.too_large",
+            &[("max", &(MAX_FILE_BYTES >> 20))],
         ));
     }
     Ok(())
@@ -646,7 +658,8 @@ pub fn check_size(len: usize) -> Result<(), String> {
 /// workbook.
 pub fn read_book(file: &str, bytes: &[u8]) -> Result<Book, String> {
     check_size(bytes.len())?;
-    read_file(bytes, file).map_err(|e| format!("Couldn't read {file}: {e}."))
+    read_file(bytes, file)
+        .map_err(|e| msg("engine.import.cant_read", &[("file", &file), ("why", &e)]))
 }
 
 // ---------------------------------------------------------------------------

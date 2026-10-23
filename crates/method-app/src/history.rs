@@ -39,7 +39,8 @@ pub fn history_jump<R: Runtime>(
     to: usize,
 ) -> Result<View, String> {
     let mut s = state.lock_doc(doc)?;
-    s.jump_to(to)?;
+    crate::i18n::engine_err(s.jump_to(to))?;
+
     Ok(finish(&window, &mut s, None))
 }
 

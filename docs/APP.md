@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 4,060 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 4,370 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1277,12 +1277,24 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
 - **The engine's messages**: an edit refused or a value that doesn't read ("account 1100
   no longer exists", "`12.345` has more than two decimal places") comes from method-session
   as English made from a stable code and its parameters (`method_session::messages`;
-  decision 94, fifth pass). The command line, the MCP server and the browser build show
-  that English. The desktop's edit commands hand it to `i18n::engine()` (`src/i18n.rs`),
+  decision 94, fifth and sixth passes). The command line, the MCP server and the browser
+  build show that English. The desktop hands it to `i18n::engine()` (`src/i18n.rs`),
   which recognizes the code and parameters and shows the table's words for the code
-  (`engine.edit.*`, with the nouns they name under `engine.what.*`), or the text as it came
-  when the table has no entry. Each entry is the engine's English, so a translation only
-  changes what a person reads.
+  (`engine.<area>.*`, with the nouns they name under `engine.what.*`), or the text as it
+  came when the table has no entry. Each entry is the engine's English, so a translation
+  only changes what a person reads. A summary made of several messages ("Merged 2
+  comments as notes. 1 was in the budget already.") is translated sentence by sentence,
+  and its counts ("2 comments", "added 3 accounts", `engine.phrase.*`) are only looked for
+  inside it, never as a message of their own. method-core's own reasons ("divide by
+  zero", "not a number", a numbering pattern's errors) are in the catalog as
+  `engine.core.*` without method-core reading any table: it writes the same English, and
+  a test checks each one is recognized as its code. Commands that return the engine's
+  words inside a result (the apply panel's reason, a comment's "why not", an import's
+  summary, a review's notes) put just those fields through it.
+- **The desktop's own words**: sharing's refusals, its write errors and an invite link's
+  reasons (`src/shared.rs`, `shared.*`), and the window titles ("Tools", "Budget Setup",
+  and the main window's "{name} - Method Budget" with its "(edited)" form, `window.*`)
+  read the table through `tr()`.
 - **Native dialogs**: the file dialogs' titles and file-type names, the unsaved-changes
   question on close and quit with its buttons, Couldn't save and the recovered budget's
   Replace question come from the table (`dialog.*`) through `tr()` in Rust.
@@ -1304,7 +1316,8 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   is recognized back with its parameters, and the table's entry for each code is the
   engine's English.
 
-Converted: the whole page, the edits' messages and the native dialogs. The start window and New Budget, the Help menu and About, the
+Converted: the whole page, the engine's refusals and summaries, sharing's refusals, the
+window titles and the native dialogs. The start window and New Budget, the Help menu and About, the
 shortcut list and sheet, the menu bar, Budget Setup's tabs, Find and Replace, the main
 window's dialogs, toolbar tips and messages, the status bar, the common dialog buttons,
 sharing, its banners and the Activity tab, the printed reports and the report setup, the
@@ -1313,12 +1326,21 @@ setup packs, Review, Compare, presets, Explain, Overtime, Actuals, Comments), th
 strips and split view, the grid's right-click menu, levels, quick entry and row colors,
 What Changed and Merge, backups and recovery, and the import dialogs (Import Setup and
 templates, spreadsheets, charts of accounts, budget exports, schedule days, actuals).
-Still English: the other words that come from Rust as data (method-core's reasons inside
-an edit's message, such as why a formula is refused; Find and Replace, pasting, presets,
-imports and their problems, Explain's steps, Review, What Changed and Merge, undo labels,
-sharing's refusals, file errors), the window titles of Tools and Budget Setup and the
-main window's "(edited)", key names in shortcut text, and the "Untitled" file name;
-docs/research/accessibility-audit.md, "Localization", lists them.
+Engine messages converted: the edits, Find and Replace, presets, apply, pasting, moving
+rows, setup lists, tabs and panes, the read-only and review refusals, "That step is no
+longer in the history.", Review and its summary, What Changed's and Merge's refusals and
+side labels, actuals, the imports (spreadsheets, charts of accounts, budget exports,
+schedule days) with their summaries, Explain's refusal, and method-core's reasons for a
+formula's value or a number that doesn't read and its numbering pattern errors.
+Still English: the undo labels in the Edit menu and the History tab; Explain's steps;
+What Changed's change sentences and Merge's conflict sentences (written by method-core);
+method-core's formula parse errors ("expected `)` at position 4") and calculation errors
+("account 1100 line 2: divide by zero"), and its other errors; method-format's import
+problems and export file-type names; lists inside a few messages (a tag preset's missing
+items, a schedule figure's keys); the Activity tab's reasons a change was left out; the
+other method-session modules (notes, versions, the Library, packs, rates, overtime,
+Compare, reports, rename and renumber); key names in shortcut text; and the "Untitled"
+file name; docs/research/accessibility-audit.md, "Localization", lists them.
 
 ### The Help menu
 

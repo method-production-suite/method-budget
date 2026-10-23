@@ -36,7 +36,7 @@ use method_format::import::{read_file, Book, FileKind, Table};
 use serde::{Deserialize, Serialize};
 
 use crate::docs::{AppState, DocId};
-use crate::history::count;
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::sheet_import::{check_size, clip, ColumnInfo, RawRow, SheetInfo, RAW_COLS, RAW_ROWS};
 use crate::templates::UNTITLED;
@@ -91,7 +91,7 @@ impl CoaSources {
         g.1.as_ref()
             .filter(|s| s.token == token)
             .map(|s| (s.file.clone(), s.content.clone()))
-            .ok_or_else(|| "Another file was picked since. Import again.".to_string())
+            .ok_or_else(|| word("engine.import.picked_since"))
     }
 }
 
@@ -280,8 +280,12 @@ impl HostCharts {
     /// Chart `id`'s template text (a `.mthd` file), kept for New From
     /// Template. Refused, and nothing kept, when it isn't a budget file.
     pub fn add(&self, id: &str, text: &str) -> Result<(), String> {
-        let b = method_format::from_str(text)
-            .map_err(|e| format!("The {id} chart template can't be read: {e}."))?;
+        let b = method_format::from_str(text).map_err(|e| {
+            msg(
+                "engine.import.chart_unreadable",
+                &[("name", &id), ("why", &e)],
+            )
+        })?;
         self.lock().1.insert(id.to_string(), b);
         Ok(())
     }
@@ -346,11 +350,8 @@ fn options(req: &Request) -> Result<CoaOptions, String> {
     let coding = match &req.coding {
         None => None,
         Some(c) => Some(
-            parse_coding(c.category, c.account, c.sub, &c.separator).map_err(|e| {
-                let mut s = format!("That numbering pattern can't be used: {e}");
-                s.push('.');
-                s
-            })?,
+            parse_coding(c.category, c.account, c.sub, &c.separator)
+                .map_err(|e| msg("engine.import.bad_pattern", &[("why", &e)]))?,
         ),
     };
     Ok(CoaOptions {
@@ -364,13 +365,13 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, CoaMapping),
     let t = book
         .tables
         .get(req.sheet)
-        .ok_or("That sheet isn't in the file.")?;
+        .ok_or_else(|| word("engine.import.no_such_sheet"))?;
     let header_row = if req.detect_header {
         detect_header(t)
     } else {
         if let Some(h) = req.header_row {
             if h >= t.rows.len().max(1) {
-                return Err("The header row is past the end of the sheet.".into());
+                return Err(word("engine.import.header_past_end"));
             }
         }
         req.header_row
@@ -386,12 +387,10 @@ fn resolve<'b>(book: &'b Book, req: &Request) -> Result<(&'b Table, CoaMapping),
     }
     let mut columns = BTreeMap::new();
     for (key, &col) in &req.mapping {
-        let f = CoaField::parse(key).ok_or_else(|| format!("unknown field `{key}`"))?;
+        let f = CoaField::parse(key)
+            .ok_or_else(|| msg("engine.edit.unknown_field", &[("field", key)]))?;
         if col >= t.width() {
-            return Err(format!(
-                "The {} column is past the sheet's last column.",
-                f.name()
-            ));
+            return Err(msg("engine.import.column_past_end", &[("what", &f.name())]));
         }
         columns.insert(f, col);
     }
@@ -415,9 +414,12 @@ fn read(
             let mut chart = (**c).clone();
             if let Some(to) = o.coding {
                 chart = chart.recode(&to).map_err(|p| {
-                    format!(
-                        "The numbers don't fit that pattern: {}.",
-                        p.into_iter().take(5).collect::<Vec<_>>().join("; ")
+                    msg(
+                        "engine.import.numbers_dont_fit",
+                        &[(
+                            "problems",
+                            &p.into_iter().take(5).collect::<Vec<_>>().join("; "),
+                        )],
                     )
                 })?;
             }
@@ -609,40 +611,40 @@ fn preview(b: &Budget, content: &Content, req: &Request) -> Result<PreviewDto, S
 fn apply_message(r: &ApplyReport) -> String {
     let mut parts = Vec::new();
     if !r.added_categories.is_empty() {
-        parts.push(format!(
-            "added {}",
-            count(r.added_categories.len(), "category", "categories")
+        parts.push(msg(
+            "engine.phrase.added_categories",
+            &[("count", &r.added_categories.len())],
         ));
     }
     if !r.added_accounts.is_empty() {
-        parts.push(format!(
-            "added {}",
-            count(r.added_accounts.len(), "account", "accounts")
+        parts.push(msg(
+            "engine.phrase.added_accounts",
+            &[("count", &r.added_accounts.len())],
         ));
     }
     let renamed = r.renamed_categories.len() + r.renamed_accounts.len();
     if renamed > 0 {
-        parts.push(format!("renamed {renamed}"));
+        parts.push(msg("engine.phrase.renamed", &[("count", &renamed)]));
     }
     if !r.removed_accounts.is_empty() {
-        parts.push(format!(
-            "removed {}",
-            count(r.removed_accounts.len(), "empty account", "empty accounts")
+        parts.push(msg(
+            "engine.phrase.removed_empty_accounts",
+            &[("count", &r.removed_accounts.len())],
         ));
     }
     let mut s = if parts.is_empty() {
-        "The chart matches this budget: nothing to change.".to_string()
+        word("engine.import.chart_matches")
     } else {
-        let mut s = format!("Applied the chart: {}.", parts.join(", "));
-        if let Some(first) = s.get_mut(0..1) {
-            first.make_ascii_uppercase();
-        }
-        s
+        msg(
+            "engine.import.chart_applied",
+            &[("changes", &parts.join(", "))],
+        )
     };
     if !r.kept.is_empty() {
-        s.push_str(&format!(
-            " Kept {} the chart doesn't list (they have lines).",
-            count(r.kept.len(), "account", "accounts")
+        s.push(' ');
+        s.push_str(&msg(
+            "engine.import.chart_kept",
+            &[("count", &r.kept.len())],
         ));
     }
     s
@@ -665,7 +667,7 @@ fn import_new(
 ) -> Result<(Session, String), String> {
     let (chart, _) = read(content, req)?;
     if chart.category_count() == 0 {
-        return Err("No categories were found.".into());
+        return Err(word("engine.import.no_categories"));
     }
     let mut s = Session::with_budget(Budget::new(UNTITLED, currency), None);
     let made = chart.to_budget(UNTITLED, currency);
@@ -673,24 +675,39 @@ fn import_new(
         *b = made;
         Ok(())
     })?;
-    let msg = format!(
-        "New budget with {} and {}, and no lines.",
-        count(chart.category_count(), "category", "categories"),
-        count(chart.account_count(), "account", "accounts")
+    let done = msg(
+        "engine.import.chart_new",
+        &[
+            (
+                "categories",
+                &msg(
+                    "engine.phrase.categories",
+                    &[("count", &chart.category_count())],
+                ),
+            ),
+            (
+                "accounts",
+                &msg(
+                    "engine.phrase.accounts",
+                    &[("count", &chart.account_count())],
+                ),
+            ),
+        ],
     );
-    Ok((s, msg))
+    Ok((s, done))
 }
 
 /// Reads a picked file: a budget file's chart, or a spreadsheet.
 fn read_content(bytes: &[u8], file: &str) -> Result<Content, String> {
     if coa::is_budget_file(bytes, file) {
         let text = std::str::from_utf8(bytes)
-            .map_err(|_| format!("Couldn't read {file}: it isn't text."))?;
-        let chart =
-            coa::chart_from_budget_text(text).map_err(|e| format!("Couldn't read {file}: {e}."))?;
+            .map_err(|_| msg("engine.import.not_text", &[("file", &file)]))?;
+        let chart = coa::chart_from_budget_text(text)
+            .map_err(|e| msg("engine.import.cant_read", &[("file", &file), ("why", &e)]))?;
         return Ok(Content::Chart(Arc::new(chart)));
     }
-    let book = read_file(bytes, file).map_err(|e| format!("Couldn't read {file}: {e}."))?;
+    let book = read_file(bytes, file)
+        .map_err(|e| msg("engine.import.cant_read", &[("file", &file), ("why", &e)]))?;
     Ok(Content::Book(Arc::new(book)))
 }
 
@@ -786,17 +803,16 @@ pub fn chart_template_new_with(
     id: &str,
 ) -> Result<DocId, String> {
     let b = match method_format::charts::find(id) {
-        Some(chart) => chart
-            .budget()
-            .map_err(|e| format!("The {} template can't be read: {e}.", chart.name))?,
+        Some(chart) => chart.budget().map_err(|e| {
+            msg(
+                "engine.import.template_unreadable",
+                &[("name", &chart.name), ("why", &e)],
+            )
+        })?,
         None => match host.find(id) {
             Some((_, Some(b))) => b,
-            Some((name, None)) => {
-                return Err(format!(
-                    "{name} hasn't loaded yet. Check the connection and pick it again."
-                ))
-            }
-            None => return Err("That chart template isn't bundled with this version.".into()),
+            Some((name, None)) => return Err(msg("engine.import.not_loaded", &[("name", &name)])),
+            None => return Err(word("engine.import.not_bundled")),
         },
     };
     Ok(crate::templates::open_new(state, &b, false))

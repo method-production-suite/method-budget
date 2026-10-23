@@ -77,7 +77,13 @@ pub async fn export_import_pick<R: Runtime>(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
-    method_session::export_import::export_import_pick(&sources, file, bytes, Some(path)).map(Some)
+    crate::i18n::engine_err(method_session::export_import::export_import_pick(
+        &sources,
+        file,
+        bytes,
+        Some(path),
+    ))
+    .map(Some)
 }
 
 /// The review of the picked export read as `format` (`None`: detected).
@@ -88,7 +94,11 @@ pub fn export_import_preview(
     token: u64,
     format: Option<String>,
 ) -> Result<Review, String> {
-    method_session::export_import::export_import_preview(&sources, token, format.as_deref())
+    crate::i18n::engine_err(method_session::export_import::export_import_preview(
+        &sources,
+        token,
+        format.as_deref(),
+    ))
 }
 
 /// Imports the picked export as a new budget in a new tab.
@@ -100,10 +110,14 @@ pub fn export_import<R: Runtime>(
     token: u64,
     format: Option<String>,
 ) -> Result<Imported, String> {
-    let (id, message) =
-        method_session::export_import::export_import(&state, &sources, token, format.as_deref())?;
+    let (id, message) = crate::i18n::engine_err(method_session::export_import::export_import(
+        &state,
+        &sources,
+        token,
+        format.as_deref(),
+    ))?;
     Ok(Imported {
         view: finish(&window, &mut state.lock_doc(Some(id))?, None),
-        message,
+        message: message.map(|m| crate::i18n::engine(&m)),
     })
 }

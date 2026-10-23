@@ -1281,9 +1281,9 @@ mod tests {
         let e = h
             .dispatch("set_title", json!({"title": "Theirs"}))
             .unwrap_err();
-        assert_eq!(e.message(), crate::session::HELD_READ_ONLY);
+        assert_eq!(e.message(), crate::session::held_read_only());
         let e = h.dispatch("history_jump", json!({"to": 0})).unwrap_err();
-        assert_eq!(e.message(), crate::session::HELD_READ_ONLY);
+        assert_eq!(e.message(), crate::session::held_read_only());
         // Undo and redo do nothing; views still come.
         call(&h, "undo", json!({}));
         let after = call(&h, "get_view", json!({}));

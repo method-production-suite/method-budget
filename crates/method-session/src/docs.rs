@@ -27,6 +27,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use serde::Serialize;
 
+use crate::messages::word;
 use crate::session::Session;
 
 /// Names an open document for as long as it is open. Never reused in a run.
@@ -87,8 +88,21 @@ pub struct SavedSplit {
     pub target: usize,
 }
 
-const LAST_IN_PANE: &str = "A pane's only tab can't move to the other pane.";
-const NOT_SPLIT: &str = "The window isn't split.";
+fn last_in_pane() -> String {
+    word("engine.docs.last_in_pane")
+}
+
+fn not_split() -> String {
+    word("engine.docs.not_split")
+}
+
+fn no_such_pane() -> String {
+    word("engine.docs.no_such_pane")
+}
+
+fn not_in_pane() -> String {
+    word("engine.docs.not_in_pane")
+}
 
 /// One tab as the page draws it (and `list_tabs` gives it).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -228,7 +242,7 @@ impl Docs {
     /// brings it to the front. Returns the new id and the session it replaced.
     pub fn replace(&mut self, id: DocId, mut s: Session) -> Result<(DocId, Session), String> {
         s.set_held_read_only(self.read_only);
-        let at = self.index_of(id).ok_or(CLOSED)?;
+        let at = self.index_of(id).ok_or_else(closed)?;
         let new = self.new_id();
         let old = std::mem::replace(
             &mut self.tabs[at],
@@ -261,7 +275,7 @@ impl Docs {
     /// Brings tab `id` to the front: in the target pane when it is there,
     /// else in the other pane, which becomes the target.
     pub fn switch(&mut self, id: DocId) -> Result<(), String> {
-        self.index_of(id).ok_or(CLOSED)?;
+        self.index_of(id).ok_or_else(closed)?;
         self.active = id;
         if let Some(sp) = &mut self.split {
             if !sp.panes[sp.target].contains(&id) {
@@ -308,7 +322,7 @@ impl Docs {
     /// new pane is the target. Refused when the window is split already.
     pub fn split_right(&mut self) -> Result<(), String> {
         if self.split.is_some() {
-            return Err("The window is split already.".into());
+            return Err(word("engine.docs.split_already"));
         }
         self.split = Some(Split {
             panes: [self.ids(), vec![self.active]],
@@ -322,7 +336,7 @@ impl Docs {
     /// then the second's (each budget once), and the target's budget stays
     /// in front.
     pub fn close_split(&mut self) -> Result<(), String> {
-        let sp = self.split.take().ok_or(NOT_SPLIT)?;
+        let sp = self.split.take().ok_or_else(not_split)?;
         let mut order: Vec<DocId> = Vec::with_capacity(self.tabs.len());
         for id in sp.panes[0].iter().chain(&sp.panes[1]) {
             if !order.contains(id) {
@@ -348,15 +362,15 @@ impl Docs {
                 self.active = sp.fronts[pane];
                 Ok(())
             }
-            Some(_) => Err("There is no such pane.".into()),
+            Some(_) => Err(no_such_pane()),
             None if pane == 0 => Ok(()),
-            None => Err(NOT_SPLIT.into()),
+            None => Err(not_split()),
         }
     }
 
     /// Brings tab `id` to the front of `pane` (which becomes the target).
     pub fn switch_in(&mut self, pane: usize, id: DocId) -> Result<(), String> {
-        self.index_of(id).ok_or(CLOSED)?;
+        self.index_of(id).ok_or_else(closed)?;
         match &mut self.split {
             Some(sp) if pane < 2 && sp.panes[pane].contains(&id) => {
                 sp.target = pane;
@@ -364,7 +378,7 @@ impl Docs {
                 self.active = id;
                 Ok(())
             }
-            Some(_) => Err("That budget isn't in that pane.".into()),
+            Some(_) => Err(not_in_pane()),
             None => self.switch(id),
         }
     }
@@ -375,11 +389,8 @@ impl Docs {
         let Some(sp) = &mut self.split else {
             return self.move_tab(id, to);
         };
-        let list = sp.panes.get_mut(pane).ok_or("There is no such pane.")?;
-        let from = list
-            .iter()
-            .position(|t| *t == id)
-            .ok_or("That budget isn't in that pane.")?;
+        let list = sp.panes.get_mut(pane).ok_or_else(no_such_pane)?;
+        let from = list.iter().position(|t| *t == id).ok_or_else(not_in_pane)?;
         let t = list.remove(from);
         let to = to.min(list.len());
         list.insert(to, t);
@@ -397,16 +408,16 @@ impl Docs {
         from: usize,
         to: Option<usize>,
     ) -> Result<(), String> {
-        let sp = self.split.as_mut().ok_or(NOT_SPLIT)?;
+        let sp = self.split.as_mut().ok_or_else(not_split)?;
         if from > 1 {
-            return Err("There is no such pane.".into());
+            return Err(no_such_pane());
         }
         let at = sp.panes[from]
             .iter()
             .position(|t| *t == id)
-            .ok_or("That budget isn't in that pane.")?;
+            .ok_or_else(not_in_pane)?;
         if sp.panes[from].len() == 1 {
-            return Err(LAST_IN_PANE.into());
+            return Err(last_in_pane());
         }
         sp.panes[from].remove(at);
         if sp.fronts[from] == id {
@@ -567,7 +578,7 @@ impl Docs {
     /// past it). Which tab is in front doesn't change. (The master order:
     /// split, each pane's own order is [`Docs::move_in_pane`].)
     pub fn move_tab(&mut self, id: DocId, to: usize) -> Result<(), String> {
-        let from = self.index_of(id).ok_or(CLOSED)?;
+        let from = self.index_of(id).ok_or_else(closed)?;
         let doc = self.tabs.remove(from);
         let to = to.min(self.tabs.len());
         self.tabs.insert(to, doc);
@@ -579,9 +590,9 @@ impl Docs {
     /// its place comes to the front: the next one, or the one before it at
     /// the end.
     pub fn remove(&mut self, id: DocId) -> Result<Session, String> {
-        let at = self.index_of(id).ok_or(CLOSED)?;
+        let at = self.index_of(id).ok_or_else(closed)?;
         if self.tabs.len() == 1 {
-            return Err("The last budget can't be closed; close the window instead.".into());
+            return Err(word("engine.docs.last_budget"));
         }
         let doc = self.tabs.remove(at);
         if self.split.is_some() {
@@ -641,7 +652,9 @@ impl Docs {
     }
 }
 
-const CLOSED: &str = "That budget has been closed.";
+fn closed() -> String {
+    word("engine.docs.closed")
+}
 
 /// Every open budget, behind one lock.
 #[derive(Debug, Default)]
@@ -674,7 +687,7 @@ impl AppState {
     pub fn lock_doc(&self, doc: Option<DocId>) -> Result<DocGuard<'_>, String> {
         let docs = self.docs();
         let at = match doc {
-            Some(id) => docs.index_of(id).ok_or(CLOSED)?,
+            Some(id) => docs.index_of(id).ok_or_else(closed)?,
             None => docs.active_index(),
         };
         Ok(DocGuard { docs, at })
@@ -915,7 +928,7 @@ mod tests {
         assert_eq!(l.panes[1].tabs, [a]);
         assert_eq!((l.target, l.panes[0].front), (0, c));
         // A pane's only tab stays.
-        assert_eq!(d.move_to_pane(a, 1, None).unwrap_err(), LAST_IN_PANE);
+        assert_eq!(d.move_to_pane(a, 1, None).unwrap_err(), last_in_pane());
         assert!(d.move_to_pane(b, 1, None).is_err(), "B isn't on the right");
         // Merging: the left pane's tabs, then the right's, the target's
         // budget in front.

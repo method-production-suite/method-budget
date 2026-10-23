@@ -46,6 +46,7 @@ use method_core::{Budget, RowId};
 use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{tr, tr_with};
 use crate::safety::{DiskStamp, DiskStampExt};
 
 /// How long typing must pause before this computer's changes are written
@@ -1028,7 +1029,7 @@ impl SharedDoc {
             return out;
         }
         if !self.shared.dir.exists() {
-            self.error = Some("Can't reach the shared folder.".into());
+            self.error = Some(tr("shared.cant_reach"));
             return out;
         }
         // The owner started the budget again: nothing more goes into the
@@ -1150,7 +1151,10 @@ impl SharedDoc {
                 true
             }
             Err(e) => {
-                self.error = Some(format!("Couldn't write to the shared folder: {}", e.0));
+                self.error = Some(tr_with(
+                    "shared.cant_write_folder",
+                    &[("why", e.0.as_str())],
+                ));
                 false
             }
         }
@@ -1233,7 +1237,7 @@ impl SharedDoc {
                 true
             }
             Err(e) => {
-                self.error = Some(format!("Couldn't write the budget file: {}", e.0));
+                self.error = Some(tr_with("shared.cant_write_file", &[("why", e.0.as_str())]));
                 false
             }
         }
@@ -1532,14 +1536,11 @@ impl SharedDoc {
     /// computer's, what to tell them (decisions.md, entry 89).
     pub fn key_warning(&self) -> Option<String> {
         self.shared.log.key_conflict()?;
-        Some(format!(
-            "A key in your name is in this shared budget, and it isn\u{2019}t this computer\u{2019}s: someone else may have put it there. Nothing you change here is signed or shared until this is sorted out. Tell {} before you go on.",
-            if self.shared.log.owner() == Some(self.actor()) {
-                "the people you share this budget with".to_string()
-            } else {
-                self.owner_name()
-            }
-        ))
+        Some(if self.shared.log.owner() == Some(self.actor()) {
+            tr("shared.key_taken_owner")
+        } else {
+            tr_with("shared.key_taken", &[("owner", self.owner_name().as_str())])
+        })
     }
 
     /// What signing means in this budget now, in a sentence.
@@ -1741,8 +1742,8 @@ impl SharedDoc {
     pub fn blame(&self, kind: &str, key: &str, field: &str) -> Result<Vec<ValueDto>, String> {
         let uid = self
             .entity_at(kind, key)
-            .ok_or("That isn't in the shared budget any more.")?;
-        let field = Field::parse(field).ok_or("Unknown field.")?;
+            .ok_or_else(|| tr("shared.entity_gone"))?;
+        let field = Field::parse(field).ok_or_else(|| tr("shared.unknown_field"))?;
         let history = self.shared.log.blame(uid, field);
         let last = history.len().saturating_sub(1);
         Ok(history
@@ -1764,7 +1765,7 @@ impl SharedDoc {
         self.shared
             .log
             .owner()
-            .map_or_else(|| "The owner".into(), |o| self.name_of(o))
+            .map_or_else(|| tr("shared.the_owner"), |o| self.name_of(o))
     }
 
     /// Why this person can't change anything, when their role reads only.
@@ -1779,15 +1780,15 @@ impl SharedDoc {
             return Some(w);
         }
         if self.shared.log.removed(self.actor()) {
-            return Some(format!(
-                "You were removed from this shared budget, so you can read it but not change it. {} can give you a role again.",
-                self.owner_name()
+            return Some(tr_with(
+                "shared.removed_ask",
+                &[("owner", self.owner_name().as_str())],
             ));
         }
         self.role().reads_only().then(|| {
-            format!(
-                "You can read this budget but not change it. {} sets who may change what.",
-                self.owner_name()
+            tr_with(
+                "shared.read_only_ask",
+                &[("owner", self.owner_name().as_str())],
             )
         })
     }
@@ -1806,34 +1807,30 @@ impl SharedDoc {
             {
                 return self.owner_key_warning().unwrap_or_default()
             }
-            LogError::Unsigned { .. } => {
-                return "Changes in this shared budget are signed, and this one couldn\u{2019}t be signed with this computer\u{2019}s key, so it wasn\u{2019}t shared.".into()
-            }
+            LogError::Unsigned { .. } => return tr("shared.unsigned"),
             LogError::Removed { .. } => {
-                return self.refusal().unwrap_or_else(|| {
-                    "You were removed from this shared budget.".into()
-                })
+                return self.refusal().unwrap_or_else(|| tr("shared.removed"))
             }
             LogError::NotAllowed { .. } => {}
-            _ => return format!("This change couldn't be shared: {e}"),
+            _ => return tr_with("shared.not_shared", &[("why", e.to_string().as_str())]),
         }
-        let ask = format!("{} sets who may change what.", self.owner_name());
+        let owner = self.owner_name();
+        let ask = tr_with("shared.ask", &[("owner", owner.as_str())]);
         match self.role() {
-            Role::Department(scope) => format!(
-                "You can change lines and notes in {} only. {ask}",
-                self.scope_words(&scope)
+            Role::Department(scope) => tr_with(
+                "shared.department_only",
+                &[
+                    ("scope", self.scope_words(&scope).as_str()),
+                    ("owner", owner.as_str()),
+                ],
             ),
-            Role::Actuals => format!("You can change actuals and notes only. {ask}"),
-            Role::Comment => format!("You can add and change notes only. {ask}"),
+            Role::Actuals => tr_with("shared.actuals_only", &[("owner", owner.as_str())]),
+            Role::Comment => tr_with("shared.notes_only", &[("owner", owner.as_str())]),
             Role::ReadOnly => self.refusal().unwrap_or(ask),
-            Role::Editor => {
-                "Only the owner and admins lock the originals or set what people may change.".into()
-            }
-            Role::Admin => {
-                "Only the owner and co-owners make admins or change an admin's role.".into()
-            }
-            Role::CoOwner => "Only the owner makes co-owners or changes a co-owner's role.".into(),
-            Role::Owner => format!("This change couldn't be shared: {e}"),
+            Role::Editor => tr("shared.editor_limits"),
+            Role::Admin => tr("shared.only_make_admins"),
+            Role::CoOwner => tr("shared.only_make_coowners"),
+            Role::Owner => tr_with("shared.not_shared", &[("why", e.to_string().as_str())]),
         }
     }
 
@@ -1927,18 +1924,12 @@ impl SharedDoc {
     /// accounts by number. One change by this person, shared like any
     /// edit; not an undo step (set the role again to change it back).
     pub fn set_role(&mut self, actor: &str, role: &str, scope: &[String]) -> Result<(), String> {
-        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        let who = ActorId::parse(actor).ok_or_else(|| tr("shared.which_person"))?;
         if Some(who) == self.shared.log.owner() || role == "owner" {
-            return Err(
-                "There is one owner, the person who started sharing, and that doesn't change."
-                    .into(),
-            );
+            return Err(tr("shared.one_owner"));
         }
         if role != "department" && !scope.is_empty() {
-            return Err(
-                "Only Edits some categories names categories. Untick them, or pick Edits some categories."
-                    .into(),
-            );
+            return Err(tr("shared.scope_only_department"));
         }
         let mut uids = std::collections::BTreeSet::new();
         for code in scope {
@@ -1949,12 +1940,12 @@ impl SharedDoc {
                 .categories
                 .get(code)
                 .or_else(|| self.proj.binding.accounts.get(code))
-                .ok_or_else(|| format!("There is no category or account {code}."))?;
+                .ok_or_else(|| tr_with("shared.no_code", &[("code", code)]))?;
             uids.insert(*uid);
         }
-        let role = Role::parse(role, uids).ok_or("That isn't a role a person can have.")?;
+        let role = Role::parse(role, uids).ok_or_else(|| tr("shared.not_a_role"))?;
         if role.scope().is_some_and(|s| s.is_empty()) {
-            return Err("Pick at least one category for this person to edit.".into());
+            return Err(tr("shared.pick_category"));
         }
         let label = format!("{}: {}", self.name_of(who), self.role_text(&role));
         let me = self.role();
@@ -1962,17 +1953,12 @@ impl SharedDoc {
             .log
             .grant(who, role, &label, &iso_now())
             .map_err(|e| match me {
-                Role::Admin => {
-                    "Only the owner and co-owners make admins or change an admin's role."
-                        .to_string()
-                }
-                Role::CoOwner => {
-                    "Only the owner makes co-owners or changes a co-owner's role.".to_string()
-                }
-                Role::Owner => format!("This role couldn't be set: {e}"),
-                _ => format!(
-                    "Only the owner and admins set what people may change. {} can.",
-                    self.owner_name()
+                Role::Admin => tr("shared.only_make_admins"),
+                Role::CoOwner => tr("shared.only_make_coowners"),
+                Role::Owner => tr_with("shared.role_not_set", &[("why", e.to_string().as_str())]),
+                _ => tr_with(
+                    "shared.only_set_roles",
+                    &[("owner", self.owner_name().as_str())],
                 ),
             })?;
         let now = Instant::now();
@@ -2012,9 +1998,9 @@ impl SharedDoc {
         }
         let me = self.actor();
         if let Err(e) = flog::remember_owner_key(&mut self.shared, &dir, me, &iso_now()) {
-            self.error = Some(format!(
-                "Couldn\u{2019}t remember the owner\u{2019}s key: {}",
-                e.0
+            self.error = Some(tr_with(
+                "shared.cant_remember_key",
+                &[("why", e.0.as_str())],
             ));
         }
     }
@@ -2028,11 +2014,9 @@ impl SharedDoc {
     pub fn start_again(&mut self) -> Result<(), String> {
         if self.shared.log.owner() != Some(self.actor()) || self.shared.log.key_conflict().is_none()
         {
-            return Err("Start Again is for the owner, when a key in their name isn\u{2019}t this computer\u{2019}s.".into());
+            return Err(tr("shared.start_again_owner"));
         }
-        let signer = self.signer.clone().ok_or(
-            "This computer has no key to sign with, so the budget can\u{2019}t be started again.",
-        )?;
+        let signer = self.signer.clone().ok_or_else(|| tr("shared.no_key"))?;
         // Everything of this person's is in the folder first, so the old
         // log kept aside is whole.
         self.flush(Instant::now(), true);
@@ -2078,11 +2062,11 @@ impl SharedDoc {
             .shared
             .log
             .owner_key_changed()
-            .ok_or("The owner\u{2019}s key in this budget hasn\u{2019}t changed.")?;
+            .ok_or_else(|| tr("shared.owner_key_same"))?;
         let dir = self
             .owner_keys
             .clone()
-            .ok_or("This computer has nowhere to remember the owner\u{2019}s key.")?;
+            .ok_or_else(|| tr("shared.nowhere_to_remember"))?;
         flog::trust_owner_key(&dir, &self.shared.path, &self.shared.info, key, &iso_now())
             .map_err(|e| e.0)?;
         self.reopen()
@@ -2113,16 +2097,16 @@ impl SharedDoc {
     /// tell the person (docs/research/owner-key.md, part 2).
     pub fn owner_key_warning(&self) -> Option<String> {
         self.shared.log.owner_key_changed()?;
-        Some(format!(
-            "The owner\u{2019}s key in this shared budget changed, and this computer saw a different one before. Changes signed with the new key are left out here, and nothing you change is shared. Ask {} before you go on.",
-            self.owner_name()
+        Some(tr_with(
+            "shared.owner_key_changed",
+            &[("owner", self.owner_name().as_str())],
         ))
     }
 
     /// What to tell the person once the owner started the budget again.
     fn replaced_text(&self) -> Option<String> {
         self.replaced.as_ref()?;
-        Some("The owner started this shared budget again. Reopen it to join; until then you can read it but not change it.".into())
+        Some(tr("shared.replaced"))
     }
 
     /// Puts this computer's key into the log when it should be there and
@@ -2148,12 +2132,12 @@ impl SharedDoc {
     /// computer (decisions.md, entry 89). One change by this person, shared
     /// like any edit; giving them a role again lets them back in from then on.
     pub fn remove_person(&mut self, actor: &str) -> Result<(), String> {
-        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        let who = ActorId::parse(actor).ok_or_else(|| tr("shared.which_person"))?;
         if Some(who) == self.shared.log.owner() {
-            return Err("The owner can't be removed.".into());
+            return Err(tr("shared.owner_stays"));
         }
         if who == self.actor() {
-            return Err("You can't remove yourself.".into());
+            return Err(tr("shared.not_yourself"));
         }
         let label = format!("Removed {}", self.name_of(who));
         let me = self.role();
@@ -2164,14 +2148,14 @@ impl SharedDoc {
                 (_, e @ (LogError::Unsigned { .. } | LogError::Removed { .. })) => {
                     self.refused_text(&e)
                 }
-                (Role::Admin, _) => {
-                    "Only the owner and co-owners remove an admin or a co-owner.".to_string()
+                (Role::Admin, _) => tr("shared.only_remove_admins"),
+                (Role::CoOwner, _) => tr("shared.only_remove_coowners"),
+                (Role::Owner, e) => {
+                    tr_with("shared.not_removed", &[("why", e.to_string().as_str())])
                 }
-                (Role::CoOwner, _) => "Only the owner removes a co-owner.".to_string(),
-                (Role::Owner, e) => format!("This person couldn't be removed: {e}"),
-                _ => format!(
-                    "Only the owner, co-owners and admins remove people. {} can.",
-                    self.owner_name()
+                _ => tr_with(
+                    "shared.only_remove_people",
+                    &[("owner", self.owner_name().as_str())],
                 ),
             })?;
         self.reproject();
@@ -2381,13 +2365,13 @@ impl SharedDoc {
         note: &str,
     ) -> Result<(), String> {
         if !self.shared.log.roles_started() {
-            return Err("Everyone can change everything in this budget until the owner sets what people may change, so there is nothing to ask for.".into());
+            return Err(tr("shared.nothing_to_ask"));
         }
         if !self.can_ask() {
-            return Err("You can already change everything here.".into());
+            return Err(tr("shared.can_change_all"));
         }
         if !ASKABLE.contains(&role) {
-            return Err("That isn\u{2019}t a role you can ask for.".into());
+            return Err(tr("shared.not_askable"));
         }
         let mut list: Vec<String> = Vec::new();
         for code in codes {
@@ -2398,12 +2382,12 @@ impl SharedDoc {
             if !self.proj.binding.categories.contains_key(&code)
                 && !self.proj.binding.accounts.contains_key(&code)
             {
-                return Err(format!("There is no category or account {code}."));
+                return Err(tr_with("shared.no_code", &[("code", code.as_str())]));
             }
             list.push(code);
         }
         if role == "department" && list.is_empty() {
-            return Err("Say which categories or accounts you would like to change.".into());
+            return Err(tr("shared.say_which"));
         }
         let note: String = note
             .split_whitespace()
@@ -2419,7 +2403,7 @@ impl SharedDoc {
             at: iso_now(),
         };
         if self.has_asked(self.actor(), &req) {
-            return Err("You can already change that.".into());
+            return Err(tr("shared.can_change_that"));
         }
         self.request = Some(req);
         self.heartbeat(Instant::now(), true);
@@ -2436,13 +2420,13 @@ impl SharedDoc {
     /// The request by `actor` (64 hex characters) made at `at`, as its
     /// heartbeat holds it now.
     fn request_of(&self, actor: &str, at: &str) -> Result<(ActorId, AccessRequest), String> {
-        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        let who = ActorId::parse(actor).ok_or_else(|| tr("shared.which_person"))?;
         let req = self
             .people
             .get(&who)
             .and_then(|p| p.request.clone())
             .filter(|r| r.at == at)
-            .ok_or("That request was taken back or replaced.")?;
+            .ok_or_else(|| tr("shared.request_gone"))?;
         Ok((who, req))
     }
 
@@ -2453,7 +2437,7 @@ impl SharedDoc {
     pub fn allow_request(&mut self, actor: &str, at: &str, only: bool) -> Result<(), String> {
         let (who, req) = self.request_of(actor, at)?;
         if only && req.codes.is_empty() {
-            return Err("That request doesn\u{2019}t name categories or accounts.".into());
+            return Err(tr("shared.request_no_codes"));
         }
         let (key, scope) = self.granted_for(who, &req, only);
         self.set_role(actor, &key, &scope)
@@ -2499,10 +2483,10 @@ impl SharedDoc {
         let text = serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?;
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)
-                .map_err(|e| format!("Couldn\u{2019}t remember that on this computer: {e}"))?;
+                .map_err(|e| tr_with("shared.cant_remember", &[("why", e.to_string().as_str())]))?;
         }
         std::fs::write(&path, text)
-            .map_err(|e| format!("Couldn\u{2019}t remember that on this computer: {e}"))
+            .map_err(|e| tr_with("shared.cant_remember", &[("why", e.to_string().as_str())]))
     }
 
     // Invites (decisions.md, entry 97; docs/APP.md, "Inviting someone")
@@ -2533,26 +2517,20 @@ impl SharedDoc {
         }
         if !self.can_invite() {
             return Err(self.refusal().unwrap_or_else(|| {
-                format!(
-                    "Only the owner, co-owners and admins invite people. {} can.",
-                    self.owner_name()
+                tr_with(
+                    "shared.only_invite",
+                    &[("owner", self.owner_name().as_str())],
                 )
             }));
         }
         if !INVITE_DAYS.contains(&days) {
-            return Err("An invite lasts 1, 7 or 30 days.".into());
+            return Err(tr("shared.invite_days"));
         }
         if role == "owner" {
-            return Err(
-                "There is one owner, the person who started sharing, and that doesn\u{2019}t change."
-                    .into(),
-            );
+            return Err(tr("shared.one_owner_invite"));
         }
         if role != "department" && !scope.is_empty() {
-            return Err(
-                "Only Edits some categories names categories. Untick them, or pick Edits some categories."
-                    .into(),
-            );
+            return Err(tr("shared.scope_only_department"));
         }
         let mut uids = BTreeSet::new();
         for code in scope {
@@ -2563,17 +2541,17 @@ impl SharedDoc {
                 .categories
                 .get(code)
                 .or_else(|| self.proj.binding.accounts.get(code))
-                .ok_or_else(|| format!("There is no category or account {code}."))?;
+                .ok_or_else(|| tr_with("shared.no_code", &[("code", code)]))?;
             uids.insert(*uid);
         }
-        let given = Role::parse(role, uids).ok_or("That isn\u{2019}t a role a person can have.")?;
+        let given = Role::parse(role, uids).ok_or_else(|| tr("shared.not_a_role_invite"))?;
         if given.scope().is_some_and(|s| s.is_empty()) {
-            return Err("Pick at least one category for this person to edit.".into());
+            return Err(tr("shared.pick_category"));
         }
         if !method_core::log::may_give(&self.role(), &Role::ReadOnly, &given) {
             return Err(match self.role() {
-                Role::CoOwner => "Only the owner invites a co-owner.".to_string(),
-                _ => "Only the owner and co-owners invite an admin.".to_string(),
+                Role::CoOwner => tr("shared.only_invite_coowner"),
+                _ => tr("shared.only_invite_admin"),
             });
         }
         let secret = flog::sign::new_invite_secret().map_err(|e| e.0)?;
@@ -2697,7 +2675,7 @@ impl SharedDoc {
     /// hasn't seen is refused on every computer. A used invite may be
     /// cancelled too, which seals it: the use this computer has seen stands.
     pub fn cancel_invite(&mut self, id: &str) -> Result<(), String> {
-        let uid = Uid::parse(id).ok_or("Couldn\u{2019}t tell which invite that is.")?;
+        let uid = Uid::parse(id).ok_or_else(|| tr("shared.which_invite"))?;
         let rec = self
             .shared
             .log
@@ -2705,7 +2683,7 @@ impl SharedDoc {
             .invites()
             .get(&uid)
             .cloned()
-            .ok_or("That invite isn\u{2019}t in this budget.")?;
+            .ok_or_else(|| tr("shared.invite_gone"))?;
         if rec.cancelled.is_some() {
             return Ok(());
         }
@@ -2714,10 +2692,7 @@ impl SharedDoc {
             .log
             .cancel_invite(uid, &label, &iso_now())
             .map_err(|e| match e {
-                LogError::NotAllowed { .. } => {
-                    "Only the person who made an invite, or someone who may give its role, cancels it."
-                        .to_string()
-                }
+                LogError::NotAllowed { .. } => tr("shared.only_cancel"),
                 e => self.refused_text(&e),
             })?;
         self.reproject();
@@ -2750,9 +2725,9 @@ impl SharedDoc {
         let role = self.role();
         let removed = self.shared.log.removed(me);
         if self.shared.log.owner() == Some(me) || (!removed && !role.reads_only()) {
-            return Err(format!(
-                "You already have a role in this budget ({}), so there is nothing to join.",
-                self.role_text(&role)
+            return Err(tr_with(
+                "shared.already_member",
+                &[("role", self.role_text(&role).as_str())],
             ));
         }
         if rec.claimed.is_some() {
@@ -2807,12 +2782,10 @@ impl SharedDoc {
     ) -> Result<Budget, String> {
         let uid = self
             .entity_at(kind, key)
-            .ok_or("That isn't in the shared budget any more.")?;
-        let f = Field::parse(field).ok_or("Unknown field.")?;
+            .ok_or_else(|| tr("shared.entity_gone"))?;
+        let f = Field::parse(field).ok_or_else(|| tr("shared.unknown_field"))?;
         let history = self.shared.log.blame(uid, f);
-        let (_, _, value) = history
-            .get(index)
-            .ok_or("That value is no longer in the history.")?;
+        let (_, _, value) = history.get(index).ok_or_else(|| tr("shared.value_gone"))?;
         let place = self.place_of(uid, Some(f));
         let label = format!(
             "Put back {} on {}",
@@ -2824,7 +2797,7 @@ impl SharedDoc {
             .log
             .set_field(uid, f, value.clone(), &label, &iso_now())
             .map_err(|e| self.refused_text(&e))?
-            .ok_or("That isn't in the shared budget any more.")?;
+            .ok_or_else(|| tr("shared.entity_gone"))?;
         self.reproject();
         let now = Instant::now();
         self.last_edit = Some(now);
@@ -2872,9 +2845,7 @@ impl SharedDoc {
 
 /// The link is for another shared budget than the one picked.
 pub fn wrong_budget(file: &str) -> String {
-    format!(
-        "This link is for a different shared budget. Pick \u{201c}{file}\u{201d} in the shared folder it was shared through."
-    )
+    tr_with("shared.wrong_budget", &[("file", file)])
 }
 
 /// Why an invite can't be taken up, in a sentence for the person joining
@@ -2882,17 +2853,18 @@ pub fn wrong_budget(file: &str) -> String {
 pub fn invite_words(reason: &str, expires: Option<&str>) -> String {
     use method_core::log::invite::why;
     match reason {
-        why::NOT_FOUND => "The invite hasn\u{2019}t reached this computer yet: the shared folder is still bringing in the changes of the person who invited you. Wait a minute, then try again.".into(),
-        why::USED => "This invite link was already used. Ask the person who sent it for a new one.".into(),
-        why::CANCELLED => "This invite link was cancelled. Ask the person who sent it for a new one.".into(),
+        why::NOT_FOUND => tr("shared.invite.not_found"),
+        why::USED => tr("shared.invite.used"),
+        why::CANCELLED => tr("shared.invite.cancelled"),
         why::EXPIRED | why::BAD_TIME => match expires.and_then(|e| e.get(..10)) {
-            Some(day) => format!("This invite link expired on {day}. Ask the person who sent it for a new one."),
-            None => "This invite link expired. Ask the person who sent it for a new one.".into(),
+            Some(day) => tr_with("shared.invite.expired_on", &[("day", day)]),
+
+            None => tr("shared.invite.expired"),
         },
-        why::WRONG_SECRET => "This invite link doesn\u{2019}t match the invite in the budget: part of it may have been changed when it was copied. Ask for it again.".into(),
-        why::NOT_ALLOWED => "The person who sent this link can no longer give that role. Ask them, or the owner, for a new one.".into(),
-        why::OWNER => "You started sharing this budget, so there is nothing to join.".into(),
-        _ => "This invite couldn\u{2019}t be checked on this computer.".into(),
+        why::WRONG_SECRET => tr("shared.invite.wrong_secret"),
+        why::NOT_ALLOWED => tr("shared.invite.not_allowed"),
+        why::OWNER => tr("shared.invite.owner"),
+        _ => tr("shared.invite.unchecked"),
     }
 }
 

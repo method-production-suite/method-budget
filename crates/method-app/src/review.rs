@@ -62,7 +62,7 @@ fn write_to_place(s: &mut Session, force: bool) -> Result<bool, String> {
             return Err(CHANGED_ON_DISK.into());
         }
     }
-    let text = method_session::review::text(s)?;
+    let text = crate::i18n::engine_err(method_session::review::text(s))?;
     safety::write_atomically(&path, text.as_bytes(), Access::Document)
         .map_err(|e| format!("The review file couldn't be written ({e}). Use Save Review File As… in the Comments tab to keep the comments somewhere else."))?;
     let stamp = DiskStamp::of(&path, text.as_bytes());
@@ -150,7 +150,9 @@ fn start(s: &mut Session) -> Result<(), String> {
         let bytes = read_capped(&path)?;
         let stamp = read_stamp(&path, &bytes);
         (
-            Some(method_session::review::read(&file, &bytes)?),
+            Some(crate::i18n::engine_err(method_session::review::read(
+                &file, &bytes,
+            ))?),
             Some(stamp),
         )
     } else {
@@ -237,7 +239,7 @@ pub async fn review_open<R: Runtime>(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
-    let review = method_session::review::read(&file, &bytes)?;
+    let review = crate::i18n::engine_err(method_session::review::read(&file, &bytes))?;
     let stamp = read_stamp(&path, &bytes);
     change(&window, &state, doc, |s| {
         open_for_author(s, review, file, Some(path))?;
@@ -264,7 +266,7 @@ pub fn review_close<R: Runtime>(
 /// The Comments tab's list.
 #[tauri::command]
 pub fn review_list(state: State<'_, AppState>, doc: Option<DocId>) -> Result<ReviewList, String> {
-    list(&*state.lock_doc(doc)?)
+    crate::i18n::engine_dto(list(&*state.lock_doc(doc)?))
 }
 
 /// `{on, text, created, author?}`: a comment on `on`.
@@ -342,7 +344,8 @@ pub fn review_settle<R: Runtime>(
 ) -> Result<SettledView, String> {
     let mut message = String::new();
     let view = change(&window, &state, doc, |s| {
-        message = settle(s, &picks, &at, by.as_deref())?.message;
+        message = crate::i18n::engine(&settle(s, &picks, &at, by.as_deref())?.message);
+
         Ok(())
     })?;
     Ok(SettledView { view, message })
@@ -362,7 +365,7 @@ pub async fn review_save<R: Runtime>(
 ) -> Result<Option<View>, String> {
     let (current, file, dir) = {
         let s = state.lock_doc(doc)?;
-        let r = s.review().ok_or(NO_REVIEW)?;
+        let r = s.review().ok_or_else(no_review)?;
         (
             r.path.clone(),
             r.file.clone(),

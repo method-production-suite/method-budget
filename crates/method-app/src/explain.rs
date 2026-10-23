@@ -19,5 +19,8 @@ pub fn explain_number(
     doc: Option<DocId>,
     target: TargetDto,
 ) -> Result<ExplanationDto, String> {
-    method_session::explain::explain_number(&mut *state.lock_doc(doc)?, &target)
+    crate::i18n::engine_err(method_session::explain::explain_number(
+        &mut *state.lock_doc(doc)?,
+        &target,
+    ))
 }

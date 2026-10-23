@@ -38,7 +38,9 @@ pub const SETUP: &str = "setup";
 /// The page it loads: the app's own page, drawing only the setup tabs.
 pub const SETUP_PAGE: &str = "index.html?panel=setup";
 /// Its title.
-pub const SETUP_TITLE: &str = "Budget Setup";
+pub fn setup_title() -> String {
+    crate::i18n::tr("window.setup_title")
+}
 
 pub const SETUP_CLOSED: &str = "setup-closed";
 pub const SETUP_GEOMETRY: &str = "setup-geometry";
@@ -94,7 +96,7 @@ pub async fn setup_window<R: Runtime>(
         SETUP_MIN_SIZE,
     );
     let mut builder = WebviewWindowBuilder::new(&app, SETUP, WebviewUrl::App(SETUP_PAGE.into()))
-        .title(SETUP_TITLE)
+        .title(setup_title())
         .inner_size(width, height)
         .min_inner_size(SETUP_MIN_SIZE.0, SETUP_MIN_SIZE.1);
     builder = match at {

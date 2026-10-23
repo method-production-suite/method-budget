@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::docs::AppState;
 use crate::edit::{self, EditResult};
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 // The setup half of a copy (what rows use, how items stand here, renaming,
@@ -295,7 +296,7 @@ pub fn take(b: &Budget, pick: &Pick) -> EditResult<Content> {
         "rows" => {
             let want: BTreeSet<RowId> = pick.row_ids.iter().copied().collect();
             if want.is_empty() {
-                return Err("select the rows to copy first".into());
+                return Err(word("engine.paste.select_rows"));
             }
             let rows: Vec<Detail> = edit::details(b)
                 .filter(|d| want.contains(&d.id))
@@ -310,7 +311,7 @@ pub fn take(b: &Budget, pick: &Pick) -> EditResult<Content> {
         "accounts" => {
             let want: BTreeSet<&str> = pick.accounts.iter().map(String::as_str).collect();
             if want.is_empty() {
-                return Err("select the accounts to copy first".into());
+                return Err(word("engine.paste.select_accounts"));
             }
             let accounts: Vec<Account> = b
                 .categories()
@@ -320,7 +321,7 @@ pub fn take(b: &Budget, pick: &Pick) -> EditResult<Content> {
                 .collect();
             let found: BTreeSet<&str> = accounts.iter().map(|a| a.code.as_str()).collect();
             if let Some(code) = want.iter().find(|c| !found.contains(*c)) {
-                return Err(format!("account {code} no longer exists"));
+                return Err(msg("engine.edit.account_gone", &[("code", code)]));
             }
             Ok(Content::Accounts(accounts))
         }
@@ -331,15 +332,15 @@ pub fn take(b: &Budget, pick: &Pick) -> EditResult<Content> {
                 match b.topsheet.get(i) {
                     Some(TopsheetRow::Category(c)) => cats.push(c.clone()),
                     Some(TopsheetRow::ProductionTotal(_)) => {}
-                    None => return Err("that topsheet row no longer exists".into()),
+                    None => return Err(word("engine.edit.topsheet_row_gone")),
                 }
             }
             if cats.is_empty() {
-                return Err("select the categories to copy first".into());
+                return Err(word("engine.paste.select_categories"));
             }
             Ok(Content::Categories(cats))
         }
-        other => Err(format!("can't copy `{other}`")),
+        other => Err(msg("engine.paste.cant_copy", &[("what", &other)])),
     }
 }
 
@@ -506,11 +507,13 @@ pub fn preview(b: &Budget, clip: &Clip) -> Preview {
             .filter(|d| d.kind == RowKind::Line && d.currency.is_none())
             .count();
         if n > 0 {
-            let lines = if n == 1 { "line" } else { "lines" };
-            notes.push(format!(
-                "{n} {lines} in {from}, the base currency where they were copied, will count in {to}, this budget's base currency.",
-                from = clip.base_currency,
-                to = b.base_currency,
+            notes.push(msg(
+                "engine.paste.base_currency_differs",
+                &[
+                    ("count", &n),
+                    ("from", &clip.base_currency),
+                    ("to", &b.base_currency),
+                ],
             ));
         }
     }
@@ -560,10 +563,10 @@ fn choices(rs: &[Resolution]) -> EditResult<BTreeMap<(Kind, String), Choice>> {
             "keep" => Choice::Keep,
             "copied" => Choice::Copied,
             "rename" => Choice::Rename,
-            other => return Err(format!("unknown choice `{other}`")),
+            other => return Err(msg("engine.paste.unknown_choice", &[("choice", &other)])),
         };
         if choice == Choice::Rename && !kind.renamable() {
-            return Err(format!("a {} can't be added under a new name", kind.key()));
+            return Err(no_new_name(kind));
         }
         out.insert((kind, r.name.clone()), choice);
     }
@@ -641,7 +644,7 @@ fn free_range(used: &BTreeSet<u32>) -> EditResult<u32> {
         Some(&top) => top
             .checked_add(1)
             .or_else(|| (1..=u32::MAX).find(|n| !used.contains(n)))
-            .ok_or_else(|| "this account has no fringe range numbers left".into()),
+            .ok_or_else(|| word("engine.apply.range_numbers_used")),
     }
 }
 
@@ -713,9 +716,9 @@ fn free_account_code(
                     }
                 }
             }
-            return Err(format!(
-                "there is no free account number left in category {}",
-                parts.category
+            return Err(msg(
+                "engine.paste.no_account_number",
+                &[("category", &parts.category)],
             ));
         }
     }
@@ -748,7 +751,7 @@ fn free_category_code(
             }
             return segment_numbers(&parts.category, coding.category_width)
                 .find(|c| !taken.contains(c))
-                .ok_or_else(|| "there is no free category number left".to_string());
+                .ok_or_else(|| word("engine.paste.no_category_number"));
         }
     }
     count_on(code, taken)
@@ -771,7 +774,21 @@ fn count_on(code: &str, taken: &BTreeSet<String>) -> EditResult<String> {
             return Ok(c);
         }
     }
-    Err(format!("there is no free number left after {code}"))
+    Err(msg("engine.paste.no_number_after", &[("code", &code)]))
+}
+
+/// A kind of setup item that can't be pasted under a new name.
+fn no_new_name(kind: Kind) -> String {
+    let what = word(match kind {
+        Kind::Fringe => "engine.what.fringe",
+        Kind::Group => "engine.what.group",
+        Kind::Global => "engine.what.global",
+        Kind::Unit => "engine.what.unit",
+        Kind::Set => "engine.what.set",
+        Kind::Location => "engine.what.location",
+        Kind::Currency => "engine.what.currency",
+    });
+    msg("engine.paste.no_new_name", &[("what", &what)])
 }
 
 /// Pastes `clip` into `b` at `target`, with the setup items resolved as
@@ -809,7 +826,7 @@ pub fn paste(
                 let to = proposed
                     .get(&(e.kind, e.name.clone()))
                     .cloned()
-                    .ok_or_else(|| format!("a {} can't be added under a new name", e.kind.key()))?;
+                    .ok_or_else(|| no_new_name(e.kind))?;
                 if let Some(map) = renames.of(e.kind) {
                     map.insert(e.name.clone(), to.clone());
                 }
@@ -833,9 +850,9 @@ pub fn paste(
             let code = target
                 .account
                 .as_deref()
-                .ok_or("lines are pasted into an account")?;
-            let (ti, ai) =
-                find_account(b, code).ok_or_else(|| format!("account {code} no longer exists"))?;
+                .ok_or_else(|| word("engine.paste.lines_into_account"))?;
+            let (ti, ai) = find_account(b, code)
+                .ok_or_else(|| msg("engine.edit.account_gone", &[("code", &code)]))?;
             let TopsheetRow::Category(cat) = &b.topsheet[ti] else {
                 unreachable!("find_account only finds accounts in categories");
             };
@@ -846,7 +863,12 @@ pub fn paste(
                     .details
                     .iter()
                     .position(|d| d.id == id)
-                    .ok_or_else(|| format!("row {id} is not in account {code}"))?,
+                    .ok_or_else(|| {
+                        msg(
+                            "engine.edit.row_not_in_account",
+                            &[("id", &id), ("code", &code)],
+                        )
+                    })?,
             };
             // Ranges get numbers new in the account, so they never join
             // (or take the number of) a range already there.
@@ -881,12 +903,12 @@ pub fn paste(
             let code = target
                 .category
                 .as_deref()
-                .ok_or("accounts are pasted into a category")?;
+                .ok_or_else(|| word("engine.paste.accounts_into_category"))?;
             let ti = b
                 .topsheet
                 .iter()
                 .position(|r| matches!(r, TopsheetRow::Category(c) if c.code == code))
-                .ok_or_else(|| format!("category {code} no longer exists"))?;
+                .ok_or_else(|| msg("engine.edit.category_gone", &[("code", &code)]))?;
             let TopsheetRow::Category(cat) = &b.topsheet[ti] else {
                 unreachable!("position found a category");
             };
@@ -896,7 +918,12 @@ pub fn paste(
                     .accounts
                     .iter()
                     .position(|x| x.code == a)
-                    .ok_or_else(|| format!("account {a} is not in category {code}"))?,
+                    .ok_or_else(|| {
+                        msg(
+                            "engine.edit.account_not_in_category",
+                            &[("code", &a), ("category", &code)],
+                        )
+                    })?,
             };
             let mut taken = account_codes(b);
             let mut out = Vec::with_capacity(accounts.len());
@@ -1061,7 +1088,8 @@ pub fn clip_paste(
     let clip = clipboard
         .current()
         .filter(|c| c.token == token)
-        .ok_or("Something else was copied since. Paste again.")?;
+        .ok_or_else(|| word("engine.paste.copied_since"))?;
+
     let label = format!("Paste {}", content_phrase(&clip.content));
     let pasted = s.edit(label, |b| paste(b, &clip, target, resolutions))?;
     Ok(match clip.content {
