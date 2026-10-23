@@ -188,7 +188,6 @@ What the slice built, against the list this audit gave:
    `dialog.*` through `tr()`, and so do the window titles (Tools, Budget Setup, the main
    window's name with "(edited)", `window.*`). Left: the budget-export dialog's per-format
    file-type names (from method-format).
-
 5. **Room for longer words and a right-to-left check**: waits for a language.
 6. **A choice of language**: the system's, picked at start; no override in the
    preferences yet (there is nothing to choose between).

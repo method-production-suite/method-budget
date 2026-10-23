@@ -1342,7 +1342,6 @@ other method-session modules (notes, versions, the Library, packs, rates, overti
 Compare, reports, rename and renumber); key names in shortcut text; and the "Untitled"
 file name; docs/research/accessibility-audit.md, "Localization", lists them.
 
-
 ### The Help menu
 
 In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);

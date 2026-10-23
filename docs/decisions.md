@@ -5017,7 +5017,6 @@ the framework is built and adding a language is a table.
   recognized as their codes; `engine()` keeps summaries, lists and partly-engine text
   unchanged in English, and finds the pieces of a summary. Nothing a person reads in
   English changed, and the command line and MCP print the same words.
-
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -5050,7 +5049,6 @@ the framework is built and adding a language is a table.
   rename and renumber, quick add, export, setup sheets, new budget, sharing's session
   part); and errors that pass through no converted command (a few file errors in
   `src/safety_app.rs`, `src/start.rs` and the updater).
-
   A data value named as a noun in a message (an information field's label in "{what}
   `{text}` is not a number") is shown as typed. Also not built: room for longer words and
   a right-to-left check, a language override in the preferences, and the languages themselves, which wait
