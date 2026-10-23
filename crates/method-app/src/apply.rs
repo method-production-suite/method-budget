@@ -26,12 +26,12 @@ pub fn apply_summary(
     accounts: Option<Vec<String>>,
     categories: Option<Vec<usize>>,
 ) -> Result<ApplySummary, String> {
-    Ok(method_session::apply::apply_summary(
+    crate::i18n::engine_dto(Ok(method_session::apply::apply_summary(
         &mut *state.lock_doc(doc)?,
         row_ids.as_deref().unwrap_or_default(),
         accounts.as_deref().unwrap_or_default(),
         categories.as_deref().unwrap_or_default(),
-    ))
+    )))
 }
 
 /// Puts a fringe or group on the rows (`on`), or takes it off.

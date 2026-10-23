@@ -5,7 +5,7 @@
 //! and merges it in as a dated note or dismisses it.
 //!
 //! - **Reviewing** ([`Mode::Reviewing`]): the budget is read-only (every
-//!   edit, undo and redo is refused, [`crate::session::REVIEWING`]);
+//!   edit, undo and redo is refused, [`crate::session::reviewing`]);
 //!   comments are added on a line, an account, a category, a setup item or
 //!   the whole budget, edited, resolved and deleted. The host writes the
 //!   file after each change (the desktop beside the budget; a browser
@@ -39,6 +39,7 @@ pub use method_format::review::{
 };
 
 use crate::edit::EditResult;
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// Writing comments (the budget read-only) or reading them (to merge).
@@ -308,24 +309,17 @@ fn status_of(c: &Comment, found: Option<&Found>) -> Status {
 /// Why a comment can't become a note, if it can't.
 fn why_not(c: &Comment, found: Option<&Found>) -> Option<String> {
     match (found, &c.on) {
-        (None, Anchor::Row(_)) => Some("Its line is no longer in the budget.".into()),
-        (None, Anchor::Account(code)) => Some(format!(
-            "There is no account {code} in the budget now (deleted or renumbered)."
-        )),
-        (None, Anchor::Category(code)) => Some(format!(
-            "There is no category {code} in the budget now (deleted or renumbered)."
-        )),
-        (None, Anchor::Setup(r)) => Some(format!(
-            "There is no {} {} in the budget now.",
-            r.kind.key(),
-            r.name
-        )),
-        (_, Anchor::Setup(_)) => {
-            Some("Setup items don't have notes, so it stays in the review file.".into())
+        (None, Anchor::Row(_)) => Some(word("engine.review.line_gone")),
+        (None, Anchor::Account(code)) => Some(msg("engine.review.account_gone", &[("code", code)])),
+        (None, Anchor::Category(code)) => {
+            Some(msg("engine.review.category_gone", &[("code", code)]))
         }
-        (_, Anchor::Budget) => {
-            Some("The whole budget has no notes of its own, so it stays in the review file.".into())
-        }
+        (None, Anchor::Setup(r)) => Some(msg(
+            "engine.review.setup_gone",
+            &[("what", &setup_word(r.kind)), ("name", &r.name)],
+        )),
+        (_, Anchor::Setup(_)) => Some(word("engine.review.setup_no_notes")),
+        (_, Anchor::Budget) => Some(word("engine.review.budget_no_notes")),
         _ => None,
     }
 }
@@ -574,7 +568,7 @@ pub fn list_of(b: &Budget, st: &ReviewState) -> ReviewList {
 
 /// The list for the session's review file.
 pub fn list(s: &Session) -> EditResult<ReviewList> {
-    let st = s.review().ok_or(NO_REVIEW)?;
+    let st = s.review().ok_or_else(no_review)?;
     let review = effective(s, st);
     let entries = entries(s.budget(), &review);
     let mut brief = brief_of(s.budget(), st, &entries);
@@ -590,7 +584,25 @@ pub fn list(s: &Session) -> EditResult<ReviewList> {
 // Opening and closing
 
 /// What a command on comments is told when no review file is open.
-pub const NO_REVIEW: &str = "No review file is open on this budget.";
+/// What a review command is told when no review file is open.
+pub fn no_review() -> String {
+    word("engine.review.none_open")
+}
+
+/// The noun for a kind of setup item a comment can be on.
+fn setup_word(kind: SetupKind) -> String {
+    word(match kind {
+        SetupKind::Global => "engine.what.global",
+        SetupKind::Fringe => "engine.what.fringe",
+        SetupKind::Group => "engine.what.group",
+        SetupKind::Unit => "engine.what.unit",
+        SetupKind::Set => "engine.what.set",
+        SetupKind::Location => "engine.what.location",
+        SetupKind::Currency => "engine.what.currency",
+        SetupKind::Charge => "engine.what.charge",
+        SetupKind::Credit => "engine.what.credit",
+    })
+}
 
 /// What the reviewed budget is, from the budget: its title, and where a
 /// copy saved for sharing came from.
@@ -619,7 +631,7 @@ pub struct SettledView {
 
 /// Reads a review file's bytes, `name` naming it in the error.
 pub fn read(name: &str, bytes: &[u8]) -> EditResult<Review> {
-    fmt::read(bytes).map_err(|e| format!("{name} can't be read: {e}."))
+    fmt::read(bytes).map_err(|e| msg("engine.review.cant_read", &[("name", &name), ("why", &e)]))
 }
 
 /// Opens budget `s` for review: read-only from now on, with the comments
@@ -631,7 +643,7 @@ pub fn start_reviewing(
     path: Option<PathBuf>,
 ) -> EditResult {
     if s.is_shared() {
-        return Err("A budget shared through a folder can't be opened for review. Save a copy for sharing and review that.".into());
+        return Err(word("engine.review.shared_folder"));
     }
     let review = existing.unwrap_or_else(|| Review::new(reviewed(s.budget())));
     s.set_review(Some(ReviewState::new(review, Mode::Reviewing, file, path)));
@@ -646,7 +658,7 @@ pub fn open_for_author(
     path: Option<PathBuf>,
 ) -> EditResult {
     if s.is_reviewing() {
-        return Err("This budget is open for review. Its comments are already showing.".into());
+        return Err(word("engine.review.already_reviewing"));
     }
     s.set_review(Some(ReviewState::new(review, Mode::Reading, file, path)));
     Ok(())
@@ -659,7 +671,7 @@ pub fn close(s: &mut Session) {
 
 /// The review file's text as it would be written now.
 pub fn text(s: &Session) -> EditResult<String> {
-    let st = s.review().ok_or(NO_REVIEW)?;
+    let st = s.review().ok_or_else(no_review)?;
     Ok(fmt::write(&effective(s, st)))
 }
 
@@ -688,15 +700,15 @@ pub fn mark_saved(s: &mut Session, path: Option<PathBuf>, file: Option<String>) 
 fn reviewing(s: &mut Session) -> EditResult<&mut ReviewState> {
     match s.review_mut() {
         Some(st) if st.mode == Mode::Reviewing => Ok(st),
-        Some(_) => Err("Comments are written while reviewing (File > Open for Review). Here you can merge or dismiss them.".into()),
-        None => Err(NO_REVIEW.into()),
+        Some(_) => Err(word("engine.review.write_while_reviewing")),
+        None => Err(no_review()),
     }
 }
 
 fn comment_mut(st: &mut ReviewState, id: CommentId) -> EditResult<&mut Comment> {
     st.review
         .get_mut(id)
-        .ok_or_else(|| "That comment is no longer in the review.".to_string())
+        .ok_or_else(|| word("engine.review.comment_gone"))
 }
 
 fn clean_author(a: Option<&str>) -> EditResult<String> {
@@ -722,14 +734,14 @@ pub fn add(
         let b = s.budget();
         let ix = Index::new(b);
         find(b, &ix, &on)
-            .ok_or_else(|| format!("{} isn't in the budget.", anchor_words(&on)))?
+            .ok_or_else(|| msg("engine.review.place_gone", &[("place", &anchor_words(&on))]))?
             .place
     };
     let st = reviewing(s)?;
     if st.review.comments.len() >= fmt::MAX_COMMENTS {
-        return Err(format!(
-            "A review file can have at most {} comments.",
-            fmt::MAX_COMMENTS
+        return Err(msg(
+            "engine.review.too_many",
+            &[("max", &fmt::MAX_COMMENTS)],
         ));
     }
     let id = st.review.next_id();
@@ -784,7 +796,7 @@ pub fn delete(s: &mut Session, id: CommentId) -> EditResult {
     let before = st.review.comments.len();
     st.review.comments.retain(|c| c.id != id);
     if st.review.comments.len() == before {
-        return Err("That comment is no longer in the review.".into());
+        return Err(word("engine.review.comment_gone"));
     }
     st.touched();
     Ok(())
@@ -828,8 +840,8 @@ fn plural(n: usize, one: &str, many: &str) -> String {
 fn reading(s: &Session) -> EditResult<&ReviewState> {
     match s.review() {
         Some(st) if st.mode == Mode::Reading => Ok(st),
-        Some(_) => Err("A budget open for review can't take its own comments; open the review file on the author's budget.".into()),
-        None => Err(NO_REVIEW.into()),
+        Some(_) => Err(word("engine.review.own_comments")),
+        None => Err(no_review()),
     }
 }
 
@@ -845,7 +857,7 @@ pub fn settle(s: &mut Session, picks: &[Pick], at: &str, by: Option<&str>) -> Ed
     let review = effective(s, reading(s)?);
     for p in picks {
         if review.get(p.id).is_none() {
-            return Err(format!("Comment {} isn't in this review.", p.id));
+            return Err(msg("engine.review.not_in_review", &[("id", &p.id)]));
         }
     }
     let list = entries(s.budget(), &review);
@@ -931,58 +943,36 @@ pub fn settle(s: &mut Session, picks: &[Pick], at: &str, by: Option<&str>) -> Ed
     Ok(done)
 }
 
+/// What [`settle`] did, in sentences joined by a space (each one a message
+/// of its own, so the desktop translates them one by one).
 fn settled_message(d: &Settled) -> String {
-    let mut parts = Vec::new();
-    if d.merged > 0 {
-        parts.push(format!(
-            "merged {} as notes",
-            plural(d.merged, "comment", "comments")
-        ));
-    }
-    if d.dismissed > 0 {
-        parts.push(format!(
-            "dismissed {}",
-            plural(d.dismissed, "comment", "comments")
-        ));
-    }
-    let mut out = if parts.is_empty() {
-        "Nothing changed".to_string()
-    } else {
-        let s = parts.join(" and ");
-        let mut c = s.chars();
-        c.next()
-            .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
-            .unwrap_or_default()
-    };
-    out.push('.');
+    let comments = |n: usize| msg("engine.phrase.comments", &[("count", &n)]);
+    let mut out = vec![match (d.merged, d.dismissed) {
+        (0, 0) => word("engine.review.settled_nothing"),
+        (m, 0) => msg("engine.review.settled_merged", &[("count", &m)]),
+        (0, n) => msg("engine.review.settled_dismissed", &[("count", &n)]),
+        (m, n) => msg(
+            "engine.review.settled_both",
+            &[("merged", &comments(m)), ("dismissed", &comments(n))],
+        ),
+    }];
     if d.already > 0 {
-        out.push_str(&format!(
-            " {} in the budget already.",
-            if d.already == 1 {
-                "1 was".to_string()
-            } else {
-                format!("{} were", d.already)
-            }
+        out.push(msg(
+            "engine.review.settled_already",
+            &[("count", &d.already)],
         ));
     }
     if d.kept > 0 {
-        out.push_str(&if d.kept == 1 {
-            " 1 comment stays open: its place is gone or has no notes.".to_string()
-        } else {
-            format!(
-                " {} comments stay open: their place is gone or has no notes.",
-                d.kept
-            )
-        });
+        out.push(msg("engine.review.settled_kept", &[("count", &d.kept)]));
     }
-    out
+    out.join(" ")
 }
 
 /// Takes a dismissal back: the comment is open again.
 pub fn restore(s: &mut Session, id: CommentId) -> EditResult {
     reading(s)?;
     let Some(st) = s.review_mut() else {
-        return Err(NO_REVIEW.into());
+        return Err(no_review());
     };
     let c = comment_mut(st, id)?;
     if c.outcome
@@ -1009,12 +999,12 @@ pub fn parse_anchor(b: &Budget, s: &str) -> EditResult<Anchor> {
             "row" | "line" => rest
                 .parse::<RowId>()
                 .map(Anchor::Row)
-                .map_err(|_| format!("\"{rest}\" isn't a row id")),
+                .map_err(|_| msg("engine.review.not_a_row_id", &[("text", &rest)])),
             "account" => Ok(Anchor::Account(rest)),
             "category" => Ok(Anchor::Category(rest)),
             k => SetupKind::from_key(k)
                 .map(|kind| Anchor::Setup(SetupRef { kind, name: rest }))
-                .ok_or_else(|| format!("\"{k}\" isn't something a comment can be on (row, account, category, budget, or a setup kind: global, fringe, group, unit, set, location, currency, charge, credit)")),
+                .ok_or_else(|| msg("engine.review.not_a_place_kind", &[("kind", &k)])),
         };
     }
     let ix = Index::new(b);
@@ -1024,9 +1014,7 @@ pub fn parse_anchor(b: &Budget, s: &str) -> EditResult<Anchor> {
     if ix.categories.contains_key(s) {
         return Ok(Anchor::Category(s.to_string()));
     }
-    Err(format!(
-        "\"{s}\" is no account or category in the budget; write row:ID, account:NUMBER, category:CODE, fringe:NAME (or another setup kind) or budget"
-    ))
+    Err(msg("engine.review.not_a_place", &[("text", &s)]))
 }
 
 #[cfg(test)]
@@ -1059,7 +1047,7 @@ mod tests {
             b.title = "Changed".into();
             Ok(())
         });
-        assert_eq!(err.unwrap_err(), crate::session::REVIEWING);
+        assert_eq!(err.unwrap_err(), crate::session::reviewing());
         assert!(!s.undo());
         assert!(s.jump_to(0).is_err());
 

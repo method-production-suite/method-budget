@@ -16,6 +16,7 @@ use method_core::explain::{Explainer, Explanation, Link, Role, Step, Target};
 use method_core::{Budget, Cents, RecalcOptions, RowId, TopsheetRow};
 use serde::{Deserialize, Serialize};
 
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// A step that can be explained on its own sends its children only when it
@@ -247,12 +248,10 @@ pub fn explain_in(b: &Budget, target: &TargetDto, partial: bool) -> Result<Expla
 pub fn explain_number(s: &mut Session, target: &TargetDto) -> Result<ExplanationDto, String> {
     let (budget, outcome) = s.totals();
     if outcome.report.is_none() {
-        let why = outcome
-            .error
-            .as_ref()
-            .map(|e| format!(": {e}"))
-            .unwrap_or_default();
-        return Err(format!("the totals can't be worked out{why}"));
+        return Err(match outcome.error.as_ref() {
+            Some(e) => msg("engine.explain.totals_unworkable_why", &[("why", e)]),
+            None => word("engine.explain.totals_unworkable"),
+        });
     }
     let partial = outcome.sanitized.is_some();
     let b = outcome.sanitized.as_ref().unwrap_or(budget);

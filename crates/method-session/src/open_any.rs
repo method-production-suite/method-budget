@@ -29,6 +29,7 @@ use method_format::import::{read_file, Book};
 use serde::Serialize;
 
 use crate::export_import::{ExportSources, Review};
+use crate::messages::msg;
 use crate::sheet_import::{check_size, Picked, SheetSources};
 use crate::view::View;
 
@@ -127,8 +128,8 @@ pub fn plan(file: &str, bytes: &[u8]) -> Result<Plan, String> {
         }
     }
     Err(match export_error {
-        Some(e) => format!("Couldn't read {file}: {e}."),
-        None => format!("{file} isn't a budget, a budget export or a spreadsheet. {OPEN_READS}"),
+        Some(e) => msg("engine.import.cant_read", &[("file", &file), ("why", &e)]),
+        None => msg("engine.import.not_openable", &[("file", &file)]),
     })
 }
 

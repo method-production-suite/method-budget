@@ -28,7 +28,13 @@ pub fn clip_copy(
     on_clipboard: bool,
 ) -> Result<ClipInfo, String> {
     let s = state.lock_doc(doc)?;
-    method_session::clipboard::clip_copy(&s, &clipboard, &pick, &text, on_clipboard)
+    crate::i18n::engine_err(method_session::clipboard::clip_copy(
+        &s,
+        &clipboard,
+        &pick,
+        &text,
+        on_clipboard,
+    ))
 }
 
 /// Like `clip_copy`, then deletes what was copied, as one undo step.
@@ -58,7 +64,12 @@ pub fn clip_preview(
     doc: Option<DocId>,
     text: Option<String>,
 ) -> Result<Option<Preview>, String> {
-    method_session::clipboard::clip_preview(&state, &clipboard, doc, text.as_deref())
+    crate::i18n::engine_dto(method_session::clipboard::clip_preview(
+        &state,
+        &clipboard,
+        doc,
+        text.as_deref(),
+    ))
 }
 
 /// `{token, target, resolutions}`: pastes the reviewed copy, as one undo
@@ -74,8 +85,13 @@ pub fn clip_paste<R: Runtime>(
     resolutions: Vec<Resolution>,
 ) -> Result<View, String> {
     let mut s = state.lock_doc(doc)?;
-    let first =
-        method_session::clipboard::clip_paste(&mut s, &clipboard, token, &target, &resolutions)?;
+    let first = crate::i18n::engine_err(method_session::clipboard::clip_paste(
+        &mut s,
+        &clipboard,
+        token,
+        &target,
+        &resolutions,
+    ))?;
     Ok(finish(&window, &mut s, first))
 }
 

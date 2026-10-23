@@ -151,7 +151,7 @@ fn kind_label(k: RowKind) -> String {
 }
 
 /// The noun for a kind of setup item.
-fn kind_word(kind: method_core::SetupKind) -> String {
+pub(crate) fn kind_word(kind: method_core::SetupKind) -> String {
     use method_core::SetupKind as K;
     word(match kind {
         K::Global => "engine.what.global",

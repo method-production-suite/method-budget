@@ -88,7 +88,7 @@ impl SessionFiles for Session {
             // person's changes there (and the keeper's file is rewritten);
             // nobody else writes the file (docs/research/collaboration.md, 4.3).
             if !safety::same_file(path, sh.path()) {
-                return Err(SHARED_STAYS.into());
+                return Err(shared_stays());
             }
             sh.flush_all();
             return match sh.status(Instant::now()).error {
@@ -151,7 +151,7 @@ impl SessionFiles for Session {
             return Err("This budget is already shared.".into());
         }
         if self.is_read_only() {
-            return Err(READ_ONLY.into());
+            return Err(read_only());
         }
         let path = self
             .path()

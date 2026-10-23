@@ -111,7 +111,7 @@ docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, im
 What the slice built, against the list this audit gave:
 
 1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
-   4,060 entries, 174 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   4,370 entries, 196 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
    with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
    language lacks (with a console warning) and the system's language picked, English by
    default. The table loads as one of the page's own scripts under its
@@ -151,7 +151,8 @@ What the slice built, against the list this audit gave:
    `message:`, `hint:`, `aria-label` or `toast()` literal with letters in a converted
    script, on a word in `ui/index.html` with no key or English that differs from the
    table's, on a key missing from the table and on an entry nothing uses.
-3. **Engine messages with stable codes**: first slice built (decision 94, fifth pass).
+3. **Engine messages with stable codes**: first and second slices built (decision 94,
+   fifth and sixth passes).
    `method-session/src/messages.rs` is the engine's catalog: each message a code
    (`engine.edit.row_gone`) and its English with `{name}` parameters, made at its source
    with `msg()`, so the command line, the MCP server and the browser build print the same
@@ -159,20 +160,35 @@ What the slice built, against the list this audit gave:
    (`messages::recognize()`) and shows the table's words for it (`i18n::engine()`),
    falling back to the text. Converted: every refusal and validation error of the edits
    (`edit.rs`, `edit/typed.rs`, the cell batch's limit): 97 messages and 34 nouns they
-   name. Still sentences: method-core's own reasons (a refused formula's why, an account
-   number the pattern can't read, calculation errors), the other method-session modules
-   (Find and Replace, pasting, presets, apply, actuals, Review, What Changed and Merge,
-   imports, setup lists, schedule days, history, undo labels), method-format's import
-   problems, and the desktop's own errors (file reads and writes, sharing's refusals in
-   `src/shared.rs`).
+   name. The second slice converted Find and Replace, presets, apply, pasting, moving rows,
+   setup lists, tabs and panes, the session's read-only and review refusals and "That step
+   is no longer in the history.", Review and its settle summary, What Changed and Merge's
+   refusals and side labels, actuals, the imports and their summaries (spreadsheets,
+   charts of accounts, budget exports, schedule days with their notes and problems) and
+   Explain's refusal (214 messages and 17 nouns), and catalogued method-core's own
+   reasons (`engine.core.*`, 14: a formula's divide by zero, unknown global and number too
+   large, a number that doesn't read, the numbering pattern's errors) without method-core
+   reading a table. Summaries are messages joined by a space and count phrases
+   (`engine.phrase.*`) only recognized inside them, so the generic templates don't
+   swallow other text. The desktop's own words read the table: sharing's refusals, its
+   write errors and invite-link reasons (`src/shared.rs`, 70 `shared.*` entries). Still
+   sentences: the undo labels (Edit menu, History tab), Explain's steps, What Changed's
+   change sentences and Merge's conflict sentences (method-core), method-core's formula
+   parse and calculation errors (left out because their templates would win over the
+   message they sit in) and its other errors, method-format's import problems, the
+   Activity tab's reasons a change was left out, and the method-session modules not yet
+   converted (notes, versions, the Library, packs, rates, overtime, Compare, reports,
+   rename, renumber).
 4. **The menu bar and native dialogs reading the same table**: the menu bar is built
    (`src/menu.rs` takes every item's words from `menu.<id>`, and its menus' names, the app
    menu, Open Recent, Autosave, Revert to Backup and Check for Updates from the same
    table; the test matching it to `shortcuts.js` still holds). The native dialogs are
    built too: every file dialog's title and file-type names, the unsaved-changes question
    with its buttons, Couldn't save and the recovered budget's Replace question come from
-   `dialog.*` through `tr()`. Left: the budget-export dialog's per-format file-type names
-   (from method-format), and the Tools and Budget Setup window titles.
+   `dialog.*` through `tr()`, and so do the window titles (Tools, Budget Setup, the main
+   window's name with "(edited)", `window.*`). Left: the budget-export dialog's per-format
+   file-type names (from method-format).
+
 5. **Room for longer words and a right-to-left check**: waits for a language.
 6. **A choice of language**: the system's, picked at start; no override in the
    preferences yet (there is nothing to choose between).

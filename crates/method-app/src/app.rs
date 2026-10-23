@@ -33,8 +33,17 @@ pub(crate) const WEBSITE: &str = "https://methodbudget.com";
 type CmdResult<T = View> = Result<T, String>;
 
 pub(crate) fn window_title(s: &Session) -> String {
-    let edited = if s.is_dirty() { " (edited)" } else { "" };
-    format!("{}{edited} - {APP_NAME}", s.display_name())
+    if s.is_dirty() {
+        crate::i18n::tr_with(
+            "window.title_edited",
+            &[("name", s.display_name().as_str()), ("app", APP_NAME)],
+        )
+    } else {
+        crate::i18n::tr_with(
+            "window.title",
+            &[("name", s.display_name().as_str()), ("app", APP_NAME)],
+        )
+    }
 }
 
 /// The view after a command, with the tabs listed and the main window's
@@ -57,7 +66,9 @@ pub(crate) fn finish<R: Runtime>(
     if method_session::review::needs_write(s) {
         crate::review::write_back(s);
     }
-    let view = s.finish(created);
+    let mut view = s.finish(created);
+    crate::i18n::Localize::localize(&mut view);
+
     crate::tools::changed(window, view.doc, view.rev);
     crate::tabs::after_command(window.app_handle(), s.docs());
     view
@@ -69,9 +80,10 @@ pub(crate) fn apply<R: Runtime, T>(
     doc: Option<DocId>,
     f: impl FnOnce(&mut Session) -> edit::EditResult<T>,
 ) -> CmdResult {
-    let mut s = state.lock_doc(doc)?;
     // An edit refused shows in the person's language (src/i18n.rs).
+    let mut s = crate::i18n::engine_err(state.lock_doc(doc))?;
     crate::i18n::engine_err(f(&mut s))?;
+
     Ok(finish(window, &mut s, None))
 }
 

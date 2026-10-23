@@ -20,7 +20,8 @@ use method_core::usage::usage;
 use method_core::{Budget, Cents, Report, SetupKind};
 use serde::Serialize;
 
-use crate::edit::EditResult;
+use crate::edit::{kind_word, EditResult};
+use crate::messages::msg;
 use crate::session::Session;
 
 /// One item's use.
@@ -52,7 +53,7 @@ pub fn table_key(kind: SetupKind) -> &'static str {
 pub fn parse_kind(s: &str) -> EditResult<SetupKind> {
     SetupKind::from_name(s)
         .or_else(|| SetupKind::ALL.iter().copied().find(|k| table_key(*k) == s))
-        .ok_or_else(|| format!("unknown kind of setup item `{s}`"))
+        .ok_or_else(|| msg("engine.setup.unknown_kind", &[("kind", &s)]))
 }
 
 /// The dollars of item `name` of `kind`, from the report.
@@ -108,11 +109,14 @@ pub fn usage_of(
 /// Refused at either end. Quick repeats on the same item are one undo step.
 pub fn move_item(b: &mut Budget, kind: SetupKind, name: &str, by: i32) -> EditResult {
     if !method_core::rename::exists(b, kind, name) {
-        return Err(format!("{} {name} no longer exists", kind.name()));
+        return Err(msg(
+            "engine.edit.item_gone",
+            &[("what", &kind_word(kind)), ("name", &name)],
+        ));
     }
     let by = isize::try_from(by).unwrap_or(0);
     if !method_core::order::move_by(b, kind, name, by) {
-        return Err(format!("{name} can't move further"));
+        return Err(msg("engine.setup.cant_move_further", &[("name", &name)]));
     }
     Ok(())
 }

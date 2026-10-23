@@ -148,7 +148,7 @@ pub fn switch_tab<R: Runtime>(
     doc: DocId,
     pane: Option<usize>,
 ) -> CmdResult {
-    let mut s = method_session::tabs::switch_tab(&state, doc, pane)?;
+    let mut s = crate::i18n::engine_err(method_session::tabs::switch_tab(&state, doc, pane))?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -162,7 +162,7 @@ pub fn move_tab<R: Runtime>(
     to: usize,
 ) -> CmdResult<Vec<TabInfo>> {
     let mut docs = state.docs();
-    let tabs = method_session::tabs::move_tab(&mut docs, doc, to)?;
+    let tabs = crate::i18n::engine_err(method_session::tabs::move_tab(&mut docs, doc, to))?;
     after_command(&app, &docs);
     Ok(tabs)
 }
@@ -220,7 +220,7 @@ pub fn close_tab<R: Runtime>(
 pub fn split_view<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> CmdResult {
     Ok(finish(
         &window,
-        &mut method_session::tabs::split_view(&state)?,
+        &mut crate::i18n::engine_err(method_session::tabs::split_view(&state))?,
         None,
     ))
 }
@@ -230,7 +230,7 @@ pub fn split_view<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppStat
 pub fn close_split<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> CmdResult {
     Ok(finish(
         &window,
-        &mut method_session::tabs::close_split(&state)?,
+        &mut crate::i18n::engine_err(method_session::tabs::close_split(&state))?,
         None,
     ))
 }
@@ -249,7 +249,9 @@ pub fn set_target_pane<R: Runtime>(
     account: Option<String>,
     ai: Option<usize>,
 ) -> CmdResult {
-    let mut s = method_session::tabs::set_target_pane(&state, pane, category, ti, account, ai)?;
+    let mut s = crate::i18n::engine_err(method_session::tabs::set_target_pane(
+        &state, pane, category, ti, account, ai,
+    ))?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -262,7 +264,9 @@ pub fn move_tab_in_pane<R: Runtime>(
     doc: DocId,
     to: usize,
 ) -> CmdResult {
-    let mut s = method_session::tabs::move_tab_in_pane(&state, pane, doc, to)?;
+    let mut s = crate::i18n::engine_err(method_session::tabs::move_tab_in_pane(
+        &state, pane, doc, to,
+    ))?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -276,7 +280,7 @@ pub fn move_to_pane<R: Runtime>(
     from: usize,
     to: Option<usize>,
 ) -> CmdResult {
-    let mut s = method_session::tabs::move_to_pane(&state, doc, from, to)?;
+    let mut s = crate::i18n::engine_err(method_session::tabs::move_to_pane(&state, doc, from, to))?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -293,7 +297,9 @@ pub fn pane_view(
     account: Option<String>,
     ai: Option<usize>,
 ) -> CmdResult {
-    method_session::tabs::pane_view(&state, doc, category, ti, account, ai)
+    crate::i18n::engine_err(method_session::tabs::pane_view(
+        &state, doc, category, ti, account, ai,
+    ))
 }
 
 #[cfg(test)]

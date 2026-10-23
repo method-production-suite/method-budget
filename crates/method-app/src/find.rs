@@ -19,7 +19,7 @@ pub fn find(
     doc: Option<DocId>,
     query: FindQuery,
 ) -> Result<Found, String> {
-    method_session::find::find(&*state.lock_doc(doc)?, &query)
+    crate::i18n::engine_err(method_session::find::find(&*state.lock_doc(doc)?, &query))
 }
 
 /// Replaces in the checked results (`targets`) as one undo step; `with`
@@ -34,7 +34,12 @@ pub fn replace<R: Runtime>(
     with: Option<String>,
 ) -> Result<Replaced, String> {
     let mut s = state.lock_doc(doc)?;
-    let updated = method_session::find::replace(&mut s, &query, &targets, with.as_deref())?;
+    let updated = crate::i18n::engine_err(method_session::find::replace(
+        &mut s,
+        &query,
+        &targets,
+        with.as_deref(),
+    ))?;
     Ok(Replaced {
         view: finish(&window, &mut s, None),
         updated,

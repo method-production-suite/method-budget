@@ -93,7 +93,10 @@ pub fn line_preset_preview(
     doc: Option<DocId>,
     index: usize,
 ) -> Result<crate::clipboard::Preview, String> {
-    method_session::presets::line_preset_preview(&*state.lock_doc(doc)?, index)
+    crate::i18n::engine_dto(method_session::presets::line_preset_preview(
+        &*state.lock_doc(doc)?,
+        index,
+    ))
 }
 
 /// `{index, account, beforeRow}`: inserts copies of the block above the row
@@ -109,7 +112,9 @@ pub fn insert_line_preset<R: Runtime>(
     before_row: Option<RowId>,
 ) -> Result<View, String> {
     let mut s = state.lock_doc(doc)?;
-    let first = method_session::presets::insert_line_preset(&mut s, index, &account, before_row)?;
+    let first = crate::i18n::engine_err(method_session::presets::insert_line_preset(
+        &mut s, index, &account, before_row,
+    ))?;
     Ok(finish(&window, &mut s, first))
 }
 

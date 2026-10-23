@@ -13,7 +13,7 @@
 //!   setup items, stamped with a `provenance` (source title, version, when,
 //!   app version, a note). The budget doesn't change.
 //! - A budget whose provenance says "shared copy" opens **read-only**: every
-//!   edit is refused in [`crate::session::Session::edit`] with [`READ_ONLY`].
+//!   edit is refused in [`crate::session::Session::edit`] with [`read_only`].
 //!   Make Editable Copy opens the same budget in a new untitled tab, stamped
 //!   as an editable copy.
 //! - When a shared (or editable) copy is open next to the budget it came
@@ -44,7 +44,7 @@ use crate::templates::{safe_file_stem, UNTITLED};
 use crate::versions::{check_created, check_name, check_note};
 
 /// What an edit to a shared copy is told.
-pub use crate::session::READ_ONLY;
+pub use crate::session::read_only;
 
 /// The application version stamped on copies.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -488,7 +488,7 @@ mod tests {
         let e = s
             .edit("Test", |b| crate::edit::set_title(b, "Changed"))
             .unwrap_err();
-        assert_eq!(e, READ_ONLY);
+        assert_eq!(e, read_only());
         assert_eq!(s.budget(), &before);
         assert!(!s.can_undo() && !s.is_dirty());
 

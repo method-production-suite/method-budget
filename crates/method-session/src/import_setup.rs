@@ -138,7 +138,8 @@ pub fn import_setup(
 ) -> EditResult<Imported> {
     let (_, src) = sources
         .get(token)
-        .ok_or("Another file was picked since. Import again.")?;
+        .ok_or_else(|| crate::messages::word("engine.import.picked_since"))?;
+
     let label = format!(
         "Import {} of setup",
         crate::history::count(picks.len(), "item", "items")

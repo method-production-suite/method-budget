@@ -99,8 +99,13 @@ pub fn import_setup<R: Runtime>(
     resolutions: Vec<Resolution>,
 ) -> Result<ImportDone, String> {
     let mut s = state.lock_doc(doc)?;
-    let counts =
-        method_session::import_setup::import_setup(&mut s, &sources, token, &picks, &resolutions)?;
+    let counts = crate::i18n::engine_err(method_session::import_setup::import_setup(
+        &mut s,
+        &sources,
+        token,
+        &picks,
+        &resolutions,
+    ))?;
     Ok(ImportDone::new(finish(&window, &mut s, None), counts))
 }
 

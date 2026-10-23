@@ -33,7 +33,9 @@ pub fn what_changed(
     doc: Option<DocId>,
     against: Against,
 ) -> Result<WhatChangedDto, String> {
-    method_session::diffmerge::what_changed(&state, &files, doc, against, read_saved)
+    crate::i18n::engine_dto(method_session::diffmerge::what_changed(
+        &state, &files, doc, against, read_saved,
+    ))
 }
 
 /// The merge of copy `copy` into budget `doc` (`None`: the one in front)
@@ -48,7 +50,9 @@ pub fn merge_preview(
     base: BaseSource,
     picks: Option<BTreeMap<String, String>>,
 ) -> Result<MergeDto, String> {
-    method_session::diffmerge::merge_preview(&state, &files, doc, copy, base, picks)
+    crate::i18n::engine_dto(method_session::diffmerge::merge_preview(
+        &state, &files, doc, copy, base, picks,
+    ))
 }
 
 /// Merges copy `copy` into budget `doc` against `base` with `picks`, as one
@@ -63,7 +67,9 @@ pub fn merge_apply<R: Runtime>(
     base: BaseSource,
     picks: Option<BTreeMap<String, String>>,
 ) -> Result<View, String> {
-    let mut s = method_session::diffmerge::merge_apply(&state, &files, doc, copy, base, picks)?;
+    let mut s = crate::i18n::engine_err(method_session::diffmerge::merge_apply(
+        &state, &files, doc, copy, base, picks,
+    ))?;
     Ok(crate::app::finish(&window, &mut s, None))
 }
 

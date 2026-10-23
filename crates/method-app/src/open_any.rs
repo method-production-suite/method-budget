@@ -50,7 +50,8 @@ pub(crate) fn open_any<R: Runtime>(
         (Vec::new(), Plan::Budget)
     } else {
         let bytes = read_capped(path)?;
-        let plan = plan(&file, &bytes)?;
+        let plan = crate::i18n::engine_err(plan(&file, &bytes))?;
+
         (bytes, plan)
     };
     open_planned(

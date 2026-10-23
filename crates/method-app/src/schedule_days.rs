@@ -63,7 +63,10 @@ pub async fn schedule_days_pick<R: Runtime>(
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
     let b = state.lock_doc(doc)?.budget().clone();
-    method_session::schedule_days::schedule_days_pick(&b, &sources, file, &bytes).map(Some)
+    crate::i18n::engine_dto(method_session::schedule_days::schedule_days_pick(
+        &b, &sources, file, &bytes,
+    ))
+    .map(Some)
 }
 
 /// The review of the picked file against budget `doc` with `picks` (`None`:
@@ -77,7 +80,12 @@ pub fn schedule_days_review(
     picks: Option<Vec<Pick>>,
 ) -> Result<Review, String> {
     let b = state.lock_doc(doc)?.budget().clone();
-    method_session::schedule_days::schedule_days_review(&b, &sources, token, picks.as_deref())
+    crate::i18n::engine_dto(method_session::schedule_days::schedule_days_review(
+        &b,
+        &sources,
+        token,
+        picks.as_deref(),
+    ))
 }
 
 /// Sets the picked globals in budget `doc` as one undo step.
@@ -90,15 +98,16 @@ pub fn schedule_days_apply<R: Runtime>(
     token: u64,
     picks: Option<Vec<Pick>>,
 ) -> Result<Imported, String> {
-    let (id, message) = method_session::schedule_days::schedule_days_apply(
-        &state,
-        &sources,
-        doc,
-        token,
-        picks.as_deref(),
-    )?;
+    let (id, message) =
+        crate::i18n::engine_err(method_session::schedule_days::schedule_days_apply(
+            &state,
+            &sources,
+            doc,
+            token,
+            picks.as_deref(),
+        ))?;
     Ok(Imported {
         view: finish(&window, &mut state.lock_doc(Some(id))?, None),
-        message,
+        message: crate::i18n::engine(&message),
     })
 }

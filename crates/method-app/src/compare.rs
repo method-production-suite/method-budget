@@ -54,7 +54,9 @@ pub fn compare_budgets(
     doc: Option<DocId>,
     sources: Vec<Source>,
 ) -> Result<CompareDto, String> {
-    method_session::compare::compare_budgets(&state, &files, doc, &sources)
+    crate::i18n::engine_err(method_session::compare::compare_budgets(
+        &state, &files, doc, &sources,
+    ))
 }
 
 /// One account's lines in budget `doc` against `sources`.
@@ -66,7 +68,9 @@ pub fn compare_detail(
     sources: Vec<Source>,
     code: String,
 ) -> Result<DetailDto, String> {
-    method_session::compare::compare_detail(&state, &files, doc, &sources, &code)
+    crate::i18n::engine_err(method_session::compare::compare_detail(
+        &state, &files, doc, &sources, &code,
+    ))
 }
 
 /// Shows an Open dialog for budgets to compare with and reads the chosen

@@ -73,7 +73,10 @@ pub async fn actuals_pick<R: Runtime>(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let bytes = crate::sheet_import::read_capped(&path)?;
-    method_session::actuals::actuals_pick(&sources, file, &bytes).map(Some)
+    crate::i18n::engine_err(method_session::actuals::actuals_pick(
+        &sources, file, &bytes,
+    ))
+    .map(Some)
 }
 
 /// The preview of importing with the dialog's choices into budget `doc`.
@@ -87,7 +90,12 @@ pub fn actuals_preview(
     request: Request,
 ) -> Result<PreviewDto, String> {
     let s = state.lock_doc(doc)?;
-    method_session::actuals::actuals_preview(s.budget(), &sources, token, &request)
+    crate::i18n::engine_err(method_session::actuals::actuals_preview(
+        s.budget(),
+        &sources,
+        token,
+        &request,
+    ))
 }
 
 /// Imports with the dialog's choices into budget `doc`, as one undo step.
@@ -103,8 +111,9 @@ pub fn actuals_import<R: Runtime>(
     imported: String,
 ) -> Result<Imported, String> {
     let mut s = state.lock_doc(doc)?;
-    let message =
-        method_session::actuals::actuals_import(&mut s, &sources, token, &request, &imported)?;
+    let message = crate::i18n::engine_dto(method_session::actuals::actuals_import(
+        &mut s, &sources, token, &request, &imported,
+    ))?;
     Ok(Imported {
         view: finish(&window, &mut s, None),
         message,
@@ -119,7 +128,7 @@ pub fn actuals_list(
     filter: FilterInput,
 ) -> Result<ListDto, String> {
     let s = state.lock_doc(doc)?;
-    method_session::actuals::actuals_list(s.budget(), &filter)
+    crate::i18n::engine_err(method_session::actuals::actuals_list(s.budget(), &filter))
 }
 
 /// Changes, reassigns or unassigns transactions `ids` (one undo step).

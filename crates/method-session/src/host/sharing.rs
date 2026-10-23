@@ -123,7 +123,7 @@ mod tests {
         let e = h
             .dispatch("set_title", json!({"doc": copy, "title": "x"}))
             .unwrap_err();
-        assert_eq!(e.message(), crate::session::READ_ONLY);
+        assert_eq!(e.message(), crate::session::read_only());
 
         let o = call(&h, "share_copy_original", json!({"doc": copy}));
         assert_eq!(o["doc"], first);

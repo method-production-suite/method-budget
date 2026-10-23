@@ -35,7 +35,7 @@ use method_format::import::exchange::{
 use serde::Serialize;
 
 use crate::docs::{AppState, DocId};
-use crate::history::count;
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::sheet_import::check_size;
 use crate::view::View;
@@ -101,7 +101,7 @@ impl ExportSources {
                 path: s.path.clone(),
                 convert: s.convert,
             })
-            .ok_or_else(|| "Another file was picked since. Import again.".to_string())
+            .ok_or_else(|| word("engine.import.picked_since"))
     }
 }
 
@@ -193,7 +193,7 @@ fn format_of(key: Option<&str>) -> Result<Option<ExportFormat>, String> {
         None => Ok(None),
         Some(k) => ExportFormat::parse(k)
             .map(Some)
-            .ok_or_else(|| format!("Unknown export layout `{k}`.")),
+            .ok_or_else(|| msg("engine.import.unknown_layout", &[("layout", &k)])),
     }
 }
 
@@ -202,11 +202,8 @@ fn read(
     bytes: &[u8],
     format: Option<ExportFormat>,
 ) -> Result<(Built, Reconciliation), String> {
-    exchange::import(bytes, file, format).map_err(|e| {
-        let mut s = format!("Couldn't read {file}: {e}");
-        s.push('.');
-        s
-    })
+    exchange::import(bytes, file, format)
+        .map_err(|e| msg("engine.import.cant_read", &[("file", &file), ("why", &e)]))
 }
 
 /// The review of an import.
@@ -312,7 +309,7 @@ budget as a Method Budget file (.mthd)."
 fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), String> {
     let c = im.counts.clone();
     if c.categories == 0 {
-        return Err("The export has no categories to import.".into());
+        return Err(word("engine.import.export_no_categories"));
     }
     let mut s = Session::with_budget(
         method_core::Budget::new(crate::templates::UNTITLED, im.budget.base_currency.clone()),
@@ -328,13 +325,21 @@ fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), St
         s.set_converted(converted_notice(&from.file));
         return Ok((s, None));
     }
-    let msg = format!(
-        "Imported {}, {} and {}: check the notes in the review before relying on it.",
-        count(c.categories, "category", "categories"),
-        count(c.accounts, "account", "accounts"),
-        count(c.lines, "line", "lines")
+    let done = msg(
+        "engine.import.export_imported",
+        &[
+            (
+                "categories",
+                &msg("engine.phrase.categories", &[("count", &c.categories)]),
+            ),
+            (
+                "accounts",
+                &msg("engine.phrase.accounts", &[("count", &c.accounts)]),
+            ),
+            ("what", &msg("engine.phrase.lines", &[("count", &c.lines)])),
+        ],
     );
-    Ok((s, Some(msg)))
+    Ok((s, Some(done)))
 }
 
 // ---------------------------------------------------------------------------

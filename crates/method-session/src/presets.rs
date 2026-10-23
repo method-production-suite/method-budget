@@ -38,7 +38,8 @@ use serde::Deserialize;
 
 use crate::apply::rows_under;
 use crate::clipboard::{self, Clip, Content, Pasted, Preview, Setup, Target};
-use crate::edit::{details, EditResult};
+use crate::edit::{details, row_gone, EditResult};
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// Lines take a currency.
@@ -67,15 +68,15 @@ impl Which {
         match s {
             "tags" => Ok(Which::Tags),
             "lines" => Ok(Which::Lines),
-            other => Err(format!("unknown kind of preset `{other}`")),
+            other => Err(msg("engine.presets.unknown_kind", &[("kind", &other)])),
         }
     }
 
-    fn what(self) -> &'static str {
-        match self {
-            Which::Tags => "tag preset",
-            Which::Lines => "line block",
-        }
+    fn what(self) -> String {
+        word(match self {
+            Which::Tags => "engine.what.tag_preset",
+            Which::Lines => "engine.what.line_block",
+        })
     }
 
     fn len(self, b: &Budget) -> usize {
@@ -93,7 +94,7 @@ impl Which {
     }
 
     fn gone(self) -> String {
-        format!("That {} no longer exists.", self.what())
+        msg("engine.presets.gone", &[("what", &self.what())])
     }
 }
 
@@ -102,12 +103,15 @@ impl Which {
 fn check_name(b: &Budget, which: Which, name: &str, except: Option<usize>) -> EditResult<String> {
     let name = name.trim();
     if name.is_empty() {
-        return Err(format!("Give the {} a name.", which.what()));
+        return Err(msg("engine.presets.give_name", &[("what", &which.what())]));
     }
     if name.chars().count() > MAX_TOOL_PRESET_NAME_CHARS {
-        return Err(format!(
-            "A {} name can be at most {MAX_TOOL_PRESET_NAME_CHARS} characters.",
-            which.what()
+        return Err(msg(
+            "engine.presets.name_long",
+            &[
+                ("what", &which.what()),
+                ("max", &MAX_TOOL_PRESET_NAME_CHARS),
+            ],
         ));
     }
     let key = name.to_lowercase();
@@ -117,9 +121,9 @@ fn check_name(b: &Budget, which: Which, name: &str, except: Option<usize>) -> Ed
         .enumerate()
         .any(|(i, n)| Some(i) != except && n.trim().to_lowercase() == key);
     if taken {
-        return Err(format!(
-            "There is already a {} called \"{name}\".",
-            which.what()
+        return Err(msg(
+            "engine.presets.name_taken",
+            &[("what", &which.what()), ("name", &name)],
         ));
     }
     Ok(name.to_string())
@@ -131,9 +135,13 @@ fn check_room(b: &Budget, which: Which) -> EditResult {
         Which::Lines => MAX_LINE_PRESETS,
     };
     if which.len(b) >= max {
-        return Err(format!(
-            "A budget can keep at most {max} {}s.",
-            which.what()
+        let many = word(match which {
+            Which::Tags => "engine.what.tag_presets",
+            Which::Lines => "engine.what.line_blocks",
+        });
+        return Err(msg(
+            "engine.presets.too_many",
+            &[("max", &max), ("what", &many)],
         ));
     }
     Ok(())
@@ -172,7 +180,7 @@ pub fn delete_preset(b: &mut Budget, which: Which, index: usize) -> EditResult {
 pub fn move_preset(b: &mut Budget, which: Which, index: usize, to: usize) -> EditResult {
     check_index(b, which, index)?;
     if to >= which.len(b) {
-        return Err(format!("Can't move the {} there.", which.what()));
+        return Err(msg("engine.presets.cant_move", &[("what", &which.what())]));
     }
     match which {
         Which::Tags => {
@@ -229,11 +237,12 @@ fn refuse_missing(b: &Budget, p: &TagPreset) -> EditResult {
     if missing.is_empty() {
         return Ok(());
     }
-    Err(format!(
-        "This budget has no {}. Edit the preset, or add {} first.",
-        missing.join(", "),
-        if missing.len() == 1 { "it" } else { "them" }
-    ))
+    let code = if missing.len() == 1 {
+        "engine.presets.missing_one"
+    } else {
+        "engine.presets.missing_many"
+    };
+    Err(msg(code, &[("items", &missing.join(", "))]))
 }
 
 /// `p` as it is stored: names trimmed, blank values as none, the base
@@ -324,9 +333,9 @@ pub fn tag_preset_from_row(
 ) -> EditResult<usize> {
     let d = details(b)
         .find(|d| d.id == id)
-        .ok_or_else(|| format!("row {id} no longer exists"))?;
+        .ok_or_else(|| row_gone(id))?;
     if !is_costed(d) {
-        return Err("Only lines and adjustments have tags to save.".into());
+        return Err(word("engine.presets.no_tags_to_save"));
     }
     let preset = TagPreset {
         name: name.to_string(),
@@ -367,9 +376,7 @@ impl Mode {
         match s {
             "add" => Ok(Mode::Add),
             "replace" => Ok(Mode::Replace),
-            other => Err(format!(
-                "unknown way to apply a preset `{other}`; use add or replace"
-            )),
+            other => Err(msg("engine.presets.unknown_mode", &[("mode", &other)])),
         }
     }
 }
@@ -397,7 +404,10 @@ pub fn replace_tags(b: &mut Budget, tags: TagPreset, ids: &[RowId]) -> EditResul
     let p = tidy_tags(b, tags);
     let missing = missing_items(b, &p);
     if !missing.is_empty() {
-        return Err(format!("This budget has no {}.", missing.join(", ")));
+        return Err(msg(
+            "engine.presets.missing",
+            &[("items", &missing.join(", "))],
+        ));
     }
     put_tags(b, &p, Mode::Replace, ids)
 }
@@ -405,7 +415,7 @@ pub fn replace_tags(b: &mut Budget, tags: TagPreset, ids: &[RowId]) -> EditResul
 /// Puts the tags `p` carries on rows `ids` (see the module notes).
 fn put_tags(b: &mut Budget, p: &TagPreset, mode: Mode, ids: &[RowId]) -> EditResult<usize> {
     if ids.is_empty() {
-        return Err("Select one or more lines first.".into());
+        return Err(word("engine.presets.select_lines"));
     }
     let want: BTreeSet<RowId> = ids.iter().copied().collect();
     let have: BTreeSet<RowId> = details(b)
@@ -413,10 +423,10 @@ fn put_tags(b: &mut Budget, p: &TagPreset, mode: Mode, ids: &[RowId]) -> EditRes
         .filter(|id| want.contains(id))
         .collect();
     if let Some(gone) = want.difference(&have).next() {
-        return Err(format!("row {gone} no longer exists"));
+        return Err(row_gone(*gone));
     }
     if !details(b).any(|d| want.contains(&d.id) && is_costed(d)) {
-        return Err("None of the selected rows can take tags.".into());
+        return Err(word("engine.presets.none_take_tags"));
     }
     refuse_missing(b, p)?;
     let base = b.base_currency.clone();
@@ -474,7 +484,7 @@ pub fn selection_rows(
 ) -> EditResult<Vec<RowId>> {
     let have: BTreeSet<RowId> = details(b).map(|d| d.id).collect();
     if let Some(gone) = row_ids.iter().find(|id| !have.contains(id)) {
-        return Err(format!("row {gone} no longer exists"));
+        return Err(row_gone(*gone));
     }
     for code in accounts {
         let found = b
@@ -482,12 +492,12 @@ pub fn selection_rows(
             .flat_map(|c| &c.accounts)
             .any(|a| a.code == *code);
         if !found {
-            return Err(format!("account {code} no longer exists"));
+            return Err(msg("engine.edit.account_gone", &[("code", code)]));
         }
     }
     for &ti in categories {
         if !matches!(b.topsheet.get(ti), Some(TopsheetRow::Category(_))) {
-            return Err("That category no longer exists.".into());
+            return Err(word("engine.presets.category_gone"));
         }
     }
     Ok(rows_under(b, row_ids, accounts, categories))
@@ -582,7 +592,7 @@ pub fn store_line_block(
     let name = check_name(b, Which::Lines, name, None)?;
     let want: BTreeSet<RowId> = ids.iter().copied().collect();
     if want.is_empty() {
-        return Err("Select the lines to save first.".into());
+        return Err(word("engine.presets.select_lines_to_save"));
     }
     let mut rows: Vec<Detail> = details(b)
         .filter(|d| want.contains(&d.id))
@@ -590,11 +600,12 @@ pub fn store_line_block(
         .collect();
     let have: BTreeSet<RowId> = rows.iter().map(|d| d.id).collect();
     if let Some(gone) = want.difference(&have).next() {
-        return Err(format!("row {gone} no longer exists"));
+        return Err(row_gone(*gone));
     }
     if rows.len() > MAX_BLOCK_ROWS {
-        return Err(format!(
-            "A line block can hold at most {MAX_BLOCK_ROWS} rows."
+        return Err(msg(
+            "engine.presets.block_too_big",
+            &[("max", &MAX_BLOCK_ROWS)],
         ));
     }
     let mut ranges: BTreeMap<u32, u32> = BTreeMap::new();
@@ -646,7 +657,7 @@ fn block_clip(b: &Budget, index: usize) -> EditResult<Clip> {
     check_index(b, Which::Lines, index)?;
     let p = &b.line_presets[index];
     if p.rows.is_empty() {
-        return Err("That line block has no rows.".into());
+        return Err(word("engine.presets.block_empty"));
     }
     let mut clip = Clip::new(b, Content::Rows(p.rows.clone()), None);
     clip.setup = to_setup(&p.setup);
@@ -697,7 +708,8 @@ pub fn save_tag_preset(
     preset: serde_json::Value,
 ) -> EditResult<usize> {
     let preset = method_format::tag_preset_from_value(preset)
-        .map_err(|e| format!("That tag preset can't be saved: {e}"))?;
+        .map_err(|e| msg("engine.presets.cant_save", &[("why", &e)]))?;
+
     let label = if index.is_some() {
         "Update a tag preset"
     } else {

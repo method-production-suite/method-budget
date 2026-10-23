@@ -35,6 +35,7 @@ use crate::compare::{CompareFiles, Picked};
 use crate::diagnose::lenient_recalc;
 use crate::docs::{AppState, DocGuard, DocId, Docs};
 use crate::host::FileIn;
+use crate::messages::{msg, word};
 
 /// Most picks a merge takes (one per conflict).
 const MAX_PICKS: usize = 50_000;
@@ -396,7 +397,9 @@ impl Held {
 
 /// An open budget with the totals its session keeps.
 fn held_open(docs: &mut Docs, doc: DocId) -> Result<Held, String> {
-    let s = docs.get_mut(doc).ok_or("That budget has been closed.")?;
+    let s = docs
+        .get_mut(doc)
+        .ok_or_else(|| word("engine.docs.closed"))?;
     let label = s.tab_label();
     let detail = s
         .path()
@@ -418,18 +421,20 @@ fn held_open(docs: &mut Docs, doc: DocId) -> Result<Held, String> {
 fn held_file(files: &CompareFiles, token: u64) -> Result<Held, String> {
     let (label, path, b) = files
         .get(token)
-        .ok_or("That file is no longer at hand; choose it again.")?;
+        .ok_or_else(|| word("engine.merge.file_gone"))?;
     Ok(Held::raw(label, path, b))
 }
 
 fn held_version(docs: &Docs, front: DocId, id: VersionId) -> Result<Held, String> {
-    let s = docs.get(front).ok_or("The budget has been closed.")?;
+    let s = docs
+        .get(front)
+        .ok_or_else(|| word("engine.merge.budget_closed"))?;
     let v = s
         .budget()
         .version(id)
-        .ok_or("That version has been deleted.")?;
+        .ok_or_else(|| word("engine.merge.version_deleted"))?;
     Ok(Held::raw(
-        format!("Version \"{}\"", v.name),
+        msg("engine.merge.version_label", &[("name", &v.name)]),
         v.created.clone(),
         Arc::new(v.budget.to_budget()),
     ))
@@ -452,9 +457,7 @@ pub fn gather_diff(
 ) -> Result<Gathered, String> {
     let to = held_open(docs, front)?;
     let from = match against {
-        Against::Tab { doc } if doc == front => {
-            return Err("That is the budget being compared.".into())
-        }
+        Against::Tab { doc } if doc == front => return Err(word("engine.merge.same_budget")),
         Against::Tab { doc } => Older::Held(Box::new(held_open(docs, doc)?)),
         Against::Version { id } => {
             // A version holds content only: its versions and actuals are
@@ -468,10 +471,10 @@ pub fn gather_diff(
         }
         Against::File { token } => Older::Held(Box::new(held_file(files, token)?)),
         Against::Saved => {
-            let s = docs.get(front).ok_or("The budget has been closed.")?;
-            let path = s
-                .path()
-                .ok_or("This budget hasn't been saved to a file yet.")?;
+            let s = docs
+                .get(front)
+                .ok_or_else(|| word("engine.merge.budget_closed"))?;
+            let path = s.path().ok_or_else(|| word("engine.merge.never_saved"))?;
             Older::Saved(path.to_path_buf())
         }
     };
@@ -496,7 +499,7 @@ impl Gathered {
             Older::Saved(path) => {
                 let b = read_saved(&path)?;
                 Held::raw(
-                    "The saved file".into(),
+                    word("engine.merge.saved_file"),
                     path.display().to_string(),
                     Arc::new(b),
                 )
@@ -533,24 +536,25 @@ pub struct MergeInputs {
 
 /// The version `copy` was shared from, if it came from `ours`.
 fn shared_from(ours: &Budget, copy: &Budget) -> Result<(VersionId, String), String> {
-    let p = copy.provenance.as_ref().ok_or(
-        "Choose the base: the budget both copies started from (a version of this budget, or the file that was sent).",
-    )?;
+    let p = copy
+        .provenance
+        .as_ref()
+        .ok_or_else(|| word("engine.merge.choose_base"))?;
     if !method_core::share::came_from(copy, ours) {
-        return Err(format!(
-            "This copy came from \"{}\", not this budget. Choose the base: the budget both started from.",
-            p.source_title
+        return Err(msg(
+            "engine.merge.other_budget",
+            &[("title", &p.source_title)],
         ));
     }
     let Some(name) = &p.source_version else {
-        return Err("This copy was saved from the budget as it stood, not from a version. Choose the base: the file that was sent.".into());
+        return Err(word("engine.merge.not_from_version"));
     };
     ours.versions
         .iter()
         .rev()
         .find(|v| v.name == *name)
         .map(|v| (v.id, v.name.clone()))
-        .ok_or_else(|| format!("The version \"{name}\" this copy was shared from is no longer in this budget. Choose the base."))
+        .ok_or_else(|| msg("engine.merge.version_gone", &[("name", name)]))
 }
 
 /// Copies out the budget in front, the returned copy and the base. Call it
@@ -564,9 +568,7 @@ pub fn gather_merge(
 ) -> Result<MergeInputs, String> {
     let ours = held_open(docs, front)?;
     let copy = match copy {
-        CopySource::Tab { doc } if doc == front => {
-            return Err("A budget can't merge changes from itself.".into())
-        }
+        CopySource::Tab { doc } if doc == front => return Err(word("engine.merge.from_itself")),
         CopySource::Tab { doc } => held_open(docs, doc)?,
         CopySource::File { token } => held_file(files, token)?,
     };
@@ -576,15 +578,13 @@ pub fn gather_merge(
         BaseSource::Auto => match shared_from(&ours.budget, &copy.budget) {
             Ok((id, name)) => {
                 let mut h = held_version(docs, front, id)?;
-                h.side.label = format!("Version \"{name}\" (what was shared)");
+                h.side.label = msg("engine.merge.version_shared_label", &[("name", &name)]);
                 (Some(h), true, None)
             }
             Err(why) => (None, false, Some(why)),
         },
         BaseSource::Version { id } => (Some(held_version(docs, front, id)?), shared, None),
-        BaseSource::Tab { doc } if doc == front => {
-            return Err("The budget in front can't be the base.".into())
-        }
+        BaseSource::Tab { doc } if doc == front => return Err(word("engine.merge.front_not_base")),
         BaseSource::Tab { doc } => (Some(held_open(docs, doc)?), false, None),
         BaseSource::File { token } => (Some(held_file(files, token)?), false, None),
     };
@@ -600,15 +600,16 @@ pub fn gather_merge(
 /// The page's picks: conflict key to `"ours"` or `"theirs"`.
 fn read_picks(picks: &BTreeMap<String, String>) -> Result<BTreeMap<String, Side>, String> {
     if picks.len() > MAX_PICKS {
-        return Err("Too many choices.".into());
+        return Err(word("engine.merge.too_many_choices"));
     }
     picks
         .iter()
         .map(|(k, v)| {
             if k.len() > MAX_KEY {
-                return Err("That choice isn't one of the conflicts.".to_string());
+                return Err(word("engine.merge.not_a_conflict"));
             }
-            let side = Side::from_key(v).ok_or_else(|| format!("\"{v}\" isn't ours or theirs."))?;
+            let side =
+                Side::from_key(v).ok_or_else(|| msg("engine.merge.not_a_side", &[("side", v)]))?;
             Ok((k.clone(), side))
         })
         .collect()
@@ -753,7 +754,7 @@ pub fn merge_apply<'a>(
         return Err(inputs
             .needs_base
             .clone()
-            .unwrap_or_else(|| "Choose the base first.".into()));
+            .unwrap_or_else(|| word("engine.merge.choose_base_first")));
     };
     let label = format!("Merge changes from {}", inputs.copy_label());
     let copy = Arc::clone(&inputs.copy.budget);

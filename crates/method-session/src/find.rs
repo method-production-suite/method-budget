@@ -32,6 +32,7 @@ use method_core::{Budget, Dec, Detail, Formula, RowId, RowKind, TopsheetRow, MAX
 use serde::{Deserialize, Serialize};
 
 use crate::edit::{details, row_gone, rows_by_id, EditResult};
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::view::View;
 
@@ -75,7 +76,7 @@ impl Scope {
             "currency" => Scope::Currency,
             "note" => Scope::Note,
             "account" => Scope::Account,
-            other => return Err(format!("can't search for `{other}`")),
+            other => return Err(msg("engine.find.cant_search", &[("scope", &other)])),
         })
     }
 
@@ -95,20 +96,20 @@ impl Scope {
         }
     }
 
-    fn what(self) -> &'static str {
-        match self {
-            Scope::Description => "description",
-            Scope::Formula => "formula",
-            Scope::Global => "global",
-            Scope::Fringe => "fringe",
-            Scope::Group => "group",
-            Scope::Set => "set",
-            Scope::Location => "location",
-            Scope::Unit => "unit",
-            Scope::Currency => "currency",
-            Scope::Note => "note",
-            Scope::Account => "account",
-        }
+    fn what(self) -> String {
+        word(match self {
+            Scope::Description => "engine.what.description",
+            Scope::Formula => "engine.what.formula",
+            Scope::Global => "engine.what.global",
+            Scope::Fringe => "engine.what.fringe",
+            Scope::Group => "engine.what.group",
+            Scope::Set => "engine.what.set",
+            Scope::Location => "engine.what.location",
+            Scope::Unit => "engine.what.unit",
+            Scope::Currency => "engine.what.currency",
+            Scope::Note => "engine.what.note",
+            Scope::Account => "engine.what.account",
+        })
     }
 }
 
@@ -391,9 +392,7 @@ impl Finder {
                     return Ok(None);
                 }
                 if !is_ident(name) {
-                    return Err(format!(
-                        "`{name}` isn't a global's name: names are letters, digits and _, with at least one letter or _"
-                    ));
+                    return Err(msg("engine.find.not_a_global_name", &[("name", &name)]));
                 }
                 Want::Token(name.to_string())
             }
@@ -544,11 +543,10 @@ fn global_value(b: &Budget, name: &str) -> EditResult<Dec> {
     only.globals = b.globals.clone();
     match method_core::delete_global(&mut only, name) {
         Ok(Some(v)) => Ok(v),
-        Ok(None) => Err(format!(
-            "there is no global {name}, so it has no value to put in its place"
-        )),
-        Err(e) => Err(format!(
-            "global {name} can't be worked out ({e}), so its value can't take its place"
+        Ok(None) => Err(msg("engine.find.no_global_value", &[("name", &name)])),
+        Err(e) => Err(msg(
+            "engine.find.global_unworkable",
+            &[("name", &name), ("why", &e)],
         )),
     }
 }
@@ -566,18 +564,17 @@ impl Finder {
                     });
                 };
                 if w.is_empty() {
-                    return Err("type a global, a number or a formula to put in its place".into());
+                    return Err(word("engine.find.type_replacement"));
                 }
                 if w == name {
-                    return Err(format!("{name} would be replaced by itself"));
+                    return Err(msg("engine.find.replaced_by_itself", &[("name", &name)]));
                 }
-                let e = Expr::parse(w).map_err(|e| format!("`{w}` isn't a formula: {e}"))?;
+                let e = Expr::parse(w)
+                    .map_err(|e| msg("engine.find.not_a_formula", &[("text", &w), ("why", &e)]))?;
                 let mut vars = BTreeSet::new();
                 e.vars(&mut vars);
                 if let Some(v) = vars.iter().find(|v| !b.globals.contains_key(*v)) {
-                    return Err(format!(
-                        "there is no global {v}; add it under Globals first"
-                    ));
+                    return Err(msg("engine.find.no_global_add", &[("name", v)]));
                 }
                 let simple = is_ident(w) || w.bytes().all(|c| c.is_ascii_digit() || c == b'.');
                 Ok(With::Token {
@@ -595,13 +592,13 @@ impl Finder {
                 };
                 let w = w.trim();
                 if w.is_empty() {
-                    return Err(format!(
-                        "pick the {} to put in its place, or remove it",
-                        self.scope.what()
+                    return Err(msg(
+                        "engine.find.pick_replacement",
+                        &[("what", &self.scope.what())],
                     ));
                 }
                 if w == old {
-                    return Err(format!("{old} would be replaced by itself"));
+                    return Err(msg("engine.find.replaced_by_itself", &[("name", old)]));
                 }
                 let known = match self.scope {
                     Scope::Fringe => b.fringes.contains_key(w),
@@ -613,9 +610,9 @@ impl Finder {
                     _ => false,
                 };
                 if !known {
-                    return Err(format!(
-                        "there is no {} `{w}`; add it in the tools panel first",
-                        self.scope.what()
+                    return Err(msg(
+                        "engine.find.no_such_add",
+                        &[("what", &self.scope.what()), ("name", &w)],
                     ));
                 }
                 Ok(With::Name(Some(w.to_string())))
@@ -638,8 +635,9 @@ impl Finder {
                         let new = splice(&n.text, &m.ranges(&n.text), w);
                         let len = new.chars().count();
                         if len > MAX_NOTE_CHARS {
-                            return Err(format!(
-                                "a note would be {len} characters; notes can be at most {MAX_NOTE_CHARS}"
+                            return Err(msg(
+                                "engine.find.note_too_long",
+                                &[("len", &len), ("max", &MAX_NOTE_CHARS)],
                             ));
                         }
                         n.text = new;
@@ -684,17 +682,19 @@ impl Finder {
                     Scope::Currency => {
                         d.currency = new.filter(|n| *n != self.base).map(String::from);
                     }
-                    _ => return Err("nothing to replace there".into()),
+                    _ => return Err(word("engine.find.nothing_there")),
                 }
             }
-            _ => return Err("nothing to replace there".into()),
+            _ => return Err(word("engine.find.nothing_there")),
         }
         Ok(*d != before)
     }
 }
 
-const STALE: &str =
-    "some of the checked results no longer match (the budget changed); search again";
+/// The checked results no longer match.
+fn stale() -> String {
+    word("engine.find.stale")
+}
 
 /// Replaces what `q` finds in each of `targets` (results of [`search`] with
 /// the same query) by `with`. `with` is the replacement text, global, number,
@@ -708,9 +708,9 @@ pub fn replace_in(
     targets: &[Target],
     with: Option<&str>,
 ) -> EditResult<usize> {
-    let finder = Finder::new(b, q)?.ok_or("type what to find first")?;
+    let finder = Finder::new(b, q)?.ok_or_else(|| word("engine.find.type_what"))?;
     if targets.is_empty() {
-        return Err("check one or more results first".into());
+        return Err(word("engine.find.check_results"));
     }
     let with = finder.replacement(b, with)?;
     let fields = finder.scope.fields();
@@ -730,30 +730,27 @@ pub fn replace_in(
             continue;
         }
         if !fields.contains(&t.field.as_str()) {
-            return Err(format!(
-                "a {} search doesn't look in `{}`",
-                finder.scope.what(),
-                t.field
+            return Err(msg(
+                "engine.find.field_not_searched",
+                &[("what", &finder.scope.what()), ("field", &t.field)],
             ));
         }
         if finder.scope == Scope::Account {
             let code = t.account.as_deref().ok_or("which account?")?;
             if t.field == "code" {
-                return Err(
-                    "account numbers aren't replaced here; change them in the account list".into(),
-                );
+                return Err(word("engine.find.account_numbers"));
             }
             let acct = b
                 .categories()
                 .flat_map(|c| &c.accounts)
                 .find(|a| a.code == code)
-                .ok_or_else(|| format!("account {code} no longer exists"))?;
+                .ok_or_else(|| msg("engine.edit.account_gone", &[("code", &code)]))?;
             let current = names.get(code).unwrap_or(&acct.name);
             if !finder.account_matches(&acct.code, current, "name") {
-                return Err(STALE.into());
+                return Err(stale());
             }
             let (Want::Text(m), With::Text(w)) = (&finder.want, &with) else {
-                return Err("nothing to replace there".into());
+                return Err(word("engine.find.nothing_there"));
             };
             let new = splice(current, &m.ranges(current), w).trim().to_string();
             if new != *current {
@@ -772,14 +769,14 @@ pub fn replace_in(
             }
         };
         if !finder.row_matches(copy, &t.field) {
-            return Err(STALE.into());
+            return Err(stale());
         }
         if finder.change(copy, &t.field, &with)? {
             updated += 1;
         }
     }
     if updated == 0 {
-        return Err("nothing would change: the replacement is what is there already".into());
+        return Err(word("engine.find.nothing_would_change"));
     }
 
     // Then apply them.

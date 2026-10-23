@@ -81,7 +81,10 @@ pub async fn sheet_import_pick<R: Runtime>(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
-    method_session::sheet_import::sheet_import_pick(&sources, file, &bytes).map(Some)
+    crate::i18n::engine_err(method_session::sheet_import::sheet_import_pick(
+        &sources, file, &bytes,
+    ))
+    .map(Some)
 }
 
 /// The preview of importing with the dialog's choices into budget `doc`
@@ -95,7 +98,9 @@ pub fn sheet_import_preview(
     request: Request,
 ) -> Result<PreviewDto, String> {
     let b = state.lock_doc(doc)?.budget().clone();
-    method_session::sheet_import::sheet_import_preview(&b, &sources, token, &request)
+    crate::i18n::engine_dto(method_session::sheet_import::sheet_import_preview(
+        &b, &sources, token, &request,
+    ))
 }
 
 /// Imports with the dialog's choices: into budget `doc` as one undo step,
@@ -109,11 +114,12 @@ pub fn sheet_import<R: Runtime>(
     token: u64,
     request: Request,
 ) -> Result<Imported, String> {
-    let (id, message) =
-        method_session::sheet_import::sheet_import(&state, &sources, doc, token, &request)?;
+    let (id, message) = crate::i18n::engine_err(method_session::sheet_import::sheet_import(
+        &state, &sources, doc, token, &request,
+    ))?;
     Ok(Imported {
         view: finish(&window, &mut state.lock_doc(Some(id))?, None),
-        message,
+        message: crate::i18n::engine(&message),
     })
 }
 

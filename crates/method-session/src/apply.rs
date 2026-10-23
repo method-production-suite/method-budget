@@ -19,8 +19,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use method_core::{Budget, Dec, Detail, FringeKind, RowId, RowKind, TagPreset, TopsheetRow};
 use serde::{Deserialize, Serialize};
 
-use crate::edit::{details, EditResult};
+use crate::edit::{details, row_gone, EditResult};
 use crate::history::rows_phrase;
+use crate::messages::{msg, word};
 use crate::report_dto::SelectionDto;
 use crate::session::{SelectionIndex, Session};
 
@@ -49,17 +50,15 @@ impl Tag {
         match s {
             "fringes" => Ok(Tag::Fringes),
             "groups" => Ok(Tag::Groups),
-            other => Err(format!(
-                "`{other}` can't be applied to rows; use fringes or groups"
-            )),
+            other => Err(msg("engine.apply.unknown_tag", &[("field", &other)])),
         }
     }
 
-    fn what(self) -> &'static str {
-        match self {
-            Tag::Fringes => "fringe",
-            Tag::Groups => "group",
-        }
+    fn what(self) -> String {
+        word(match self {
+            Tag::Fringes => "engine.what.fringe",
+            Tag::Groups => "engine.what.group",
+        })
     }
 
     fn takes(self, d: &Detail) -> bool {
@@ -89,13 +88,11 @@ impl Tag {
         }
     }
 
-    fn none_take(self) -> &'static str {
-        match self {
-            Tag::Fringes => {
-                "fringes only go on lines and adjustment rows, and none of the selected rows is one"
-            }
-            Tag::Groups => "none of the selected rows can be in a group",
-        }
+    fn none_take(self) -> String {
+        word(match self {
+            Tag::Fringes => "engine.apply.none_take_fringes",
+            Tag::Groups => "engine.apply.none_take_groups",
+        })
     }
 }
 
@@ -113,9 +110,7 @@ impl Pick {
             "set" => Ok(Pick::Set),
             "location" => Ok(Pick::Location),
             "currency" => Ok(Pick::Currency),
-            other => Err(format!(
-                "`{other}` can't be assigned to rows; use set, location or currency"
-            )),
+            other => Err(msg("engine.apply.unknown_pick", &[("field", &other)])),
         }
     }
 
@@ -134,14 +129,12 @@ impl Pick {
         }
     }
 
-    fn none_take(self) -> &'static str {
-        match self {
-            Pick::Set => "none of the selected rows can take a set",
-            Pick::Location => "none of the selected rows can take a location",
-            Pick::Currency => {
-                "currencies only go on lines, and none of the selected rows is a line"
-            }
-        }
+    fn none_take(self) -> String {
+        word(match self {
+            Pick::Set => "engine.apply.none_take_set",
+            Pick::Location => "engine.apply.none_take_location",
+            Pick::Currency => "engine.apply.none_take_currency",
+        })
     }
 
     /// The stored value for `typed`: blank clears it, and the base currency
@@ -160,11 +153,15 @@ impl Pick {
             return Ok(Some(v.to_string()));
         }
         Err(match self {
-            Pick::Set => format!("there is no set `{v}`"),
-            Pick::Location => format!("there is no location `{v}`"),
-            Pick::Currency => {
-                format!("there is no exchange rate for {v}; add it under Currencies first")
-            }
+            Pick::Set => msg(
+                "engine.apply.no_such",
+                &[("what", &word("engine.what.set")), ("name", &v)],
+            ),
+            Pick::Location => msg(
+                "engine.apply.no_such",
+                &[("what", &word("engine.what.location")), ("name", &v)],
+            ),
+            Pick::Currency => msg("engine.edit.no_exchange_rate_listed", &[("code", &v)]),
         })
     }
 }
@@ -173,7 +170,7 @@ impl Pick {
 /// row that no longer exists.
 fn selected(b: &Budget, ids: &[RowId]) -> EditResult<BTreeSet<RowId>> {
     if ids.is_empty() {
-        return Err("select one or more lines first".into());
+        return Err(word("engine.apply.select_lines"));
     }
     let want: BTreeSet<RowId> = ids.iter().copied().collect();
     let have: BTreeSet<RowId> = details(b)
@@ -181,7 +178,7 @@ fn selected(b: &Budget, ids: &[RowId]) -> EditResult<BTreeSet<RowId>> {
         .filter(|id| want.contains(id))
         .collect();
     if let Some(gone) = want.difference(&have).next() {
-        return Err(format!("row {gone} no longer exists"));
+        return Err(row_gone(*gone));
     }
     Ok(want)
 }
@@ -214,7 +211,7 @@ pub fn apply_tag(
     let ids = selected(b, ids)?;
     let name = name.trim();
     if name.is_empty() {
-        return Err(format!("{} name is empty", tag.what()));
+        return Err(msg("engine.edit.name_empty", &[("what", &tag.what())]));
     }
     let mut any = false;
     let mut carried = false;
@@ -223,10 +220,13 @@ pub fn apply_tag(
         carried |= tag.names(d).contains(name);
     }
     if !any {
-        return Err(tag.none_take().into());
+        return Err(tag.none_take());
     }
     if !tag.defined(b, name) && (on || !carried) {
-        return Err(format!("there is no {} `{name}`", tag.what()));
+        return Err(msg(
+            "engine.apply.no_such",
+            &[("what", &tag.what()), ("name", &name)],
+        ));
     }
     let mut changed = 0;
     for d in selected_mut(b, &ids) {
@@ -251,7 +251,7 @@ pub fn clear_tags(b: &mut Budget, ids: &[RowId], field: &str) -> EditResult<usiz
     let tag = Tag::parse(field)?;
     let ids = selected(b, ids)?;
     if !details(b).any(|d| ids.contains(&d.id) && tag.takes(d)) {
-        return Err(tag.none_take().into());
+        return Err(tag.none_take());
     }
     let mut changed = 0;
     for d in selected_mut(b, &ids) {
@@ -312,7 +312,7 @@ pub fn assign_value(
     let ids = selected(b, ids)?;
     let value = pick.value(b, value)?;
     if !details(b).any(|d| ids.contains(&d.id) && pick.takes(d)) {
-        return Err(pick.none_take().into());
+        return Err(pick.none_take());
     }
     let mut changed = 0;
     for d in selected_mut(b, &ids) {
@@ -348,7 +348,7 @@ fn range_plan(b: &Budget, ids: &[RowId]) -> EditResult<RangePlan> {
         .categories()
         .flat_map(|c| &c.accounts)
         .find(|a| a.details.iter().any(|d| ids.contains(&d.id)))
-        .ok_or("select one or more lines first")?;
+        .ok_or_else(|| word("engine.apply.select_lines"))?;
     let at: Vec<usize> = acct
         .details
         .iter()
@@ -357,16 +357,16 @@ fn range_plan(b: &Budget, ids: &[RowId]) -> EditResult<RangePlan> {
         .map(|(i, _)| i)
         .collect();
     if at.len() != ids.len() {
-        return Err("a fringe range has to stay inside one account".into());
+        return Err(word("engine.apply.range_one_account"));
     }
     let (first, last) = (at[0], at[at.len() - 1]);
     let rows = &acct.details;
     let gap = (first..=last).any(|i| !ids.contains(&rows[i].id) && is_costed(&rows[i]));
     if gap {
-        return Err("select lines next to each other to make a fringe range".into());
+        return Err(word("engine.apply.range_adjacent"));
     }
     if at.iter().filter(|&&i| is_line(&rows[i])).count() < 2 {
-        return Err("a fringe range needs at least two lines".into());
+        return Err(word("engine.apply.range_two_lines"));
     }
     let members: BTreeSet<RowId> = at
         .iter()
@@ -399,7 +399,7 @@ fn range_plan(b: &Budget, ids: &[RowId]) -> EditResult<RangePlan> {
         Some(&top) => top
             .checked_add(1)
             .or_else(|| (1..=u32::MAX).find(|n| !used.contains(n)))
-            .ok_or("this account has no fringe range numbers left")?,
+            .ok_or_else(|| word("engine.apply.range_numbers_used"))?,
     };
     Ok(RangePlan {
         members,
@@ -428,7 +428,7 @@ pub fn clear_range(b: &mut Budget, ids: &[RowId]) -> EditResult<usize> {
         .filter(|d| ids.contains(&d.id) && d.fringe_range.is_some())
         .count();
     if ranged == 0 {
-        return Err("none of the selected lines are in a fringe range".into());
+        return Err(word("engine.apply.none_in_range"));
     }
     for d in selected_mut(b, &ids) {
         d.fringe_range = None;
@@ -619,10 +619,11 @@ pub fn summary(
     });
 
     let range_blocked = if rows.is_empty() {
-        Some("select lines first".to_string())
+        Some(word("engine.apply.select_lines_first"))
     } else {
         match range_plan(b, &rows) {
-            Ok(p) if p.unchanged => Some("these lines are already one fringe range".to_string()),
+            Ok(p) if p.unchanged => Some(word("engine.apply.already_one_range")),
+
             Ok(_) => None,
             Err(e) => Some(e),
         }

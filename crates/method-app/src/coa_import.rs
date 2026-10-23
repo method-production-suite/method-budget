@@ -71,7 +71,10 @@ pub async fn coa_import_pick<R: Runtime>(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
-    method_session::coa_import::coa_import_pick(&sources, file, &bytes).map(Some)
+    crate::i18n::engine_err(method_session::coa_import::coa_import_pick(
+        &sources, file, &bytes,
+    ))
+    .map(Some)
 }
 
 /// The preview of importing with the dialog's choices (against budget
@@ -85,7 +88,9 @@ pub fn coa_import_preview(
     request: Request,
 ) -> Result<PreviewDto, String> {
     let b = state.lock_doc(doc)?.budget().clone();
-    method_session::coa_import::coa_import_preview(&b, &sources, token, &request)
+    crate::i18n::engine_err(method_session::coa_import::coa_import_preview(
+        &b, &sources, token, &request,
+    ))
 }
 
 /// Imports with the dialog's choices: a new tab with the chart, or applied
@@ -99,11 +104,12 @@ pub fn coa_import<R: Runtime>(
     token: u64,
     request: Request,
 ) -> Result<Imported, String> {
-    let (id, message) =
-        method_session::coa_import::coa_import(&state, &sources, doc, token, &request)?;
+    let (id, message) = crate::i18n::engine_err(method_session::coa_import::coa_import(
+        &state, &sources, doc, token, &request,
+    ))?;
     Ok(Imported {
         view: finish(&window, &mut state.lock_doc(Some(id))?, None),
-        message,
+        message: crate::i18n::engine(&message),
     })
 }
 
@@ -121,6 +127,6 @@ pub fn chart_template_new<R: Runtime>(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<View, String> {
-    let doc = method_session::coa_import::chart_template_new(&state, &id)?;
+    let doc = crate::i18n::engine_err(method_session::coa_import::chart_template_new(&state, &id))?;
     Ok(finish(&window, &mut state.lock_doc(Some(doc))?, None))
 }

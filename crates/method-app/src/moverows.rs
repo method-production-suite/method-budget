@@ -23,7 +23,7 @@ pub fn move_rows<R: Runtime>(
     by: i32,
 ) -> Result<MovedView, String> {
     let mut s = state.lock_doc(doc)?;
-    let m = method_session::moverows::move_rows(&mut s, &row_ids, by)?;
+    let m = crate::i18n::engine_err(method_session::moverows::move_rows(&mut s, &row_ids, by))?;
     Ok(MovedView::new(finish(&window, &mut s, None), m))
 }
 
@@ -38,7 +38,7 @@ pub fn move_accounts<R: Runtime>(
     by: i32,
 ) -> Result<MovedView, String> {
     let mut s = state.lock_doc(doc)?;
-    let m = method_session::moverows::move_accounts(&mut s, &codes, by)?;
+    let m = crate::i18n::engine_err(method_session::moverows::move_accounts(&mut s, &codes, by))?;
     Ok(MovedView::new(finish(&window, &mut s, None), m))
 }
 
@@ -53,7 +53,9 @@ pub fn move_topsheet_rows<R: Runtime>(
     by: i32,
 ) -> Result<MovedView, String> {
     let mut s = state.lock_doc(doc)?;
-    let m = method_session::moverows::move_topsheet_rows(&mut s, &indexes, by)?;
+    let m = crate::i18n::engine_err(method_session::moverows::move_topsheet_rows(
+        &mut s, &indexes, by,
+    ))?;
     Ok(MovedView::new(finish(&window, &mut s, None), m))
 }
 
