@@ -821,11 +821,11 @@ pub fn replace(
     targets: &[Target],
     with: Option<&str>,
 ) -> EditResult<usize> {
-    let label = format!(
-        "Replace {} with {}",
-        crate::history::count(targets.len(), "match", "matches"),
-        with.unwrap_or("nothing").trim()
-    );
+    let n = targets.len();
+    let label = match with {
+        Some(w) => msg("engine.undo.replace", &[("count", &n), ("text", &w.trim())]),
+        None => msg("engine.undo.replace_with_nothing", &[("count", &n)]),
+    };
     s.edit(label, |b| replace_in(b, query, targets, with))
 }
 

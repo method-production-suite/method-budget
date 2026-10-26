@@ -710,11 +710,11 @@ pub fn save_tag_preset(
     let preset = method_format::tag_preset_from_value(preset)
         .map_err(|e| msg("engine.presets.cant_save", &[("why", &e)]))?;
 
-    let label = if index.is_some() {
-        "Update a tag preset"
+    let label = word(if index.is_some() {
+        "engine.undo.update_a_tag_preset"
     } else {
-        "Save a tag preset"
-    };
+        "engine.undo.save_a_tag_preset"
+    });
     s.edit(label, |b| store_tag_preset(b, index, preset))
 }
 
@@ -725,7 +725,8 @@ pub fn tag_preset_from_line(
     name: &str,
     parts: Option<TagParts>,
 ) -> EditResult<usize> {
-    s.edit(format!("Save tag preset {}", name.trim()), |b| {
+    let label = msg("engine.undo.save_tag_preset", &[("name", &name.trim())]);
+    s.edit(label, |b| {
         tag_preset_from_row(b, row_id, name, parts.unwrap_or_default())
     })
 }
@@ -742,7 +743,7 @@ pub fn apply_tag_preset(
     categories: &[usize],
 ) -> EditResult<usize> {
     let mode = Mode::parse(mode)?;
-    s.edit("Apply a tag preset", |b| {
+    s.edit(word("engine.undo.apply_tag_preset"), |b| {
         let rows = selection_rows(b, row_ids, accounts, categories)?;
         put_tag_preset(b, index, mode, &rows)
     })
@@ -755,7 +756,8 @@ pub fn save_line_preset(
     row_ids: &[RowId],
     keep: Option<BlockFields>,
 ) -> EditResult<usize> {
-    s.edit(format!("Save line block {}", name.trim()), |b| {
+    let label = msg("engine.undo.save_line_block", &[("name", &name.trim())]);
+    s.edit(label, |b| {
         store_line_block(b, name, row_ids, keep.unwrap_or_default())
     })
 }
@@ -774,7 +776,10 @@ pub fn insert_line_preset(
     account: &str,
     before_row: Option<RowId>,
 ) -> EditResult<Option<RowId>> {
-    let label = format!("Insert a line block in {}", account.trim());
+    let label = msg(
+        "engine.undo.insert_line_block",
+        &[("code", &account.trim())],
+    );
     let pasted = s.edit(label, |b| insert_block(b, index, account, before_row))?;
     Ok(pasted.rows.first().copied())
 }
@@ -782,19 +787,22 @@ pub fn insert_line_preset(
 /// `which` is `tags` or `lines`.
 pub fn rename_tool_preset(s: &mut Session, which: &str, index: usize, name: &str) -> EditResult {
     let which = Which::parse(which)?;
-    s.edit(format!("Rename a preset to {}", name.trim()), |b| {
-        rename_preset(b, which, index, name)
-    })
+    let label = msg("engine.undo.rename_preset", &[("name", &name.trim())]);
+    s.edit(label, |b| rename_preset(b, which, index, name))
 }
 
 pub fn delete_tool_preset(s: &mut Session, which: &str, index: usize) -> EditResult {
     let which = Which::parse(which)?;
-    s.edit("Delete a preset", |b| delete_preset(b, which, index))
+    s.edit(word("engine.undo.delete_preset"), |b| {
+        delete_preset(b, which, index)
+    })
 }
 
 pub fn move_tool_preset(s: &mut Session, which: &str, index: usize, to: usize) -> EditResult {
     let which = Which::parse(which)?;
-    s.edit("Move a preset", |b| move_preset(b, which, index, to))
+    s.edit(word("engine.undo.move_preset"), |b| {
+        move_preset(b, which, index, to)
+    })
 }
 
 #[cfg(test)]

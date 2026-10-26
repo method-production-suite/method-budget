@@ -14,33 +14,51 @@ use crate::edit::{
     self, ChargeInput, CreditInput, CurrencyInput, EditResult, FringeInput, FringeRowInput,
     GroupInput, InfoInput, LocationInput, SetInput, UnitInput,
 };
+use crate::messages::{msg, word};
 use crate::report_dto::{ChargeDto, IncentivesDto, LocationReportDto};
 use crate::session::Session;
 use crate::view::Focus;
 
-/// "Add account 21-01 Camera": a verb, a code and a name.
-fn label2(verb: &str, code: &str, name: &str) -> String {
-    format!("{verb} {} {}", code.trim(), name.trim())
-        .trim_end()
-        .to_string()
-}
-
-/// "Add fringe FICA" or "Edit fringe FICA".
-fn upsert_label(kind: &str, exists: bool, name: &str) -> String {
-    let verb = if exists { "Edit" } else { "Add" };
-    format!("{verb} {kind} {}", name.trim())
-}
-
-/// "Edit category 10", "Delete production total Total above the line".
-fn topsheet_label(verb: &str, b: &Budget, index: usize) -> String {
-    match b.topsheet.get(index) {
-        Some(TopsheetRow::Category(c)) => format!("{verb} category {}", c.code),
-        Some(TopsheetRow::ProductionTotal(p)) => {
-            format!("{verb} production total {}", p.name)
-        }
-        None => format!("{verb} a topsheet row"),
+/// "Add account 21-01 Camera": a code and a name (`named`'s words), or a
+/// code alone (`unnamed`'s) when the name is blank.
+fn label2(named: &str, unnamed: &str, code: &str, name: &str) -> String {
+    let (code, name) = (code.trim(), name.trim());
+    if name.is_empty() {
+        msg(unnamed, &[("code", &code)]).trim_end().to_string()
+    } else {
+        msg(named, &[("code", &code), ("name", &name)])
     }
 }
+
+/// "Add fringe FICA" or "Edit fringe FICA": `codes` are the add and the
+/// edit.
+fn upsert_label(codes: [&str; 2], exists: bool, name: &str) -> String {
+    let [add, edit] = codes;
+    let code = if exists { edit } else { add };
+    msg(code, &[("name", &name.trim())])
+}
+
+/// "Edit category 10", "Delete production total Total above the line":
+/// `codes` are for a category, a production total and neither.
+fn topsheet_label(codes: [&str; 3], b: &Budget, index: usize) -> String {
+    let [category, total, neither] = codes;
+    match b.topsheet.get(index) {
+        Some(TopsheetRow::Category(c)) => msg(category, &[("code", &c.code)]),
+        Some(TopsheetRow::ProductionTotal(p)) => msg(total, &[("name", &p.name)]),
+        None => word(neither),
+    }
+}
+
+const EDIT_TOPSHEET: [&str; 3] = [
+    "engine.undo.edit_category",
+    "engine.undo.edit_production_total",
+    "engine.undo.edit_topsheet_row",
+];
+const DELETE_TOPSHEET: [&str; 3] = [
+    "engine.undo.delete_category",
+    "engine.undo.delete_production_total",
+    "engine.undo.delete_topsheet_row",
+];
 
 /// [`Session::edit`] with the step's label worked out from the budget as it
 /// is before the edit (to name a row by its account and line).
@@ -158,21 +176,26 @@ pub fn location_report(s: &mut Session) -> Result<LocationReportDto, String> {
 // Structure
 
 pub fn set_title(s: &mut Session, title: &str) -> EditResult {
-    s.edit(format!("Rename budget to {}", title.trim()), |b| {
-        edit::set_title(b, title)
-    })
+    let label = msg("engine.undo.rename_budget", &[("title", &title.trim())]);
+    s.edit(label, |b| edit::set_title(b, title))
 }
 
 pub fn add_category(s: &mut Session, code: &str, name: &str, at: Option<usize>) -> EditResult {
-    s.edit(label2("Add category", code, name), |b| {
-        edit::add_category(b, code, name, at).map(drop)
-    })
+    let label = label2(
+        "engine.undo.add_category",
+        "engine.undo.add_category_unnamed",
+        code,
+        name,
+    );
+    s.edit(label, |b| edit::add_category(b, code, name, at).map(drop))
 }
 
 pub fn add_production_total(s: &mut Session, name: &str, at: Option<usize>) -> EditResult {
-    s.edit(format!("Add production total {}", name.trim()), |b| {
-        edit::add_production_total(b, name, at).map(drop)
-    })
+    let label = msg(
+        "engine.undo.add_production_total",
+        &[("name", &name.trim())],
+    );
+    s.edit(label, |b| edit::add_production_total(b, name, at).map(drop))
 }
 
 pub fn update_topsheet_row(
@@ -183,7 +206,7 @@ pub fn update_topsheet_row(
 ) -> EditResult {
     edit_as(
         s,
-        |b| topsheet_label("Edit", b, index),
+        |b| topsheet_label(EDIT_TOPSHEET, b, index),
         |b| edit::update_topsheet_row(b, index, code, name),
     )
 }
@@ -191,7 +214,7 @@ pub fn update_topsheet_row(
 pub fn delete_topsheet_row(s: &mut Session, index: usize) -> EditResult {
     edit_as(
         s,
-        |b| topsheet_label("Delete", b, index),
+        |b| topsheet_label(DELETE_TOPSHEET, b, index),
         |b| edit::delete_topsheet_row(b, index),
     )
 }
@@ -203,7 +226,13 @@ pub fn add_account(
     name: &str,
     after: Option<&str>,
 ) -> EditResult {
-    s.edit(label2("Add account", code, name), |b| {
+    let label = label2(
+        "engine.undo.add_account",
+        "engine.undo.add_account_unnamed",
+        code,
+        name,
+    );
+    s.edit(label, |b| {
         edit::add_account(b, category_code, code, name, after)
     })
     .map(drop)
@@ -211,18 +240,20 @@ pub fn add_account(
 
 pub fn update_account(s: &mut Session, code: &str, new_code: &str, name: &str) -> EditResult {
     let label = if code.trim() == new_code.trim() {
-        format!("Rename account {}", code.trim())
+        msg("engine.undo.rename_account", &[("code", &code.trim())])
     } else {
-        format!("Renumber account {} to {}", code.trim(), new_code.trim())
+        msg(
+            "engine.undo.renumber_account",
+            &[("code", &code.trim()), ("new", &new_code.trim())],
+        )
     };
     s.edit(label, |b| edit::update_account(b, code, new_code, name))
         .map(drop)
 }
 
 pub fn delete_account(s: &mut Session, code: &str) -> EditResult {
-    s.edit(format!("Delete account {}", code.trim()), |b| {
-        edit::delete_account(b, code)
-    })
+    let label = msg("engine.undo.delete_account", &[("code", &code.trim())]);
+    s.edit(label, |b| edit::delete_account(b, code))
 }
 
 // ---------------------------------------------------------------------------
@@ -284,33 +315,34 @@ pub fn set_global(s: &mut Session, name: &str, formula: &str) -> EditResult {
     edit_as(
         s,
         |b| {
-            let verb = if b.globals.contains_key(name.trim()) {
-                "Set"
+            let code = if b.globals.contains_key(name.trim()) {
+                "engine.undo.set_global"
             } else {
-                "Add"
+                "engine.undo.add_global"
             };
-            format!("{verb} global {} = {}", name.trim(), formula.trim())
+            msg(
+                code,
+                &[("name", &name.trim()), ("formula", &formula.trim())],
+            )
         },
         |b| edit::set_global(b, name, formula),
     )
 }
 
 pub fn delete_global(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete global {}", name.trim()), |b| {
-        edit::delete_global(b, name)
-    })
+    let label = msg("engine.undo.delete_global", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_global(b, name))
 }
 
 /// A global's description, unit, decimals, show-by-name and folder.
 pub fn set_global_info(s: &mut Session, name: &str, info: &GlobalInfoInput) -> EditResult {
-    s.edit(format!("Edit the details of global {}", name.trim()), |b| {
-        display::apply_global_info(b, name, info)
-    })
+    let label = msg("engine.undo.edit_global_details", &[("name", &name.trim())]);
+    s.edit(label, |b| display::apply_global_info(b, name, info))
 }
 
 /// The budget's numbers-on-screen settings.
 pub fn set_display_prefs(s: &mut Session, prefs: &DisplayPrefsInput) -> EditResult {
-    s.edit("Change numbers on screen", |b| {
+    s.edit(word("engine.undo.numbers_on_screen"), |b| {
         display::apply_display_prefs(b, prefs)
     })
 }
@@ -318,21 +350,32 @@ pub fn set_display_prefs(s: &mut Session, prefs: &DisplayPrefsInput) -> EditResu
 pub fn set_fringe(s: &mut Session, name: &str, fringe: &FringeInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("fringe", b.fringes.contains_key(name.trim()), name),
+        |b| {
+            upsert_label(
+                ["engine.undo.add_fringe", "engine.undo.edit_fringe"],
+                b.fringes.contains_key(name.trim()),
+                name,
+            )
+        },
         |b| edit::set_fringe(b, name, fringe),
     )
 }
 
 pub fn delete_fringe(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete fringe {}", name.trim()), |b| {
-        edit::delete_fringe(b, name)
-    })
+    let label = msg("engine.undo.delete_fringe", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_fringe(b, name))
 }
 
 pub fn set_group(s: &mut Session, name: &str, group: &GroupInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("group", b.groups.contains_key(name.trim()), name),
+        |b| {
+            upsert_label(
+                ["engine.undo.add_group", "engine.undo.edit_group"],
+                b.groups.contains_key(name.trim()),
+                name,
+            )
+        },
         |b| edit::set_group(b, name, group),
     )
 }
@@ -341,7 +384,7 @@ pub fn set_group(s: &mut Session, name: &str, group: &GroupInput) -> EditResult 
 /// `ungrouped_lines`, `conflict` or `fringes_in_totals`, `value` is
 /// `include` or `exclude`.
 pub fn set_group_rule(s: &mut Session, rule: &str, value: &str) -> EditResult {
-    s.edit("Change a group rule", |b| {
+    s.edit(word("engine.undo.group_rule"), |b| {
         edit::set_group_rule(b, rule, value)
     })
 }
@@ -349,13 +392,15 @@ pub fn set_group_rule(s: &mut Session, rule: &str, value: &str) -> EditResult {
 /// How the budget works out its totals (decisions.md, entry 55): `value` is
 /// `binary` or `exact`.
 pub fn set_arithmetic(s: &mut Session, value: &str) -> EditResult {
-    s.edit("Change rounding", |b| edit::set_arithmetic(b, value))
+    s.edit(word("engine.undo.rounding"), |b| {
+        edit::set_arithmetic(b, value)
+    })
 }
 
 /// Whether account totals are rounded to whole units (decisions.md, entry
 /// 69).
 pub fn set_round_account_totals(s: &mut Session, value: bool) -> EditResult {
-    s.edit("Change account total rounding", |b| {
+    s.edit(word("engine.undo.account_total_rounding"), |b| {
         edit::set_round_account_totals(b, value)
     })
 }
@@ -363,7 +408,7 @@ pub fn set_round_account_totals(s: &mut Session, value: bool) -> EditResult {
 /// What every percent fringe's cutoff is multiplied by (decisions.md, entry
 /// 59): `value` is `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
 pub fn set_cutoff_factor(s: &mut Session, value: &str) -> EditResult {
-    s.edit("Change the cutoff factor", |b| {
+    s.edit(word("engine.undo.cutoff_factor"), |b| {
         edit::set_cutoff_factor(b, value)
     })
 }
@@ -371,51 +416,65 @@ pub fn set_cutoff_factor(s: &mut Session, value: &str) -> EditResult {
 /// The budget's fringe row: its account number, description and place on
 /// the topsheet (decisions.md, entry 60).
 pub fn set_fringe_row(s: &mut Session, row: &FringeRowInput) -> EditResult {
-    s.edit("Change the fringe row", |b| edit::set_fringe_row(b, row))
+    s.edit(word("engine.undo.fringe_row"), |b| {
+        edit::set_fringe_row(b, row)
+    })
 }
 
 /// The fringes of categories after the last production total (decisions.md,
 /// entry 56): `value` is `keep` or `drop`.
 pub fn set_trailing_level_fringes(s: &mut Session, value: &str) -> EditResult {
-    s.edit("Change fringes after the last production total", |b| {
+    s.edit(word("engine.undo.trailing_fringes"), |b| {
         edit::set_trailing_level_fringes(b, value)
     })
 }
 
 pub fn delete_group(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete group {}", name.trim()), |b| {
-        edit::delete_group(b, name)
-    })
+    let label = msg("engine.undo.delete_group", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_group(b, name))
 }
 
 pub fn set_unit(s: &mut Session, name: &str, unit: &UnitInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("unit", b.units.contains_key(name.trim()), name),
+        |b| {
+            upsert_label(
+                ["engine.undo.add_unit", "engine.undo.edit_unit"],
+                b.units.contains_key(name.trim()),
+                name,
+            )
+        },
         |b| edit::set_unit(b, name, unit),
     )
 }
 
 /// `clear_lines`: also blank the unit columns that name it.
 pub fn delete_unit(s: &mut Session, name: &str, clear_lines: bool) -> EditResult {
-    s.edit(format!("Delete unit {}", name.trim()), |b| {
-        edit::delete_unit_with(b, name, clear_lines)
-    })
+    let label = msg("engine.undo.delete_unit", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_unit_with(b, name, clear_lines))
 }
 
 pub fn set_currency(s: &mut Session, code: &str, currency: &CurrencyInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("currency", b.currencies.contains_key(code.trim()), code),
+        |b| {
+            let code_ = code.trim();
+            let exists = b.currencies.contains_key(code_);
+            let c = if exists {
+                "engine.undo.edit_currency"
+            } else {
+                "engine.undo.add_currency"
+            };
+            msg(c, &[("code", &code_)])
+        },
         |b| edit::set_currency(b, code, currency),
     )
 }
 
 /// `clear_lines`: lines in it go back to the base currency first.
 pub fn delete_currency(s: &mut Session, code: &str, clear_lines: bool) -> EditResult {
-    s.edit(format!("Delete currency {}", code.trim()), |b| {
-        edit::delete_currency_with(b, code, clear_lines)
-    })
+    let label = msg("engine.undo.delete_currency", &[("code", &code.trim())]);
+    s.edit(label, |b| edit::delete_currency_with(b, code, clear_lines))
 }
 
 // ---------------------------------------------------------------------------
@@ -423,113 +482,129 @@ pub fn delete_currency(s: &mut Session, code: &str, clear_lines: bool) -> EditRe
 // (the topsheet setup tabs in ui/js/topsheet-setup.js)
 
 pub fn set_charge(s: &mut Session, index: Option<usize>, charge: &ChargeInput) -> EditResult {
-    let label = if index.is_some() {
-        "Edit a charge"
+    let label = word(if index.is_some() {
+        "engine.undo.edit_charge"
     } else {
-        "Add a charge"
-    };
+        "engine.undo.add_charge"
+    });
     s.edit(label, |b| edit::set_charge(b, index, charge))
         .map(drop)
 }
 
 pub fn delete_charge(s: &mut Session, index: usize) -> EditResult {
-    s.edit("Delete a charge", |b| edit::delete_charge(b, index))
+    s.edit(word("engine.undo.delete_charge"), |b| {
+        edit::delete_charge(b, index)
+    })
 }
 
 pub fn move_charge(s: &mut Session, index: usize, to: usize) -> EditResult {
-    s.edit("Move a charge", |b| edit::move_charge(b, index, to))
+    s.edit(word("engine.undo.move_charge"), |b| {
+        edit::move_charge(b, index, to)
+    })
 }
 
 pub fn set_credit(s: &mut Session, index: Option<usize>, credit: &CreditInput) -> EditResult {
-    let label = if index.is_some() {
-        "Edit a credit"
+    let label = word(if index.is_some() {
+        "engine.undo.edit_credit"
     } else {
-        "Add a credit"
-    };
+        "engine.undo.add_credit"
+    });
     s.edit(label, |b| edit::set_credit(b, index, credit))
         .map(drop)
 }
 
 pub fn delete_credit(s: &mut Session, index: usize) -> EditResult {
-    s.edit("Delete a credit", |b| edit::delete_credit(b, index))
+    s.edit(word("engine.undo.delete_credit"), |b| {
+        edit::delete_credit(b, index)
+    })
 }
 
 pub fn move_credit(s: &mut Session, index: usize, to: usize) -> EditResult {
-    s.edit("Move a credit", |b| edit::move_credit(b, index, to))
+    s.edit(word("engine.undo.move_credit"), |b| {
+        edit::move_credit(b, index, to)
+    })
 }
 
 pub fn set_set(s: &mut Session, name: &str, set: &SetInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("set", b.sets.contains_key(name.trim()), name),
+        |b| {
+            upsert_label(
+                ["engine.undo.add_set", "engine.undo.edit_set"],
+                b.sets.contains_key(name.trim()),
+                name,
+            )
+        },
         |b| edit::set_set(b, name, set),
     )
 }
 
 pub fn delete_set(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete set {}", name.trim()), |b| {
-        edit::delete_set(b, name)
-    })
+    let label = msg("engine.undo.delete_set", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_set(b, name))
 }
 
 pub fn set_location(s: &mut Session, name: &str, location: &LocationInput) -> EditResult {
     edit_as(
         s,
-        |b| upsert_label("location", b.locations.contains_key(name.trim()), name),
+        |b| {
+            upsert_label(
+                ["engine.undo.add_location", "engine.undo.edit_location"],
+                b.locations.contains_key(name.trim()),
+                name,
+            )
+        },
         |b| edit::set_location(b, name, location),
     )
 }
 
 pub fn delete_location(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete location {}", name.trim()), |b| {
-        edit::delete_location(b, name)
-    })
+    let label = msg("engine.undo.delete_location", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_location(b, name))
 }
 
 pub fn set_info(s: &mut Session, name: &str, value: &InfoInput) -> EditResult {
-    s.edit(format!("Edit budget info {}", name.trim()), |b| {
-        edit::set_info(b, name, value)
-    })
+    let label = msg("engine.undo.edit_info", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::set_info(b, name, value))
 }
 
 pub fn delete_info(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete budget info {}", name.trim()), |b| {
-        edit::delete_info(b, name)
-    })
+    let label = msg("engine.undo.delete_info", &[("name", &name.trim())]);
+    s.edit(label, |b| edit::delete_info(b, name))
 }
 
 pub fn set_fringe_posting(s: &mut Session, mode: &str, suffix: Option<&str>) -> EditResult {
-    s.edit("Change fringe posting", |b| {
+    s.edit(word("engine.undo.fringe_posting"), |b| {
         edit::set_fringe_posting(b, mode, suffix)
     })
 }
 
 /// Category, account, sub-account and set widths, and the separator.
 pub fn set_account_coding(s: &mut Session, widths: [u8; 4], separator: Option<&str>) -> EditResult {
-    s.edit("Change account numbering", |b| {
+    s.edit(word("engine.undo.account_numbering"), |b| {
         edit::set_account_coding(b, widths, separator)
     })
 }
 
 pub fn set_totals_currency(s: &mut Session, code: Option<&str>) -> EditResult {
-    s.edit("Change the totals currency", |b| {
+    s.edit(word("engine.undo.totals_currency"), |b| {
         edit::set_totals_currency(b, code)
     })
 }
 
 pub fn lock_baseline(s: &mut Session) -> EditResult {
-    s.edit("Lock the baseline", edit::lock_baseline)
+    s.edit(word("engine.undo.lock_baseline"), edit::lock_baseline)
 }
 
 pub fn set_baseline_frozen(s: &mut Session, frozen: bool) -> EditResult {
-    let label = if frozen {
-        "Freeze the original totals"
+    let label = word(if frozen {
+        "engine.undo.freeze_totals"
     } else {
-        "Unfreeze the original totals"
-    };
+        "engine.undo.unfreeze_totals"
+    });
     s.edit(label, |b| edit::set_baseline_frozen(b, frozen))
 }
 
 pub fn clear_baseline(s: &mut Session) -> EditResult {
-    s.edit("Clear the baseline", edit::clear_baseline)
+    s.edit(word("engine.undo.clear_baseline"), edit::clear_baseline)
 }

@@ -844,9 +844,10 @@ pub fn read(file: &str, bytes: &[u8]) -> Result<ScheduleDays, String> {
 
 /// The undo step's name.
 fn step_label(days: &ScheduleDays) -> String {
-    format!("Set globals from the schedule {}", days.schedule.trim())
-        .trim_end()
-        .to_string()
+    match days.schedule.trim() {
+        "" => word("engine.undo.schedule_days"),
+        name => msg("engine.undo.schedule_days_named", &[("name", &name)]),
+    }
 }
 
 /// Applies to the budget in `s`, as one undo step. The message saying what

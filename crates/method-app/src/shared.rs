@@ -1520,7 +1520,12 @@ impl SharedDoc {
                 && self.shared.log.key_conflict().is_some(),
             owner_key_warning: self.owner_key_warning(),
             replaced: self.replaced_text(),
-            not_in_new: self.replaced.clone().unwrap_or_default(),
+            not_in_new: self
+                .replaced
+                .iter()
+                .flatten()
+                .map(|l| crate::i18n::label(l))
+                .collect(),
             requests: self.requests(),
             my_request: self.request.as_ref().map(|r| self.request_dto(me, r)),
             can_ask: self.can_ask(),
@@ -1573,7 +1578,7 @@ impl SharedDoc {
                 name: self.name_of(c.actor),
                 color: self.color_of(c.actor),
                 time: c.time.clone(),
-                label: c.label.clone(),
+                label: crate::i18n::label(&c.label),
                 why: refused_why(reason),
             })
             .collect()
@@ -1627,7 +1632,7 @@ impl SharedDoc {
             actor: c.actor.hex(),
             name: self.name_of(c.actor),
             color: self.color_of(c.actor),
-            label: c.label.clone(),
+            label: crate::i18n::label(&c.label),
             time: c.time.clone(),
             places,
         })
@@ -1658,7 +1663,7 @@ impl SharedDoc {
             .shared
             .log
             .change(stamp.change())
-            .map(|c| c.label.clone())
+            .map(|c| crate::i18n::label(&c.label))
             .unwrap_or_default();
         ValueDto {
             value: self.value_text(value),
@@ -2833,7 +2838,7 @@ impl SharedDoc {
                     color: self.color_of(c.actor),
                     me: c.actor == self.actor(),
                     time: c.time.clone(),
-                    label: c.label.clone(),
+                    label: crate::i18n::label(&c.label),
                     ops: c.ops.len(),
                     place: first.and_then(|(u, f)| self.place_of(u, f)),
                     signed: c.sig.is_some(),

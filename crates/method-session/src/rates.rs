@@ -287,7 +287,7 @@ pub fn rate_table_save(
     replacing: Option<&str>,
 ) -> EditResult {
     let t = table.table()?;
-    let label = format!("Save rate table {}", t.name);
+    let label = crate::messages::msg("engine.undo.save_rate_table", &[("name", &t.name)]);
     s.edit(label, |b| {
         rates::save_table(b, t, replacing).map_err(|e| e.0)
     })
@@ -296,7 +296,8 @@ pub fn rate_table_save(
 /// Deletes the rate table `name`; lines filled from it keep their figures.
 /// One undo step.
 pub fn rate_table_delete(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete rate table {name}"), |b| {
+    let label = crate::messages::msg("engine.undo.delete_rate_table", &[("name", &name)]);
+    s.edit(label, |b| {
         rates::delete_table(b, name).map(|_| ()).map_err(|e| e.0)
     })
 }
@@ -322,8 +323,11 @@ pub fn rate_fill(
     as_of: Option<&str>,
 ) -> EditResult<FilledDto> {
     let label = match crate::history::row_place(s.budget(), row_id) {
-        Some((code, n)) => format!("Fill rate on {code} line {n} from {table}"),
-        None => format!("Fill rate from {table}"),
+        Some((code, n)) => crate::messages::msg(
+            "engine.undo.fill_rate_at",
+            &[("code", &code), ("line", &n), ("table", &table)],
+        ),
+        None => crate::messages::msg("engine.undo.fill_rate", &[("table", &table)]),
     };
     s.edit(label, |b| {
         let f = rates::fill(b, row_id, table, classification, unit, as_of).map_err(|e| e.0)?;
@@ -359,9 +363,9 @@ pub fn rate_update(s: &mut Session, rows: &[RowId]) -> EditResult<usize> {
         });
     }
     let label = if changed.len() == 1 {
-        "Update rate to the table".to_string()
+        crate::messages::word("engine.undo.update_rate")
     } else {
-        format!("Update {} rates to their tables", changed.len())
+        crate::messages::msg("engine.undo.update_rates", &[("count", &changed.len())])
     };
     s.edit(label, |b| {
         for id in &changed {

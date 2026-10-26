@@ -654,7 +654,7 @@ fn apply_message(r: &ApplyReport) -> String {
 fn import_into(s: &mut Session, content: &Content, req: &Request) -> Result<String, String> {
     let (chart, _) = read(content, req)?;
     let opts = apply_options(req);
-    let rep = s.edit("Apply a chart of accounts", |b| apply(b, &chart, &opts))?;
+    let rep = s.edit(word("engine.undo.apply_chart"), |b| apply(b, &chart, &opts))?;
     Ok(apply_message(&rep))
 }
 
@@ -671,7 +671,7 @@ fn import_new(
     }
     let mut s = Session::with_budget(Budget::new(UNTITLED, currency), None);
     let made = chart.to_budget(UNTITLED, currency);
-    s.edit("Import a chart of accounts", |b| {
+    s.edit(word("engine.undo.import_chart"), |b| {
         *b = made;
         Ok(())
     })?;

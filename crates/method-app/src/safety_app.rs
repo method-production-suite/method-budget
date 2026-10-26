@@ -614,10 +614,13 @@ pub fn restore(
     let text = backups.read(&path, id).map_err(|e| e.to_string())?;
     let budget =
         method_format::from_str(&text).map_err(|e| format!("That backup can't be read: {e}"))?;
-    s.edit("Revert to a backup", |b| {
-        *b = budget;
-        Ok(())
-    })
+    s.edit(
+        method_session::messages::word("engine.undo.revert_to_backup"),
+        |b| {
+            *b = budget;
+            Ok(())
+        },
+    )
 }
 
 /// The first command-line argument that names an existing file (Windows and

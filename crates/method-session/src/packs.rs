@@ -209,8 +209,9 @@ pub fn pack_import(
     let title = method_core::pack::info(&src)
         .map(|i| i.title.clone())
         .unwrap_or_default();
-    let counts = s.edit("Import setup pack", |b| {
-        pack::import_pack(b, &src, picks, resolutions)
-    })?;
+    let counts = s.edit(
+        crate::messages::word("engine.undo.import_setup_pack"),
+        |b| pack::import_pack(b, &src, picks, resolutions),
+    )?;
     Ok(imported_message(&counts, &title, false))
 }

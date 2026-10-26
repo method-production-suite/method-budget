@@ -210,7 +210,10 @@ impl SessionFiles for Session {
         self.check_writable()?;
         let sh = self.shared_mut().ok_or("This budget isn't shared.")?;
         let budget = sh.use_value(kind, key, field, index)?;
-        self.adopt_projected(budget, "Put back a value");
+        self.adopt_projected(
+            budget,
+            &method_session::messages::word("engine.undo.put_back_value"),
+        );
         Ok(())
     }
 }

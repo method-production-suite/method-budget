@@ -122,9 +122,11 @@ pub fn renumber_accounts(s: &mut Session, widths: [u8; 4], separator: Option<&st
     let to = coding_from(widths, separator)?;
     let plan = renumber::plan(s.budget(), &to).map_err(|e| e.to_string())?;
     let hints = method_core::log::Hint::from_plan(&plan);
-    s.edit_with_hints("Renumber accounts to the new pattern", &hints, |b| {
-        apply(b, widths, separator)
-    })
+    s.edit_with_hints(
+        crate::messages::word("engine.undo.renumber_accounts"),
+        &hints,
+        |b| apply(b, widths, separator),
+    )
 }
 
 #[cfg(test)]

@@ -17,6 +17,13 @@
 //! a stable code and its parameters (`method_session::messages`), and the
 //! table's entry for the code is the same English, so the person sees it in
 //! their language, or as the engine wrote it when the table has no entry.
+//!
+//! Undo labels go through [`label`] the same way. A label is stored (in the
+//! history, in a shared budget's change log, read by other computers and
+//! older versions), so it stays the engine's English; only what this
+//! computer shows is translated: the History tab, the Activity tab, a
+//! field's past values, the changes that just arrived and the changes a
+//! restarted shared budget left out.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -161,6 +168,39 @@ fn one_message(text: &str, nested: bool) -> Option<String> {
     Some(fill(&words, &params))
 }
 
+/// An undo label in the person's language: when `text` is one of the
+/// engine's labels (`method_session::messages::recognize_label`), the
+/// table's words for its code with its parameters filled in (a noun or a
+/// rows phrase inside it translated too, the names the person typed kept
+/// as they are); otherwise `text` as it is. In English the result is `text`.
+pub fn label(text: &str) -> String {
+    use method_session::messages::{recognize_label, NESTED};
+    let Some(m) = recognize_label(text) else {
+        return text.to_string();
+    };
+    let count = m
+        .params
+        .iter()
+        .find(|(n, _)| *n == "count")
+        .map(|(_, v)| v.as_str());
+    let Some(words) = lookup(m.code, count) else {
+        return text.to_string();
+    };
+    let params: Vec<(&str, String)> = m
+        .params
+        .iter()
+        .map(|(n, v)| {
+            let v = if NESTED.contains(n) {
+                translated(v, true).unwrap_or_else(|| v.clone())
+            } else {
+                v.clone()
+            };
+            (*n, v)
+        })
+        .collect();
+    fill(&words, &params)
+}
+
 /// [`engine`] over an error, for a command's result.
 pub fn engine_err<T>(r: Result<T, String>) -> Result<T, String> {
     r.map_err(|e| engine(&e))
@@ -256,6 +296,15 @@ impl Localize for method_session::diffmerge::MergeDto {
             b.label.localize();
         }
         self.needs_base.localize();
+    }
+}
+
+/// The History tab's steps: their labels.
+impl Localize for method_session::session::History {
+    fn localize(&mut self) {
+        for s in &mut self.steps {
+            s.label = label(&s.label);
+        }
     }
 }
 
@@ -914,6 +963,79 @@ mod tests {
             assert_eq!(engine(&text), text);
         }
         assert_eq!(engine("3 accounts"), "3 accounts");
+    }
+
+    /// Undo labels (seventh pass): made from the catalog, they come back
+    /// through the table unchanged in English, labels nested inside them
+    /// included; the person's own words and labels cut short stay as they
+    /// are; and an error message is never taken for a label.
+    #[test]
+    fn undo_labels_are_shown_through_the_table() {
+        use method_session::history::{
+            cell_label, cells_label, delete_rows_label, row_place, rows_field_label, rows_phrase,
+        };
+        let session = method_session::session::Session::new();
+        let b = session.budget();
+        let account = b
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .find(|a| a.details.len() >= 2)
+            .expect("the starter has an account with two lines");
+        let ids: Vec<_> = account.details.iter().map(|d| d.id).take(2).collect();
+        let (code, _) = row_place(b, ids[0]).unwrap();
+        let made = [
+            cell_label(b, ids[1], "rate"),
+            rows_field_label(b, &ids, "x4"),
+            cells_label(b, &[(ids[0], "rate", ""), (ids[1], "rate", "")], None),
+            delete_rows_label(b, &ids[..1]),
+            msg(
+                "engine.undo.add_fringe_to_rows",
+                &[("name", &"FICA"), ("rows", &rows_phrase(b, &ids))],
+            ),
+            msg(
+                "engine.undo.save_version",
+                &[("name", &"Edit rate on 21-01 line 3")],
+            ),
+            msg("engine.undo.move_accounts_up", &[("count", &1)]),
+        ];
+        assert_eq!(made[0], format!("Edit rate on {code} line 2"));
+        assert_eq!(made[1], format!("Set 4X on 2 lines in {code}"));
+        assert_eq!(made[2], format!("Clear 2 cells in {code}"));
+        assert_eq!(made[3], format!("Delete line 1 of {code}"));
+        assert_eq!(made[4], format!("Add fringe FICA to 2 lines in {code}"));
+        for text in &made {
+            assert!(
+                method_session::messages::recognize_label(text).is_some(),
+                "{text:?} is a label"
+            );
+            assert_eq!(&label(text), text);
+        }
+        for text in [
+            "Rename fringe x\u{2026}",
+            "My own words",
+            "account 1100 no longer exists",
+        ] {
+            assert_eq!(label(text), text);
+        }
+        // Every label's code is in the table (so a language can word it).
+        let table = parse_table(EN).unwrap();
+        for m in MESSAGES
+            .iter()
+            .filter(|m| m.code.starts_with("engine.undo."))
+        {
+            assert!(table.contains_key(m.code), "{}", m.code);
+        }
+        let mut h = method_session::session::History {
+            steps: vec![method_session::session::HistoryStep {
+                label: made[0].clone(),
+                at: 1,
+                done: true,
+            }],
+            current: 1,
+            trimmed: false,
+        };
+        h.localize();
+        assert_eq!(h.steps[0].label, made[0]);
     }
 
     /// Dialog words method-session also writes (for the browser build) are

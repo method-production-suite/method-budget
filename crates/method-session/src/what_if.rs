@@ -237,10 +237,14 @@ pub fn apply_what_if(s: &mut Session, input: &WhatIfInput) -> EditResult<usize> 
     if changed == 0 {
         return Err(format!("The lines are already at {place}."));
     }
-    let label = format!(
-        "Move {} to {place}",
-        crate::history::rows_phrase(s.budget(), &rows)
-    );
+    let moved = crate::history::rows_phrase(s.budget(), &rows);
+    let label = match to {
+        Some(to) => crate::messages::msg(
+            "engine.undo.move_rows_to",
+            &[("rows", &moved), ("place", &to)],
+        ),
+        None => crate::messages::msg("engine.undo.move_rows_to_no_location", &[("rows", &moved)]),
+    };
     s.edit(label, |b| {
         move_lines(b, &rows, to).map_err(|e| e.to_string())
     })

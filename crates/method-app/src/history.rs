@@ -26,7 +26,10 @@ pub use method_session::history::*;
 /// oldest first, with how many are applied.
 #[tauri::command]
 pub fn history_list(state: State<'_, AppState>, doc: Option<DocId>) -> Result<History, String> {
-    Ok(state.lock_doc(doc)?.history())
+    let mut h = state.lock_doc(doc)?.history();
+    // The labels are kept in English; they're shown in the person's language.
+    crate::i18n::Localize::localize(&mut h);
+    Ok(h)
 }
 
 /// Undoes or redoes budget `doc`'s steps until `to` of them are applied

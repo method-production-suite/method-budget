@@ -166,14 +166,15 @@ pub fn apply_group_update(
 
 /// Sets bold, italic, indent and/or color on several rows.
 pub fn set_row_style(s: &mut Session, input: &RowStyleInput) -> EditResult {
-    s.edit("Format lines", |b| apply_row_style(b, input))
+    s.edit(crate::messages::word("engine.undo.format_lines"), |b| {
+        apply_row_style(b, input)
+    })
 }
 
 /// Sets or clears (`None`) a group's color.
 pub fn set_group_color(s: &mut Session, name: &str, color: Option<&str>) -> EditResult {
-    s.edit(format!("Color group {}", name.trim()), |b| {
-        apply_group_color(b, name, color)
-    })
+    let label = crate::messages::msg("engine.undo.color_group", &[("name", &name.trim())]);
+    s.edit(label, |b| apply_group_color(b, name, color))
 }
 
 /// Everything about an existing group in one undo step.
@@ -183,9 +184,8 @@ pub fn update_group(
     group: &GroupInput,
     color: Option<&str>,
 ) -> EditResult {
-    s.edit(format!("Edit group {}", name.trim()), |b| {
-        apply_group_update(b, name, group, color)
-    })
+    let label = crate::messages::msg("engine.undo.edit_group", &[("name", &name.trim())]);
+    s.edit(label, |b| apply_group_update(b, name, group, color))
 }
 
 #[cfg(test)]

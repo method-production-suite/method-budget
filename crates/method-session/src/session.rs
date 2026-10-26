@@ -259,7 +259,9 @@ fn tidy_label(label: String) -> String {
         .map(|c| if c.is_control() { ' ' } else { c })
         .collect();
     let t = one_line.trim();
-    let t = if t.is_empty() { "Change" } else { t };
+    if t.is_empty() {
+        return word("engine.undo.change");
+    }
     if t.chars().count() <= LABEL_MAX_CHARS {
         return t.to_string();
     }
@@ -559,7 +561,7 @@ impl Session {
     /// unsaved changes, no conflict. A copy saved for sharing (read-only)
     /// takes the file's version too: reading its own file isn't editing it.
     pub fn adopt_file_version(&mut self, theirs: Budget, stamp: DiskStamp) -> Result<(), String> {
-        self.edit_unchecked("Load the file's version", &[], |b| {
+        self.edit_unchecked(word("engine.undo.load_file_version"), &[], |b| {
             *b = theirs;
             Ok(())
         })?;
@@ -1030,7 +1032,14 @@ impl Session {
             return false;
         };
         self.notice = note;
-        self.adopt_projected(budget, if back { "Undo" } else { "Redo" });
+        self.adopt_projected(
+            budget,
+            &word(if back {
+                "engine.undo.undo"
+            } else {
+                "engine.undo.redo"
+            }),
+        );
         true
     }
 

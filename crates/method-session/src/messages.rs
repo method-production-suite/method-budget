@@ -27,6 +27,17 @@
 //! And a summary of several sentences is several messages joined by a
 //! space, or a list of phrases joined by ", ", which the desktop translates
 //! piece by piece (`i18n::engine()`), rather than one template per mix.
+//!
+//! Undo labels (`engine.undo.*`, decision 94, seventh pass) are made here
+//! too, so the History tab, the Activity tab and the rest can show them in
+//! the person's language. A label is stored: in the session's history, in a
+//! shared budget's change log as the change's `label`, and from there in
+//! what other computers and older versions read. So it is always this
+//! English, and only its display is translated, on this computer, through
+//! [`recognize_label`]. Labels are only looked for there, never as a
+//! message (an English error starting "Edit " is not a step), and a
+//! message is never looked for as a label. What the person named a thing
+//! (a version, a fringe, an account) is a parameter, kept as they wrote it.
 
 use std::fmt::Display;
 
@@ -67,12 +78,17 @@ pub const NESTED: &[&str] = &[
     "changes",
     "dismissed",
     "merged",
+    "rows",
+    "source",
     "what",
     "why",
 ];
 
 /// Codes only recognized inside a nested parameter.
 pub const PHRASE: &str = "engine.phrase.";
+
+/// Undo labels' codes, only recognized by [`recognize_label`].
+pub const UNDO: &str = "engine.undo.";
 
 /// Every engine message, by code (sorted, tested).
 pub const MESSAGES: &[Message] = &[
@@ -328,7 +344,9 @@ pub const MESSAGES: &[Message] = &[
     plural("engine.phrase.added_categories", "added {count} category", "added {count} categories"),
     plural("engine.phrase.categories", "{count} category", "{count} categories"),
     plural("engine.phrase.comments", "{count} comment", "{count} comments"),
+    m("engine.phrase.line_at", "{code} line {line}"),
     plural("engine.phrase.lines", "{count} line", "{count} lines"),
+    plural("engine.phrase.lines_in", "{count} line in {code}", "{count} lines in {code}"),
     plural("engine.phrase.new_accounts", "{count} new account", "{count} new accounts"),
     plural("engine.phrase.new_categories", "{count} new category", "{count} new categories"),
     plural("engine.phrase.new_setup_items", "{count} new setup item", "{count} new setup items"),
@@ -387,8 +405,196 @@ pub const MESSAGES: &[Message] = &[
     m("engine.session.step_gone", "That step is no longer in the history."),
     m("engine.setup.cant_move_further", "{name} can't move further"),
     m("engine.setup.unknown_kind", "unknown kind of setup item `{kind}`"),
+    m("engine.undo.account_numbering", "Change account numbering"),
+    m("engine.undo.account_total_rounding", "Change account total rounding"),
+    m("engine.undo.add_account", "Add account {code} {name}"),
+    m("engine.undo.add_account_unnamed", "Add account {code}"),
+    m("engine.undo.add_category", "Add category {code} {name}"),
+    m("engine.undo.add_category_unnamed", "Add category {code}"),
+    m("engine.undo.add_charge", "Add a charge"),
+    m("engine.undo.add_credit", "Add a credit"),
+    m("engine.undo.add_currency", "Add currency {code}"),
+    m("engine.undo.add_fringe", "Add fringe {name}"),
+    m("engine.undo.add_fringe_to_rows", "Add fringe {name} to {rows}"),
+    m("engine.undo.add_from_library", "Add from library"),
+    m("engine.undo.add_global", "Add global {name} = {formula}"),
+    m("engine.undo.add_group", "Add group {name}"),
+    m("engine.undo.add_group_to_rows", "Add group {name} to {rows}"),
+    m("engine.undo.add_location", "Add location {name}"),
+    m("engine.undo.add_note", "Add a note"),
+    m("engine.undo.add_production_total", "Add production total {name}"),
+    m("engine.undo.add_set", "Add set {name}"),
+    m("engine.undo.add_tag_to_rows", "Add tag {name} to {rows}"),
+    m("engine.undo.add_unit", "Add unit {name}"),
+    m("engine.undo.apply_chart", "Apply a chart of accounts"),
+    m("engine.undo.apply_tag_preset", "Apply a tag preset"),
+    m("engine.undo.assign_rows", "Set {what} {value} on {rows}"),
+    m("engine.undo.change", "Change"),
+    m("engine.undo.check_note", "Check off a note"),
+    m("engine.undo.clear_baseline", "Clear the baseline"),
+    m("engine.undo.clear_cell", "Clear {what}"),
+    m("engine.undo.clear_cell_at", "Clear {what} on {code} line {line}"),
+    plural("engine.undo.clear_cells", "Clear {count} cell", "Clear {count} cells"),
+    plural("engine.undo.clear_cells_in", "Clear {count} cell in {code}", "Clear {count} cells in {code}"),
+    m("engine.undo.clear_fringe_range", "Remove the fringe range from {rows}"),
+    m("engine.undo.clear_rows", "Clear {what} on {rows}"),
+    m("engine.undo.color_group", "Color group {name}"),
+    plural("engine.undo.cut_accounts", "Cut {count} account", "Cut {count} accounts"),
+    plural("engine.undo.cut_categories", "Cut {count} category", "Cut {count} categories"),
+    m("engine.undo.cut_cell", "Cut {what}"),
+    m("engine.undo.cut_cell_at", "Cut {what} on {code} line {line}"),
+    plural("engine.undo.cut_cells", "Cut {count} cell", "Cut {count} cells"),
+    plural("engine.undo.cut_cells_in", "Cut {count} cell in {code}", "Cut {count} cells in {code}"),
+    plural("engine.undo.cut_rows", "Cut {count} row", "Cut {count} rows"),
+    m("engine.undo.cutoff_factor", "Change the cutoff factor"),
+    m("engine.undo.delete_a_version", "Delete a version"),
+    m("engine.undo.delete_account", "Delete account {code}"),
+    plural("engine.undo.delete_actuals", "Delete {count} actual", "Delete {count} actuals"),
+    m("engine.undo.delete_category", "Delete category {code}"),
+    m("engine.undo.delete_charge", "Delete a charge"),
+    m("engine.undo.delete_credit", "Delete a credit"),
+    m("engine.undo.delete_currency", "Delete currency {code}"),
+    m("engine.undo.delete_fringe", "Delete fringe {name}"),
+    m("engine.undo.delete_global", "Delete global {name}"),
+    m("engine.undo.delete_group", "Delete group {name}"),
+    m("engine.undo.delete_info", "Delete budget info {name}"),
+    m("engine.undo.delete_line_at", "Delete line {line} of {code}"),
+    plural("engine.undo.delete_lines", "Delete {count} line", "Delete {count} lines"),
+    plural("engine.undo.delete_lines_from", "Delete {count} line from {code}", "Delete {count} lines from {code}"),
+    m("engine.undo.delete_location", "Delete location {name}"),
+    m("engine.undo.delete_note", "Delete a note"),
+    m("engine.undo.delete_overtime_pattern", "Delete overtime pattern {name}"),
+    m("engine.undo.delete_preset", "Delete a preset"),
+    m("engine.undo.delete_production_total", "Delete production total {name}"),
+    m("engine.undo.delete_rate_table", "Delete rate table {name}"),
+    m("engine.undo.delete_report_preset", "Delete a report preset"),
+    m("engine.undo.delete_set", "Delete set {name}"),
+    m("engine.undo.delete_topsheet_row", "Delete a topsheet row"),
+    m("engine.undo.delete_unit", "Delete unit {name}"),
+    m("engine.undo.delete_version", "Delete version {name}"),
+    plural("engine.undo.edit_actuals", "Edit {count} actual", "Edit {count} actuals"),
+    m("engine.undo.edit_category", "Edit category {code}"),
+    m("engine.undo.edit_cell", "Edit {what}"),
+    m("engine.undo.edit_cell_at", "Edit {what} on {code} line {line}"),
+    plural("engine.undo.edit_cells", "Edit {count} cell", "Edit {count} cells"),
+    plural("engine.undo.edit_cells_in", "Edit {count} cell in {code}", "Edit {count} cells in {code}"),
+    m("engine.undo.edit_charge", "Edit a charge"),
+    m("engine.undo.edit_credit", "Edit a credit"),
+    m("engine.undo.edit_currency", "Edit currency {code}"),
+    m("engine.undo.edit_fringe", "Edit fringe {name}"),
+    m("engine.undo.edit_global_details", "Edit the details of global {name}"),
+    m("engine.undo.edit_group", "Edit group {name}"),
+    m("engine.undo.edit_info", "Edit budget info {name}"),
+    m("engine.undo.edit_location", "Edit location {name}"),
+    m("engine.undo.edit_note", "Edit a note"),
+    m("engine.undo.edit_production_total", "Edit production total {name}"),
+    m("engine.undo.edit_set", "Edit set {name}"),
+    m("engine.undo.edit_topsheet_row", "Edit a topsheet row"),
+    m("engine.undo.edit_unit", "Edit unit {name}"),
+    m("engine.undo.fill_cell", "Fill down {what}"),
+    m("engine.undo.fill_cell_at", "Fill down {what} on {code} line {line}"),
+    plural("engine.undo.fill_cells", "Fill down {count} cell", "Fill down {count} cells"),
+    plural("engine.undo.fill_cells_in", "Fill down {count} cell in {code}", "Fill down {count} cells in {code}"),
+    m("engine.undo.fill_rate", "Fill rate from {table}"),
+    m("engine.undo.fill_rate_at", "Fill rate on {code} line {line} from {table}"),
+    m("engine.undo.format_lines", "Format lines"),
+    m("engine.undo.freeze_totals", "Freeze the original totals"),
+    m("engine.undo.fringe_posting", "Change fringe posting"),
+    m("engine.undo.fringe_row", "Change the fringe row"),
+    m("engine.undo.group_rule", "Change a group rule"),
+    m("engine.undo.import_actuals", "Import actuals from {file}"),
+    m("engine.undo.import_chart", "Import a chart of accounts"),
+    m("engine.undo.import_export", "Import a budget export"),
+    m("engine.undo.import_lines", "Import lines from a spreadsheet"),
+    plural("engine.undo.import_setup_items", "Import {count} item of setup", "Import {count} items of setup"),
+    m("engine.undo.import_setup_pack", "Import setup pack"),
+    m("engine.undo.insert_adjustment", "Insert adjustment in {code}"),
+    m("engine.undo.insert_line", "Insert line in {code}"),
+    m("engine.undo.insert_line_block", "Insert a line block in {code}"),
+    m("engine.undo.insert_separator", "Insert separator in {code}"),
+    m("engine.undo.insert_subtotal", "Insert subtotal in {code}"),
+    m("engine.undo.load_file_version", "Load the file's version"),
+    m("engine.undo.lock_baseline", "Lock the baseline"),
+    m("engine.undo.make_fringe_range", "Make a fringe range of {rows}"),
+    m("engine.undo.merge_changes", "Merge changes from {source}"),
+    plural("engine.undo.merge_review_comments", "Merge {count} review comment as notes", "Merge {count} review comments as notes"),
+    plural("engine.undo.move_accounts_down", "Move {count} account down", "Move {count} accounts down"),
+    plural("engine.undo.move_accounts_up", "Move {count} account up", "Move {count} accounts up"),
+    plural("engine.undo.move_actuals", "Move {count} actual to {code}", "Move {count} actuals to {code}"),
+    m("engine.undo.move_charge", "Move a charge"),
+    m("engine.undo.move_credit", "Move a credit"),
+    m("engine.undo.move_item_down", "Move {what} {name} down"),
+    m("engine.undo.move_item_up", "Move {what} {name} up"),
+    plural("engine.undo.move_lines_down", "Move {count} line down", "Move {count} lines down"),
+    plural("engine.undo.move_lines_up", "Move {count} line up", "Move {count} lines up"),
+    m("engine.undo.move_preset", "Move a preset"),
+    m("engine.undo.move_rows_to", "Move {rows} to {place}"),
+    m("engine.undo.move_rows_to_no_location", "Move {rows} to no location"),
+    plural("engine.undo.move_topsheet_rows_down", "Move {count} topsheet row down", "Move {count} topsheet rows down"),
+    plural("engine.undo.move_topsheet_rows_up", "Move {count} topsheet row up", "Move {count} topsheet rows up"),
+    m("engine.undo.new_budget", "New budget"),
+    m("engine.undo.new_line_defaults", "Change new line defaults"),
+    m("engine.undo.numbers_on_screen", "Change numbers on screen"),
+    m("engine.undo.overtime", "Overtime"),
+    m("engine.undo.overtime_at", "Overtime on {code} line {line}"),
+    plural("engine.undo.paste_accounts", "Paste {count} account", "Paste {count} accounts"),
+    plural("engine.undo.paste_categories", "Paste {count} category", "Paste {count} categories"),
+    m("engine.undo.paste_cell", "Paste {what}"),
+    m("engine.undo.paste_cell_at", "Paste {what} on {code} line {line}"),
+    plural("engine.undo.paste_cells", "Paste {count} cell", "Paste {count} cells"),
+    plural("engine.undo.paste_cells_in", "Paste {count} cell in {code}", "Paste {count} cells in {code}"),
+    plural("engine.undo.paste_rows", "Paste {count} row", "Paste {count} rows"),
+    m("engine.undo.put_back_value", "Put back a value"),
+    m("engine.undo.redo", "Redo"),
+    m("engine.undo.remove_actuals_import", "Remove the import of {file}"),
+    m("engine.undo.remove_an_actuals_import", "Remove an import of actuals"),
+    m("engine.undo.remove_fringe_from_rows", "Remove fringe {name} from {rows}"),
+    m("engine.undo.remove_group_from_rows", "Remove group {name} from {rows}"),
+    m("engine.undo.remove_tag_from_rows", "Remove tag {name} from {rows}"),
+    m("engine.undo.rename_account", "Rename account {code}"),
+    m("engine.undo.rename_budget", "Rename budget to {title}"),
+    m("engine.undo.rename_item", "Rename {what} {from} to {to}"),
+    m("engine.undo.rename_preset", "Rename a preset to {name}"),
+    m("engine.undo.rename_version", "Rename a version to {name}"),
+    m("engine.undo.renumber_account", "Renumber account {code} to {new}"),
+    m("engine.undo.renumber_accounts", "Renumber accounts to the new pattern"),
+    m("engine.undo.reorder", "Reorder {what}"),
+    plural("engine.undo.replace", "Replace {count} match with {text}", "Replace {count} matches with {text}"),
+    plural("engine.undo.replace_with_nothing", "Replace {count} match with nothing", "Replace {count} matches with nothing"),
+    m("engine.undo.restore_a_version", "Restore a version"),
+    m("engine.undo.restore_version", "Restore version {name}"),
+    m("engine.undo.revert_to_backup", "Revert to a backup"),
+    m("engine.undo.rounding", "Change rounding"),
+    m("engine.undo.save_a_tag_preset", "Save a tag preset"),
+    m("engine.undo.save_line_block", "Save line block {name}"),
+    m("engine.undo.save_overtime_pattern", "Save overtime pattern {name}"),
+    m("engine.undo.save_rate_table", "Save rate table {name}"),
+    m("engine.undo.save_report_preset", "Save a report preset"),
+    m("engine.undo.save_tag_preset", "Save tag preset {name}"),
+    m("engine.undo.save_version", "Save version {name}"),
+    m("engine.undo.save_version_from_history", "Save version \u{201c}{name}\u{201d} from the history"),
+    m("engine.undo.schedule_days", "Set globals from the schedule"),
+    m("engine.undo.schedule_days_named", "Set globals from the schedule {name}"),
+    m("engine.undo.set_etc", "Set the estimate to complete of {account}"),
+    m("engine.undo.set_field_rows", "Set {what} on {rows}"),
+    m("engine.undo.set_global", "Set global {name} = {formula}"),
+    m("engine.undo.set_tags_rows", "Set the tags on {rows}"),
+    m("engine.undo.short_code", "Set the short code of {name}"),
+    m("engine.undo.store_returned_copy", "Store a returned copy as version \"{name}\""),
+    m("engine.undo.totals_currency", "Change the totals currency"),
+    m("engine.undo.trailing_fringes", "Change fringes after the last production total"),
+    plural("engine.undo.unassign_actuals", "Unassign {count} actual", "Unassign {count} actuals"),
+    m("engine.undo.uncheck_note", "Uncheck a note"),
+    m("engine.undo.undo", "Undo"),
+    m("engine.undo.unfreeze_totals", "Unfreeze the original totals"),
+    m("engine.undo.update_a_tag_preset", "Update a tag preset"),
+    m("engine.undo.update_rate", "Update rate to the table"),
+    m("engine.undo.update_rates", "Update {count} rates to their tables"),
+    m("engine.undo.update_report_preset", "Update a report preset"),
+    m("engine.what.a_cell", "a cell"),
     m("engine.what.account", "account"),
     m("engine.what.adjustment_rows", "adjustment rows"),
+    m("engine.what.amount", "amount"),
     m("engine.what.amt", "Amt"),
     m("engine.what.an_excluded_amount", "an excluded amount"),
     m("engine.what.category", "category"),
@@ -407,9 +613,12 @@ pub const MESSAGES: &[Message] = &[
     m("engine.what.description", "description"),
     m("engine.what.formula", "formula"),
     m("engine.what.fringe", "fringe"),
+    m("engine.what.fringes", "fringes"),
     m("engine.what.global", "global"),
     m("engine.what.group", "group"),
+    m("engine.what.groups", "groups"),
     m("engine.what.hours", "hours"),
+    m("engine.what.item", "item"),
     m("engine.what.line_block", "line block"),
     m("engine.what.line_blocks", "line blocks"),
     m("engine.what.lines", "lines"),
@@ -425,6 +634,7 @@ pub const MESSAGES: &[Message] = &[
     m("engine.what.set", "set"),
     m("engine.what.sub_account", "sub-account"),
     m("engine.what.subtotal_rows", "subtotal rows"),
+    m("engine.what.tag", "tag"),
     m("engine.what.tag_preset", "tag preset"),
     m("engine.what.tag_presets", "tag presets"),
     m("engine.what.the_amount", "the amount"),
@@ -547,23 +757,52 @@ pub struct Recognized {
 /// parameters gives `text` back exactly. A count phrase (`engine.phrase.*`)
 /// is not a message on its own: see [`recognize_nested`].
 pub fn recognize(text: &str) -> Option<Recognized> {
-    recognize_among(text, false)
+    recognize_among(text, Among::Messages)
 }
 
 /// [`recognize`] for a nested parameter's value, which may also be a count
 /// phrase (`engine.phrase.*`).
 pub fn recognize_nested(text: &str) -> Option<Recognized> {
-    recognize_among(text, true)
+    recognize_among(text, Among::Nested)
 }
 
-fn recognize_among(text: &str, phrases: bool) -> Option<Recognized> {
+/// The code and parameters an undo label was made from (`engine.undo.*`),
+/// when `text` is one: what the History list, the Activity tab and the
+/// rest translate on display. The label itself stays this English.
+pub fn recognize_label(text: &str) -> Option<Recognized> {
+    recognize_among(text, Among::Labels)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Among {
+    /// Messages: not phrases, not labels.
+    Messages,
+    /// A nested parameter: messages and phrases.
+    Nested,
+    /// Undo labels only.
+    Labels,
+}
+
+fn recognize_among(text: &str, among: Among) -> Option<Recognized> {
     let mut best: Option<(usize, Recognized)> = None;
     for m in MESSAGES {
-        if !phrases && m.code.starts_with(PHRASE) {
+        let label = m.code.starts_with(UNDO);
+        let skip = match among {
+            Among::Messages => label || m.code.starts_with(PHRASE),
+            Among::Nested => label,
+            Among::Labels => !label,
+        };
+        if skip {
             continue;
         }
 
         for english in m.one.into_iter().chain([m.other]) {
+            // The text before the first brace is where it has to start (a
+            // quick test before the full one).
+            let head = english.split('{').next().unwrap_or("");
+            if !text.starts_with(head) {
+                continue;
+            }
             let pieces = pieces(english);
             let fixed: usize = pieces
                 .iter()
@@ -595,8 +834,8 @@ fn recognize_among(text: &str, phrases: bool) -> Option<Recognized> {
 }
 
 /// Whether `text` is `pieces` with some value for each parameter, trying
-/// every place the text after a parameter could start. The values found
-/// are pushed onto `params`.
+/// every place the text after a parameter could start (a `count` is
+/// digits). The values found are pushed onto `params`.
 fn match_pieces<'p, 't>(
     pieces: &[Piece<'p>],
     text: &'t str,
@@ -616,6 +855,14 @@ fn match_pieces<'p, 't>(
                 Some(Piece::Param(_)) => return false,
             };
             for end in ends {
+                // A count is a number ("Edit a cell" isn't "Edit {count}
+                // cell").
+                let value = &text[..end];
+                if *name == "count"
+                    && (value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()))
+                {
+                    continue;
+                }
                 let mark = params.len();
                 params.push((name, &text[..end]));
                 if match_pieces(rest, &text[end..], params) {
@@ -710,14 +957,33 @@ mod tests {
                 let text = msg(m.code, &refs);
                 assert_eq!(text, fill(english, &values));
                 let phrase = m.code.starts_with(PHRASE);
+                let label = m.code.starts_with(UNDO);
                 if phrase {
                     assert!(
                         recognize(&text).is_none_or(|r| !r.code.starts_with(PHRASE)),
                         "{text:?}: a phrase is only recognized nested"
                     );
                 }
+                if label {
+                    for r in [recognize(&text), recognize_nested(&text)]
+                        .into_iter()
+                        .flatten()
+                    {
+                        assert!(
+                            !r.code.starts_with(UNDO),
+                            "{text:?}: a label is only recognized as one"
+                        );
+                    }
+                } else {
+                    assert!(
+                        recognize_label(&text).is_none(),
+                        "{text:?}: a message is never a label"
+                    );
+                }
                 let r = if phrase {
                     recognize_nested(&text)
+                } else if label {
+                    recognize_label(&text)
                 } else {
                     recognize(&text)
                 }
@@ -778,20 +1044,146 @@ mod tests {
         assert_eq!(r.code, "engine.days.goes_too_of");
         for m in MESSAGES {
             assert!(
-                !(m.code.starts_with(PHRASE) && m.one.is_none() && !m.other.contains("{count}")),
-                "{}: a phrase counts something",
+                !(m.code.starts_with(PHRASE)
+                    && m.one.is_none()
+                    && !m.other.contains("{count}")
+                    && m.code != "engine.phrase.line_at"),
+                "{}: a phrase counts something (or is a line's place)",
                 m.code
             );
         }
+    }
+
+    /// Undo labels: the same English as before the catalog (byte for
+    /// byte, as stored in histories and shared change logs), recognized as
+    /// labels with the person's own words as plain parameters.
+    #[test]
+    fn undo_labels_keep_their_english_and_are_recognized() {
+        let rows = msg(
+            "engine.phrase.lines_in",
+            &[("count", &4), ("code", &"21-01")],
+        );
+        let cases: Vec<(String, &str)> = vec![
+            (
+                msg(
+                    "engine.undo.edit_cell_at",
+                    &[
+                        ("what", &word("engine.what.rate")),
+                        ("code", &"21-01"),
+                        ("line", &3),
+                    ],
+                ),
+                "Edit rate on 21-01 line 3",
+            ),
+            (
+                msg(
+                    "engine.undo.paste_cells_in",
+                    &[("count", &12), ("code", &"21-01")],
+                ),
+                "Paste 12 cells in 21-01",
+            ),
+            (
+                msg("engine.undo.fill_cells", &[("count", &1)]),
+                "Fill down 1 cell",
+            ),
+            (
+                msg(
+                    "engine.undo.set_field_rows",
+                    &[("what", &word("engine.what.x4")), ("rows", &rows)],
+                ),
+                "Set 4X on 4 lines in 21-01",
+            ),
+            (
+                msg(
+                    "engine.undo.add_fringe_to_rows",
+                    &[("name", &"FICA"), ("rows", &rows)],
+                ),
+                "Add fringe FICA to 4 lines in 21-01",
+            ),
+            (
+                msg(
+                    "engine.undo.assign_rows",
+                    &[
+                        ("what", &word("engine.what.set")),
+                        ("value", &"Stage A"),
+                        ("rows", &rows),
+                    ],
+                ),
+                "Set set Stage A on 4 lines in 21-01",
+            ),
+            (
+                msg(
+                    "engine.undo.save_version_from_history",
+                    &[("name", &"Rate pass")],
+                ),
+                "Save version \u{201c}Rate pass\u{201d} from the history",
+            ),
+            (
+                msg("engine.undo.store_returned_copy", &[("name", &"From Dana")]),
+                "Store a returned copy as version \"From Dana\"",
+            ),
+            (
+                msg("engine.undo.move_lines_down", &[("count", &1)]),
+                "Move 1 line down",
+            ),
+            (
+                msg(
+                    "engine.undo.rename_item",
+                    &[
+                        ("what", &word("engine.what.fringe")),
+                        ("from", &"FICA"),
+                        ("to", &"Payroll"),
+                    ],
+                ),
+                "Rename fringe FICA to Payroll",
+            ),
+            (
+                msg("engine.undo.replace_with_nothing", &[("count", &2)]),
+                "Replace 2 matches with nothing",
+            ),
+        ];
+        for (made, english) in &cases {
+            assert_eq!(made, english);
+            let r = recognize_label(made).unwrap_or_else(|| panic!("{made:?}"));
+            assert!(r.code.starts_with(UNDO), "{made:?}");
+        }
+        // The more specific label wins; the person's words stay parameters.
+        let r = recognize_label("Add fringe FICA to 4 lines in 21-01").unwrap();
+        assert_eq!(r.code, "engine.undo.add_fringe_to_rows");
+        assert_eq!(r.params[0], ("name", "FICA".to_string()));
+        assert_eq!(
+            recognize_nested(&r.params[1].1).unwrap().code,
+            "engine.phrase.lines_in"
+        );
+        let r = recognize_label("Set set Stage A on 4 lines in 21-01").unwrap();
+        assert_eq!(r.code, "engine.undo.assign_rows");
+        assert_eq!(r.params[1], ("value", "Stage A".to_string()));
+        let r = recognize_label("Edit a cell").unwrap();
+        assert_eq!(r.code, "engine.undo.edit_cell");
+        assert_eq!(
+            recognize_nested(&r.params[0].1).unwrap().code,
+            "engine.what.a_cell"
+        );
+        let r = recognize_label("Edit fringe FICA").unwrap();
+        assert_eq!(r.code, "engine.undo.edit_fringe");
+        let r = recognize_label("Renumber accounts to the new pattern").unwrap();
+        assert_eq!(r.code, "engine.undo.renumber_accounts");
+        // Not a step, and not the other way round.
+        assert_eq!(recognize_label("account 1100 no longer exists"), None);
+        assert_eq!(recognize("Edit rate on 21-01 line 3"), None);
+        // A label cut short to fit the history is left as it is.
+        assert_eq!(recognize_label("Rename fringe x\u{2026}"), None);
     }
 
     /// Every `"engine.…"` code written in the crate's sources is in the
     /// catalog, and every message in the catalog is written somewhere.
     #[test]
     fn every_code_used_is_in_the_catalog_and_every_message_is_used() {
-        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let src = here.join("src");
         let mut used = BTreeSet::new();
-        let mut dirs = vec![src];
+        // The desktop app makes a few undo labels of its own.
+        let mut dirs = vec![src, here.join("../method-app/src")];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(dir).unwrap() {
                 let p = e.unwrap().path();
@@ -799,7 +1191,10 @@ mod tests {
                     dirs.push(p);
                     continue;
                 }
-                if p.extension().is_none_or(|x| x != "rs") || p.ends_with("messages.rs") {
+                if p.extension().is_none_or(|x| x != "rs")
+                    || p.ends_with("messages.rs")
+                    || p.ends_with("i18n.rs")
+                {
                     continue;
                 }
                 let rs = std::fs::read_to_string(&p).unwrap();

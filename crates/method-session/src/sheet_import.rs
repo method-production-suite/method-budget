@@ -628,7 +628,7 @@ pub fn message(plan: &Plan, applied: &merge::Applied) -> String {
 pub fn import_into(s: &mut Session, book: &Book, req: &Request) -> Result<String, String> {
     let (t, m) = resolve(book, req)?;
     let o = options(req)?;
-    let (plan, applied) = s.edit("Import lines from a spreadsheet", |b| {
+    let (plan, applied) = s.edit(word("engine.undo.import_lines"), |b| {
         merge::import(b, t, &m, &o)
     })?;
     Ok(message(&plan, &applied))
