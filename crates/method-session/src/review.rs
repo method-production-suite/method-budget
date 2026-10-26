@@ -833,10 +833,6 @@ pub struct Settled {
     pub message: String,
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 fn reading(s: &Session) -> EditResult<&ReviewState> {
     match s.review() {
         Some(st) if st.mode == Mode::Reading => Ok(st),
@@ -885,9 +881,9 @@ pub fn settle(s: &mut Session, picks: &[Pick], at: &str, by: Option<&str>) -> Ed
         }
     }
     if !merge.is_empty() {
-        let label = format!(
-            "Merge {} as notes",
-            plural(merge.len(), "review comment", "review comments")
+        let label = msg(
+            "engine.undo.merge_review_comments",
+            &[("count", &merge.len())],
         );
         s.edit(label, |b| {
             for c in &merge {

@@ -140,10 +140,7 @@ pub fn import_setup(
         .get(token)
         .ok_or_else(|| crate::messages::word("engine.import.picked_since"))?;
 
-    let label = format!(
-        "Import {} of setup",
-        crate::history::count(picks.len(), "item", "items")
-    );
+    let label = crate::messages::msg("engine.undo.import_setup_items", &[("count", &picks.len())]);
     s.edit(label, |b| import(b, &src, picks, resolutions))
 }
 

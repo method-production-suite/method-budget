@@ -30,17 +30,17 @@ pub fn rename_item(
 
 /// A kind of setup item as a step label names it ("fringe", "global"); an
 /// unknown kind is just "item" (the rename refuses it anyway).
-fn kind_noun(kind: &str) -> &'static str {
-    match kind {
-        "global" => "global",
-        "fringe" => "fringe",
-        "group" => "group",
-        "unit" => "unit",
-        "set" => "set",
-        "location" => "location",
-        "currency" => "currency",
-        _ => "item",
-    }
+fn kind_noun(kind: &str) -> String {
+    crate::messages::word(match kind {
+        "global" => "engine.what.global",
+        "fringe" => "engine.what.fringe",
+        "group" => "engine.what.group",
+        "unit" => "engine.what.unit",
+        "set" => "engine.what.set",
+        "location" => "engine.what.location",
+        "currency" => "engine.what.currency",
+        _ => "engine.what.item",
+    })
 }
 
 /// The view after a rename, the new name, and how many places were rewritten.
@@ -65,11 +65,13 @@ pub fn rename_setup_item(
     to: &str,
 ) -> EditResult<(String, usize)> {
     let mut out = (String::new(), 0);
-    let label = format!(
-        "Rename {} {} to {}",
-        kind_noun(kind),
-        from.trim(),
-        to.trim()
+    let label = crate::messages::msg(
+        "engine.undo.rename_item",
+        &[
+            ("what", &kind_noun(kind)),
+            ("from", &from.trim()),
+            ("to", &to.trim()),
+        ],
     );
     // A shared budget's change log records the rename as one write to the
     // item's name (src/shared.rs), not a delete and an add.

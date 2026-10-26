@@ -316,7 +316,7 @@ fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), St
         None,
     );
     let made = im.budget;
-    s.edit("Import a budget export", |b| {
+    s.edit(word("engine.undo.import_export"), |b| {
         *b = made;
         Ok(())
     })?;

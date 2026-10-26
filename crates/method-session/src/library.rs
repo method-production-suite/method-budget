@@ -300,7 +300,9 @@ pub fn library_add(
     picks: &[ItemRef],
     resolutions: &[Resolution],
 ) -> Result<String, String> {
-    let counts = s.edit("Add from library", |b| add_from(b, lib, picks, resolutions))?;
+    let counts = s.edit(crate::messages::word("engine.undo.add_from_library"), |b| {
+        add_from(b, lib, picks, resolutions)
+    })?;
     Ok(copied_message(&counts, false))
 }
 

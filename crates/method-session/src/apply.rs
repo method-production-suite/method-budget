@@ -675,13 +675,16 @@ pub fn apply_to_rows(
     name: &str,
     on: bool,
 ) -> EditResult<usize> {
-    let what = tag_noun(field);
     let rows = rows_phrase(s.budget(), row_ids);
-    let label = if on {
-        format!("Add {what} {} to {rows}", name.trim())
-    } else {
-        format!("Remove {what} {} from {rows}", name.trim())
+    let code = match (field, on) {
+        ("fringes", true) => "engine.undo.add_fringe_to_rows",
+        ("fringes", false) => "engine.undo.remove_fringe_from_rows",
+        ("groups", true) => "engine.undo.add_group_to_rows",
+        ("groups", false) => "engine.undo.remove_group_from_rows",
+        (_, true) => "engine.undo.add_tag_to_rows",
+        (_, false) => "engine.undo.remove_tag_from_rows",
     };
+    let label = msg(code, &[("name", &name.trim()), ("rows", &rows)]);
     s.edit(label, |b| apply_tag(b, row_ids, field, name, on))
 }
 
@@ -694,18 +697,26 @@ pub fn assign_to_rows(
 ) -> EditResult<usize> {
     let rows = rows_phrase(s.budget(), row_ids);
     let label = match value.map(str::trim).filter(|v| !v.is_empty()) {
-        Some(v) => format!("Set {} {v} on {rows}", tag_noun(field)),
-        None => format!("Clear {} on {rows}", tag_noun(field)),
+        Some(v) => msg(
+            "engine.undo.assign_rows",
+            &[("what", &tag_noun(field)), ("value", &v), ("rows", &rows)],
+        ),
+        None => msg(
+            "engine.undo.clear_rows",
+            &[("what", &tag_noun(field)), ("rows", &rows)],
+        ),
     };
     s.edit(label, |b| assign_value(b, row_ids, field, value))
 }
 
 /// Takes every fringe or group (`field`) off the rows.
 pub fn clear_from_rows(s: &mut Session, row_ids: &[RowId], field: &str) -> EditResult<usize> {
-    let label = format!(
-        "Clear {} on {}",
-        tag_noun(field),
-        rows_phrase(s.budget(), row_ids)
+    let label = msg(
+        "engine.undo.clear_rows",
+        &[
+            ("what", &tag_noun(field)),
+            ("rows", &rows_phrase(s.budget(), row_ids)),
+        ],
     );
     s.edit(label, |b| clear_tags(b, row_ids, field))
 }
@@ -717,36 +728,39 @@ pub fn replace_tags_on_rows(
     row_ids: &[RowId],
     tags: &TagsInput,
 ) -> EditResult<usize> {
-    let label = format!("Set the tags on {}", rows_phrase(s.budget(), row_ids));
+    let label = msg(
+        "engine.undo.set_tags_rows",
+        &[("rows", &rows_phrase(s.budget(), row_ids))],
+    );
     s.edit(label, |b| replace_row_tags(b, row_ids, tags))
 }
 
 pub fn make_fringe_range(s: &mut Session, row_ids: &[RowId]) -> EditResult<u32> {
-    let label = format!(
-        "Make a fringe range of {}",
-        rows_phrase(s.budget(), row_ids)
+    let label = msg(
+        "engine.undo.make_fringe_range",
+        &[("rows", &rows_phrase(s.budget(), row_ids))],
     );
     s.edit(label, |b| make_range(b, row_ids))
 }
 
 pub fn clear_fringe_range(s: &mut Session, row_ids: &[RowId]) -> EditResult<usize> {
-    let label = format!(
-        "Remove the fringe range from {}",
-        rows_phrase(s.budget(), row_ids)
+    let label = msg(
+        "engine.undo.clear_fringe_range",
+        &[("rows", &rows_phrase(s.budget(), row_ids))],
     );
     s.edit(label, |b| clear_range(b, row_ids))
 }
 
 /// A row tag field as a step label names it: "fringe", "group", "set".
-fn tag_noun(field: &str) -> &str {
-    match field {
-        "fringes" => "fringe",
-        "groups" => "group",
-        "set" => "set",
-        "location" => "location",
-        "currency" => "currency",
-        _ => "tag",
-    }
+fn tag_noun(field: &str) -> String {
+    word(match field {
+        "fringes" => "engine.what.fringe",
+        "groups" => "engine.what.group",
+        "set" => "engine.what.set",
+        "location" => "engine.what.location",
+        "currency" => "engine.what.currency",
+        _ => "engine.what.tag",
+    })
 }
 
 #[cfg(test)]

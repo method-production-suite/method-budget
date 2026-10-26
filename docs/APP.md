@@ -1259,7 +1259,7 @@ its code, so another language is a table to fill in, not a change to the screens
 languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
-  `footer.selected_rows`...), about 4,370 of them. After its `export default` line it is
+  `footer.selected_rows`...), about 4,560 of them. After its `export default` line it is
   plain JSON, so the page imports it as one of its own scripts (the page's
   Content-Security-Policy allows only its own files, and nothing is fetched) and the
   menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
@@ -1291,6 +1291,15 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   a test checks each one is recognized as its code. Commands that return the engine's
   words inside a result (the apply panel's reason, a comment's "why not", an import's
   summary, a review's notes) put just those fields through it.
+- **Undo labels**: the name of each undo step ("Edit rate on 21-01 line 3", "Save tag
+  preset Crew") is made the same way, from a code under `engine.undo.*` (decision 94,
+  seventh pass). A label is stored, in the history and in a shared budget's change log,
+  where other computers and older versions read it, so it always stays this English;
+  only its display is translated, on this computer, by `i18n::label()`: the History tab
+  (and the name Save as Version offers from it), the Activity tab, a field's past
+  values, the changes that just arrived or were left out. Names a person typed in a
+  label (a version, a fringe, an account) are shown as typed. The labels sharing writes
+  itself for people and invites are still English.
 - **The desktop's own words**: sharing's refusals, its write errors and an invite link's
   reasons (`src/shared.rs`, `shared.*`), and the window titles ("Tools", "Budget Setup",
   and the main window's "{name} - Method Budget" with its "(edited)" form, `window.*`)

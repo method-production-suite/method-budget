@@ -401,7 +401,7 @@ pub fn share_copy_store(
     name: &str,
     created: &str,
 ) -> EditResult<VersionId> {
-    let label = format!("Store a returned copy as version \"{}\"", name.trim());
+    let label = crate::messages::msg("engine.undo.store_returned_copy", &[("name", &name.trim())]);
     original.edit(label, |b| store_as_version(b, copy, name, created))
 }
 

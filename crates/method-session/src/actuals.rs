@@ -33,7 +33,6 @@ use method_format::import::{Book, FileKind, Table};
 use serde::{Deserialize, Serialize};
 
 use crate::edit::EditResult;
-use crate::history::count;
 use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::sheet_import::{clip, read_book};
@@ -868,7 +867,7 @@ pub fn import_into(
     let (t, m) = resolve(book, req)?;
     let o = options(req)?;
     let imported = crate::versions::check_created(imported)?;
-    let label = format!("Import actuals from {}", clip(file, 60));
+    let label = msg("engine.undo.import_actuals", &[("file", &clip(file, 60))]);
     let (p, _) = s.edit(label, |b| ia::import(b, t, &m, &o, file, &imported))?;
     Ok(message(&p))
 }
@@ -1099,7 +1098,6 @@ pub fn edit_of(e: &EditInput) -> Result<TransactionEdit, String> {
 
 /// The undo step's name for an edit of `n` transactions.
 fn edit_label(b: &Budget, n: usize, e: &EditInput) -> String {
-    let what = count(n, "actual", "actuals");
     let only_account = e.account.is_some()
         && e.date.is_none()
         && e.tags.is_none()
@@ -1109,11 +1107,14 @@ fn edit_label(b: &Budget, n: usize, e: &EditInput) -> String {
         && e.amount.is_none();
     match &e.account {
         Some(a) if only_account => match actuals::chart_code(b, a) {
-            Ok(code) if code.is_empty() => format!("Unassign {what}"),
-            Ok(code) => format!("Move {what} to {code}"),
-            Err(_) => format!("Edit {what}"),
+            Ok(code) if code.is_empty() => msg("engine.undo.unassign_actuals", &[("count", &n)]),
+            Ok(code) => msg(
+                "engine.undo.move_actuals",
+                &[("count", &n), ("code", &code)],
+            ),
+            Err(_) => msg("engine.undo.edit_actuals", &[("count", &n)]),
         },
-        _ => format!("Edit {what}"),
+        _ => msg("engine.undo.edit_actuals", &[("count", &n)]),
     }
 }
 
@@ -1235,7 +1236,7 @@ pub fn actuals_update(s: &mut Session, ids: &[TransactionId], edit: &EditInput) 
 
 /// Deletes transactions `ids` (one undo step).
 pub fn actuals_delete(s: &mut Session, ids: &[TransactionId]) -> EditResult {
-    let label = format!("Delete {}", count(ids.len(), "actual", "actuals"));
+    let label = msg("engine.undo.delete_actuals", &[("count", &ids.len())]);
     s.edit(label, |b| {
         actuals::delete_transactions(b, ids)
             .map(|_| ())
@@ -1246,8 +1247,11 @@ pub fn actuals_delete(s: &mut Session, ids: &[TransactionId]) -> EditResult {
 /// Takes import `batch` back out with its transactions (one undo step).
 pub fn actuals_remove_batch(s: &mut Session, batch: u64) -> EditResult {
     let label = match s.budget().actuals.batch(batch) {
-        Some(x) if !x.file.is_empty() => format!("Remove the import of {}", clip(&x.file, 60)),
-        _ => "Remove an import of actuals".to_string(),
+        Some(x) if !x.file.is_empty() => msg(
+            "engine.undo.remove_actuals_import",
+            &[("file", &clip(&x.file, 60))],
+        ),
+        _ => word("engine.undo.remove_an_actuals_import"),
     };
     s.edit(label, |b| {
         actuals::remove_batch(b, batch)
@@ -1261,9 +1265,9 @@ pub fn actuals_remove_batch(s: &mut Session, batch: u64) -> EditResult {
 /// `percent_complete` (with `value` a percent).
 pub fn actuals_set_etc(s: &mut Session, account: &str, method: &str, value: &str) -> EditResult {
     let m = method_of(method, value)?;
-    let label = format!(
-        "Set the estimate to complete of {}",
-        clip(account.trim(), 40)
+    let label = msg(
+        "engine.undo.set_etc",
+        &[("account", &clip(account.trim(), 40))],
     );
     s.edit(label, |b| {
         actuals::set_etc(b, account, m).map_err(|err| err.to_string())

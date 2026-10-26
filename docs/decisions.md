@@ -5017,6 +5017,41 @@ the framework is built and adding a language is a table.
   recognized as their codes; `engine()` keeps summaries, lists and partly-engine text
   unchanged in English, and finds the pieces of a summary. Nothing a person reads in
   English changed, and the command line and MCP print the same words.
+- **Seventh pass: the undo labels** (194 more entries, 4,563 in all; the catalog has 556
+  codes). Every label an undo step is named by ("Edit rate on 21-01 line 3", "Paste 12
+  cells in 21-01", "Save tag preset Crew") is made at its source with `msg()` from a code
+  under `engine.undo.*` (186 codes), plus 6 nouns (`engine.what.amount`, `a_cell`,
+  `fringes`, `groups`, `item`, `tag`) and 2 rows phrases (`engine.phrase.line_at`, "21-01
+  line 3", and `engine.phrase.lines_in`, "4 lines in 21-01"). That is every label in
+  method-session (the cells, rows and inserts of `history.rs`, the commands, apply, setup
+  lists, rename, renumber, review, presets, overtime, rates, versions, notes, actuals,
+  Find's replace, the clipboard, moving rows, row styles, What-If, the imports, Merge,
+  sharing's returned copy, packs, the library, reports and quick add, and the session's
+  own "Change", "Undo", "Redo" and "Load the file's version"), and the desktop's three
+  ("Revert to a backup", "Put back a value", "New budget"). A label is stored: in the
+  session's history, in a shared budget's change log as each change's `label`, and from
+  there in what other computers and older versions read. So the label is always the
+  English it was before, byte for byte, and only its display is translated, on this
+  computer: `i18n::label()` recognizes it (`messages::recognize_label()`) and shows the
+  table's words, with a noun or rows phrase inside it translated in turn, and the text as
+  it came when it isn't one (a label cut to 120 characters, a label from an older
+  version that reads differently). It is applied where labels are shown: the History
+  tab's steps (`history_list`, and from there the default name of Save as Version), the
+  Activity tab, a field's past values, the changes that just arrived, the changes left
+  out, and the changes a restarted shared budget couldn't carry over. The Edit menu's
+  Undo and Redo items carry no label (they also undo typing in a field), so nothing
+  changed there. What a person typed (a version's name, a fringe, an account number, a
+  file name, a replacement) is a plain parameter, never translated. To keep recognition
+  honest with so many short templates: labels are only looked for by
+  `recognize_label()` and messages never are (so an English error that starts "Edit " is
+  not taken for a step, and a step not for an error); a `{count}` only takes digits ("Edit
+  a cell" is not "Edit {count} cell"); and where a generic label would win over a
+  specific one, the specific one has its own code ("Add fringe {name} to {rows}" over "Add
+  fringe {name}", tested). Tests: every label is recognized as its code with its
+  parameters and never as a message; sample labels keep their old English (the History
+  tests' expected labels, unchanged, check the rest); `label()` gives English back
+  unchanged, and leaves a cut label, plain words and an error message alone. The command
+  line and MCP print the same labels.
 - **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
   digits, dots and underscores, one entry per line, no key twice, plural entries with an
   `other` form and only the plural categories, no em dashes or exclamation marks); every
@@ -5031,8 +5066,10 @@ the framework is built and adding a language is a table.
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
-  they come: the undo labels ("Paste 3 rows", "Save tag preset Crew") in the Edit menu
-  and the History tab, about 185 places in method-session; Explain's steps and the
+  they come: the labels the desktop's sharing writes into a shared budget's log itself
+  (granting and removing a person, invites, "Put back {field} on {place}") and its undo
+  notes ("Undid ...", "Nothing to put back for ..."); automatic version names
+  ("Before restoring ..."), which are written into the file; Explain's steps and the
   totals' explanations; What Changed's change sentences and Merge's conflict sentences,
   which method-core's `diff` and `merge` write; method-core's formula parse errors and
   calculation errors (kept out on purpose, above), and its other errors (renumbering,

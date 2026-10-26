@@ -341,7 +341,7 @@ where
 /// Moves detail rows one place up (`by` -1) or down (1). See [`shift_rows`].
 pub fn move_rows(s: &mut Session, row_ids: &[RowId], by: i32) -> EditResult<Shifted> {
     let key = key_of("rows", row_ids.iter().copied());
-    let label = move_label(row_ids.len(), "line", "lines", by);
+    let label = move_label(row_ids.len(), MOVE_LINES, by);
     run(s, key, "rows", label, |b| shift_rows(b, row_ids, by))
 }
 
@@ -364,7 +364,7 @@ pub fn move_accounts(s: &mut Session, codes: &[String], by: i32) -> EditResult<S
         })
         .unwrap_or_default();
     let key = key_of("accounts", places);
-    let label = move_label(codes.len(), "account", "accounts", by);
+    let label = move_label(codes.len(), MOVE_ACCOUNTS, by);
     run(s, key, "accounts", label, |b| shift_accounts(b, codes, by))
 }
 
@@ -372,16 +372,27 @@ pub fn move_accounts(s: &mut Session, codes: &[String], by: i32) -> EditResult<S
 /// place up or down. See [`shift_topsheet_rows`].
 pub fn move_topsheet_rows(s: &mut Session, indexes: &[usize], by: i32) -> EditResult<Shifted> {
     let key = key_of("topsheet", indexes.iter().map(|&i| i as u64));
-    let label = move_label(indexes.len(), "topsheet row", "topsheet rows", by);
+    let label = move_label(indexes.len(), MOVE_TOPSHEET_ROWS, by);
     run(s, key, "topsheet", label, |b| {
         shift_topsheet_rows(b, indexes, by)
     })
 }
 
+/// The codes for moving lines, accounts and topsheet rows up and down.
+const MOVE_LINES: [&str; 2] = ["engine.undo.move_lines_up", "engine.undo.move_lines_down"];
+const MOVE_ACCOUNTS: [&str; 2] = [
+    "engine.undo.move_accounts_up",
+    "engine.undo.move_accounts_down",
+];
+const MOVE_TOPSHEET_ROWS: [&str; 2] = [
+    "engine.undo.move_topsheet_rows_up",
+    "engine.undo.move_topsheet_rows_down",
+];
+
 /// "Move 3 lines down".
-fn move_label(n: usize, one: &str, many: &str, by: i32) -> String {
-    let way = if by < 0 { "up" } else { "down" };
-    format!("Move {} {way}", crate::history::count(n, one, many))
+fn move_label(n: usize, codes: [&str; 2], by: i32) -> String {
+    let [up, down] = codes;
+    msg(if by < 0 { up } else { down }, &[("count", &n)])
 }
 
 #[cfg(test)]

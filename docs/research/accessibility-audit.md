@@ -111,7 +111,7 @@ docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, im
 What the slice built, against the list this audit gave:
 
 1. **A string table and a lookup, no new dependency**: built. `ui/i18n/en.js` (about
-   4,370 entries, 196 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
+   4,560 entries, 229 of them with plural forms) and `t(key, params)` in `ui/js/i18n.js`,
    with `{name}` filled in, plural forms picked by `Intl.PluralRules`, English for a key a
    language lacks (with a console warning) and the system's language picked, English by
    default. The table loads as one of the page's own scripts under its
@@ -152,7 +152,7 @@ What the slice built, against the list this audit gave:
    script, on a word in `ui/index.html` with no key or English that differs from the
    table's, on a key missing from the table and on an entry nothing uses.
 3. **Engine messages with stable codes**: first and second slices built (decision 94,
-   fifth and sixth passes).
+   fifth, sixth and seventh passes).
    `method-session/src/messages.rs` is the engine's catalog: each message a code
    (`engine.edit.row_gone`) and its English with `{name}` parameters, made at its source
    with `msg()`, so the command line, the MCP server and the browser build print the same
@@ -171,8 +171,13 @@ What the slice built, against the list this audit gave:
    reading a table. Summaries are messages joined by a space and count phrases
    (`engine.phrase.*`) only recognized inside them, so the generic templates don't
    swallow other text. The desktop's own words read the table: sharing's refusals, its
-   write errors and invite-link reasons (`src/shared.rs`, 70 `shared.*` entries). Still
-   sentences: the undo labels (Edit menu, History tab), Explain's steps, What Changed's
+   write errors and invite-link reasons (`src/shared.rs`, 70 `shared.*` entries). The
+   seventh pass made the undo labels codes too (`engine.undo.*`, 186, with 6 nouns and 2
+   rows phrases): a label is stored in the history and in a shared budget's change log,
+   so it stays English and is translated only on display (`i18n::label()`: the History
+   tab, the Activity tab, a field's past values, arriving and left-out changes), with
+   the names a person typed kept as typed. Still sentences: the labels sharing writes
+   for people and invites, automatic version names, Explain's steps, What Changed's
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
    message they sit in) and its other errors, method-format's import problems, the

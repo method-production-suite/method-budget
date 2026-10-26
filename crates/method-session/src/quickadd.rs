@@ -178,9 +178,10 @@ pub fn set_cell_creating(
 
 /// Sets which tags an inserted line copies from its neighbor.
 pub fn set_new_line_defaults(s: &mut Session, defaults: &NewLineDefaultsInput) -> EditResult {
-    s.edit("Change new line defaults", |b| {
-        apply_new_line_defaults(b, defaults)
-    })
+    s.edit(
+        crate::messages::word("engine.undo.new_line_defaults"),
+        |b| apply_new_line_defaults(b, defaults),
+    )
 }
 
 #[cfg(test)]

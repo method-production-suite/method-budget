@@ -124,11 +124,11 @@ pub fn save_report_preset(
 ) -> EditResult<usize> {
     let preset = method_format::report_preset_from_value(preset)
         .map_err(|e| format!("That report setup can't be saved: {e}"))?;
-    let label = if index.is_some() {
-        "Update a report preset"
+    let label = crate::messages::word(if index.is_some() {
+        "engine.undo.update_report_preset"
     } else {
-        "Save a report preset"
-    };
+        "engine.undo.save_report_preset"
+    });
     s.edit(label, |b| apply_save_preset(b, index, preset))
 }
 
@@ -290,7 +290,10 @@ impl From<&method_core::BidSheet> for BidSheetDto {
 
 /// Removes preset `index`, as one undo step.
 pub fn delete_report_preset(s: &mut Session, index: usize) -> EditResult {
-    s.edit("Delete a report preset", |b| apply_delete_preset(b, index))
+    s.edit(
+        crate::messages::word("engine.undo.delete_report_preset"),
+        |b| apply_delete_preset(b, index),
+    )
 }
 
 #[cfg(test)]

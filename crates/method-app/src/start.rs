@@ -1254,10 +1254,13 @@ pub fn open_new(state: &AppState, safety: &Safety, b: Budget) -> Result<DocId, S
         starter::blank(b.title.as_str(), b.base_currency.as_str()),
         None,
     );
-    s.edit("New budget", |x| {
-        *x = b;
-        Ok(())
-    })?;
+    s.edit(
+        method_session::messages::word("engine.undo.new_budget"),
+        |x| {
+            *x = b;
+            Ok(())
+        },
+    )?;
     let instead = state.docs().lone_untouched();
     crate::safety_app::put_in_front(state, safety, s, instead)
 }

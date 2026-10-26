@@ -241,8 +241,11 @@ pub fn ot_apply(
     write: &str,
 ) -> EditResult<Vec<RowId>> {
     let label = match crate::history::row_place(s.budget(), row_id) {
-        Some((code, line)) => format!("Overtime on {code} line {line}"),
-        None => "Overtime".to_string(),
+        Some((code, line)) => crate::messages::msg(
+            "engine.undo.overtime_at",
+            &[("code", &code), ("line", &line)],
+        ),
+        None => crate::messages::word("engine.undo.overtime"),
     };
     s.edit(label, |b| {
         apply(
@@ -265,7 +268,10 @@ pub fn ot_save_pattern(
     pattern: &PatternDto,
     replacing: Option<&str>,
 ) -> EditResult {
-    let label = format!("Save overtime pattern {}", pattern.name.trim());
+    let label = crate::messages::msg(
+        "engine.undo.save_overtime_pattern",
+        &[("name", &pattern.name.trim())],
+    );
     s.edit(label, |b| {
         let p = pattern.pattern(true)?;
         overtime::save_pattern(b, p, replacing).map_err(|e| e.to_string())
@@ -274,7 +280,8 @@ pub fn ot_save_pattern(
 
 /// Deletes the overtime pattern `name`. One undo step.
 pub fn ot_delete_pattern(s: &mut Session, name: &str) -> EditResult {
-    s.edit(format!("Delete overtime pattern {name}"), |b| {
+    let label = crate::messages::msg("engine.undo.delete_overtime_pattern", &[("name", &name)]);
+    s.edit(label, |b| {
         overtime::delete_pattern(b, name)
             .map(|_| ())
             .map_err(|e| e.to_string())

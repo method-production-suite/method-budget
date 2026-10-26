@@ -9,10 +9,16 @@ use std::sync::Arc;
 
 use method_core::{Budget, RowId, RowKind};
 
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 // ---------------------------------------------------------------------------
 // Step labels
+//
+// Each is made from a code in the engine's catalog (`engine.undo.*`,
+// src/messages.rs), so the desktop shows it in the person's language; the
+// label itself, kept in the history and in a shared budget's change log, is
+// always the English.
 
 /// `n` things: "1 line", "12 lines".
 pub fn count(n: usize, one: &str, many: &str) -> String {
@@ -24,21 +30,21 @@ pub fn count(n: usize, one: &str, many: &str) -> String {
 }
 
 /// A detail field as the grid's column calls it.
-pub fn field_name(field: &str) -> &str {
-    match field {
-        "amount" => "amount",
-        "x" => "X",
-        "rate" => "rate",
-        "x4" => "4X",
-        "unit" | "unit2" | "unit3" | "unit4" => "unit",
-        "description" => "description",
-        "currency" => "currency",
-        "fringes" => "fringes",
-        "groups" => "groups",
-        "set" => "set",
-        "location" => "location",
-        _ => "a cell",
-    }
+pub fn field_name(field: &str) -> String {
+    word(match field {
+        "amount" => "engine.what.amount",
+        "x" => "engine.what.x",
+        "rate" => "engine.what.rate",
+        "x4" => "engine.what.x4",
+        "unit" | "unit2" | "unit3" | "unit4" => "engine.what.unit",
+        "description" => "engine.what.description",
+        "currency" => "engine.what.currency",
+        "fringes" => "engine.what.fringes",
+        "groups" => "engine.what.groups",
+        "set" => "engine.what.set",
+        "location" => "engine.what.location",
+        _ => "engine.what.a_cell",
+    })
 }
 
 /// Where row `id` is: its account's code and its line number there (as the
@@ -67,21 +73,84 @@ pub fn shared_account(b: &Budget, ids: &[RowId]) -> Option<String> {
 
 /// "Edit rate on 21-01 line 3".
 pub fn cell_label(b: &Budget, id: RowId, field: &str) -> String {
-    verb_cell("Edit", b, id, field)
+    verb_cell(Verb::Edit, b, id, field)
 }
 
-fn verb_cell(verb: &str, b: &Budget, id: RowId, field: &str) -> String {
-    match row_place(b, id) {
-        Some((code, line)) => format!("{verb} {} on {code} line {line}", field_name(field)),
-        None => format!("{verb} {}", field_name(field)),
+/// What was done to cells, for a step's label.
+#[derive(Clone, Copy)]
+enum Verb {
+    Edit,
+    Paste,
+    Fill,
+    Cut,
+    Clear,
+}
+
+impl Verb {
+    /// The codes for one cell (somewhere, and on a line), several cells, and
+    /// several cells in one account.
+    fn codes(self) -> [&'static str; 4] {
+        match self {
+            Verb::Edit => [
+                "engine.undo.edit_cell",
+                "engine.undo.edit_cell_at",
+                "engine.undo.edit_cells",
+                "engine.undo.edit_cells_in",
+            ],
+            Verb::Paste => [
+                "engine.undo.paste_cell",
+                "engine.undo.paste_cell_at",
+                "engine.undo.paste_cells",
+                "engine.undo.paste_cells_in",
+            ],
+            Verb::Fill => [
+                "engine.undo.fill_cell",
+                "engine.undo.fill_cell_at",
+                "engine.undo.fill_cells",
+                "engine.undo.fill_cells_in",
+            ],
+            Verb::Cut => [
+                "engine.undo.cut_cell",
+                "engine.undo.cut_cell_at",
+                "engine.undo.cut_cells",
+                "engine.undo.cut_cells_in",
+            ],
+            Verb::Clear => [
+                "engine.undo.clear_cell",
+                "engine.undo.clear_cell_at",
+                "engine.undo.clear_cells",
+                "engine.undo.clear_cells_in",
+            ],
+        }
     }
 }
 
-/// "in 21-01" when every row is in one account, else nothing.
-fn place_suffix(b: &Budget, ids: &[RowId], word: &str) -> String {
-    shared_account(b, ids)
-        .map(|c| format!(" {word} {c}"))
-        .unwrap_or_default()
+fn verb_cell(verb: Verb, b: &Budget, id: RowId, field: &str) -> String {
+    let [somewhere, at, _, _] = verb.codes();
+    let what = field_name(field);
+    match row_place(b, id) {
+        Some((code, line)) => msg(at, &[("what", &what), ("code", &code), ("line", &line)]),
+        None => msg(somewhere, &[("what", &what)]),
+    }
+}
+
+/// `n` things, in account `code` when there is one: the code `in_code`'s
+/// words, or `anywhere`'s.
+fn counted(n: usize, code: Option<String>, anywhere: &str, in_code: &str) -> String {
+    match code {
+        Some(c) => msg(in_code, &[("count", &n), ("code", &c)]),
+        None => msg(anywhere, &[("count", &n)]),
+    }
+}
+
+/// "4 lines in 21-01" when every row is in one account, else "4 lines".
+fn lines_phrase(b: &Budget, ids: &[RowId]) -> String {
+    counted(
+        ids.len(),
+        shared_account(b, ids),
+        "engine.phrase.lines",
+        "engine.phrase.lines_in",
+    )
 }
 
 /// One value into several rows: "Set rate on 4 lines in 21-01".
@@ -89,11 +158,12 @@ pub fn rows_field_label(b: &Budget, ids: &[RowId], field: &str) -> String {
     if let [one] = ids {
         return cell_label(b, *one, field);
     }
-    format!(
-        "Set {} on {}{}",
-        field_name(field),
-        count(ids.len(), "line", "lines"),
-        place_suffix(b, ids, "in")
+    msg(
+        "engine.undo.set_field_rows",
+        &[
+            ("what", &field_name(field)),
+            ("rows", &lines_phrase(b, ids)),
+        ],
     )
 }
 
@@ -103,61 +173,59 @@ pub fn rows_field_label(b: &Budget, ids: &[RowId], field: &str) -> String {
 pub fn cells_label(b: &Budget, cells: &[(RowId, &str, &str)], action: Option<&str>) -> String {
     let all_blank = !cells.is_empty() && cells.iter().all(|(_, _, v)| v.trim().is_empty());
     let verb = match action {
-        Some("paste") => "Paste",
-        Some("fill") => "Fill down",
-        Some("cut") => "Cut",
-        Some("clear") => "Clear",
-        _ if all_blank => "Clear",
-        _ => "Edit",
+        Some("paste") => Verb::Paste,
+        Some("fill") => Verb::Fill,
+        Some("cut") => Verb::Cut,
+        Some("clear") => Verb::Clear,
+        _ if all_blank => Verb::Clear,
+        _ => Verb::Edit,
     };
     if let [(id, field, _)] = cells {
         return verb_cell(verb, b, *id, field);
     }
     let ids: Vec<RowId> = cells.iter().map(|(id, _, _)| *id).collect();
-    format!(
-        "{verb} {}{}",
-        count(cells.len(), "cell", "cells"),
-        place_suffix(b, &ids, "in")
-    )
+    let [_, _, anywhere, in_code] = verb.codes();
+    counted(cells.len(), shared_account(b, &ids), anywhere, in_code)
 }
 
 /// "Delete line 3 of 21-01", "Delete 4 lines from 21-01".
 pub fn delete_rows_label(b: &Budget, ids: &[RowId]) -> String {
     if let [one] = ids {
         if let Some((code, line)) = row_place(b, *one) {
-            return format!("Delete line {line} of {code}");
+            return msg(
+                "engine.undo.delete_line_at",
+                &[("line", &line), ("code", &code)],
+            );
         }
     }
-    format!(
-        "Delete {}{}",
-        count(ids.len(), "line", "lines"),
-        place_suffix(b, ids, "from")
+    counted(
+        ids.len(),
+        shared_account(b, ids),
+        "engine.undo.delete_lines",
+        "engine.undo.delete_lines_from",
     )
 }
 
 /// "Insert line in 21-01".
 pub fn insert_label(kind: RowKind, account: &str) -> String {
-    let what = match kind {
-        RowKind::Line => "line",
-        RowKind::Subtotal => "subtotal",
-        RowKind::Adjustment => "adjustment",
-        RowKind::Separator => "separator",
+    let code = match kind {
+        RowKind::Line => "engine.undo.insert_line",
+        RowKind::Subtotal => "engine.undo.insert_subtotal",
+        RowKind::Adjustment => "engine.undo.insert_adjustment",
+        RowKind::Separator => "engine.undo.insert_separator",
     };
-    format!("Insert {what} in {}", account.trim())
+    msg(code, &[("code", &account.trim())])
 }
 
-/// Rows of the selection, for a tool applied to them: "4 lines in 21-01".
+/// Rows of the selection, for a tool applied to them: "4 lines in 21-01",
+/// or "21-01 line 3" for one line.
 pub fn rows_phrase(b: &Budget, ids: &[RowId]) -> String {
     if let [one] = ids {
         if let Some((code, line)) = row_place(b, *one) {
-            return format!("{code} line {line}");
+            return msg("engine.phrase.line_at", &[("code", &code), ("line", &line)]);
         }
     }
-    format!(
-        "{}{}",
-        count(ids.len(), "line", "lines"),
-        place_suffix(b, ids, "in")
-    )
+    lines_phrase(b, ids)
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +261,10 @@ pub fn history_save_version(
 ) -> crate::edit::EditResult<method_core::VersionId> {
     let checked = crate::versions::check_name(name)?;
     let past = s.budget_at(step)?;
-    let label = format!("Save version \u{201c}{checked}\u{201d} from the history");
+    let label = msg(
+        "engine.undo.save_version_from_history",
+        &[("name", &checked)],
+    );
     s.edit(label, |b| {
         save_step_as_version(b, &past, &checked, note, created)
     })

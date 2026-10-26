@@ -287,7 +287,9 @@ pub fn add_note(
     created: &str,
     author: Option<&str>,
 ) -> EditResult<NoteId> {
-    s.edit("Add a note", |b| add(b, owner, text, created, author))
+    s.edit(crate::messages::word("engine.undo.add_note"), |b| {
+        add(b, owner, text, created, author)
+    })
 }
 
 /// Changes a note's text (blank removes it).
@@ -298,19 +300,23 @@ pub fn update_note(
     text: &str,
     edited: &str,
 ) -> EditResult {
-    s.edit("Edit a note", |b| update(b, owner, id, text, edited))
+    s.edit(crate::messages::word("engine.undo.edit_note"), |b| {
+        update(b, owner, id, text, edited)
+    })
 }
 
 pub fn delete_note(s: &mut Session, owner: &NoteOwner, id: NoteId) -> EditResult {
-    s.edit("Delete a note", |b| remove(b, owner, id))
+    s.edit(crate::messages::word("engine.undo.delete_note"), |b| {
+        remove(b, owner, id)
+    })
 }
 
 pub fn set_note_done(s: &mut Session, owner: &NoteOwner, id: NoteId, done: bool) -> EditResult {
-    let label = if done {
-        "Check off a note"
+    let label = crate::messages::word(if done {
+        "engine.undo.check_note"
     } else {
-        "Uncheck a note"
-    };
+        "engine.undo.uncheck_note"
+    });
     s.edit(label, |b| mark_done(b, owner, id, done))
 }
 

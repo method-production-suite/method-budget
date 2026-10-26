@@ -756,7 +756,10 @@ pub fn merge_apply<'a>(
             .clone()
             .unwrap_or_else(|| word("engine.merge.choose_base_first")));
     };
-    let label = format!("Merge changes from {}", inputs.copy_label());
+    let label = msg(
+        "engine.undo.merge_changes",
+        &[("source", &inputs.copy_label())],
+    );
     let copy = Arc::clone(&inputs.copy.budget);
     let as_sent = inputs.as_sent;
     let mut s = state.lock_doc(Some(front))?;

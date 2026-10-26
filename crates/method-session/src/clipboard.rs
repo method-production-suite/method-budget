@@ -59,13 +59,17 @@ pub enum Content {
 
 /// "12 rows", "1 account", "2 categories": what a step label says was cut
 /// or pasted.
-fn content_phrase(c: &Content) -> String {
-    let (one, many) = match c {
-        Content::Rows(_) => ("row", "rows"),
-        Content::Accounts(_) => ("account", "accounts"),
-        Content::Categories(_) => ("category", "categories"),
+/// "Cut 3 rows", "Paste 1 account": the step's label.
+fn content_label(c: &Content, paste: bool) -> String {
+    let code = match (c, paste) {
+        (Content::Rows(_), false) => "engine.undo.cut_rows",
+        (Content::Accounts(_), false) => "engine.undo.cut_accounts",
+        (Content::Categories(_), false) => "engine.undo.cut_categories",
+        (Content::Rows(_), true) => "engine.undo.paste_rows",
+        (Content::Accounts(_), true) => "engine.undo.paste_accounts",
+        (Content::Categories(_), true) => "engine.undo.paste_categories",
     };
-    crate::history::count(c.count(), one, many)
+    msg(code, &[("count", &c.count())])
 }
 
 impl Content {
@@ -1051,7 +1055,7 @@ pub fn clip_cut(
 ) -> EditResult {
     let content = take(s.budget(), pick)?;
     let clip = Clip::new(s.budget(), content, on_clipboard.then_some(text));
-    let label = format!("Cut {}", content_phrase(&clip.content));
+    let label = content_label(&clip.content, false);
     s.edit(label, |b| cut(b, pick))?;
     clipboard.set(clip);
     Ok(())
@@ -1090,7 +1094,7 @@ pub fn clip_paste(
         .filter(|c| c.token == token)
         .ok_or_else(|| word("engine.paste.copied_since"))?;
 
-    let label = format!("Paste {}", content_phrase(&clip.content));
+    let label = content_label(&clip.content, true);
     let pasted = s.edit(label, |b| paste(b, &clip, target, resolutions))?;
     Ok(match clip.content {
         Content::Rows(_) => pasted.rows.first().copied(),

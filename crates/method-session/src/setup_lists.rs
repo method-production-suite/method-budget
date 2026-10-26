@@ -136,7 +136,11 @@ pub fn setup_usage(s: &mut Session) -> BTreeMap<&'static str, BTreeMap<String, U
 /// the rest follow in name order).
 pub fn set_setup_order(s: &mut Session, kind: &str, names: &[String]) -> EditResult {
     let kind = parse_kind(kind)?;
-    s.edit(format!("Reorder {}", kind.name()), |b| {
+    let label = msg(
+        "engine.undo.reorder",
+        &[("what", &crate::edit::kind_word(kind))],
+    );
+    s.edit(label, |b| {
         method_core::order::set_order(b, kind, names);
         Ok(())
     })
@@ -147,11 +151,17 @@ pub fn set_setup_order(s: &mut Session, kind: &str, names: &[String]) -> EditRes
 pub fn move_setup_item(s: &mut Session, kind: &str, name: &str, by: i32) -> EditResult {
     let kind = parse_kind(kind)?;
     let key = format!("setup-order\u{1}{}\u{1}{name}", kind.name());
-    let label = format!(
-        "Move {} {} {}",
-        kind.name(),
-        name.trim(),
-        if by < 0 { "up" } else { "down" }
+    let code = if by < 0 {
+        "engine.undo.move_item_up"
+    } else {
+        "engine.undo.move_item_down"
+    };
+    let label = msg(
+        code,
+        &[
+            ("what", &crate::edit::kind_word(kind)),
+            ("name", &name.trim()),
+        ],
     );
     s.edit_merging(&key, label, |b| {
         move_item(b, kind, name, by).map(|()| ((), key.clone()))
@@ -161,9 +171,8 @@ pub fn move_setup_item(s: &mut Session, kind: &str, name: &str, by: i32) -> Edit
 /// A fringe's or group's short code; blank clears it.
 pub fn set_short_code(s: &mut Session, kind: &str, name: &str, code: &str) -> EditResult {
     let kind = parse_kind(kind)?;
-    s.edit(format!("Set the short code of {}", name.trim()), |b| {
-        crate::edit::set_short_code(b, kind, name, code)
-    })
+    let label = msg("engine.undo.short_code", &[("name", &name.trim())]);
+    s.edit(label, |b| crate::edit::set_short_code(b, kind, name, code))
 }
 
 #[cfg(test)]

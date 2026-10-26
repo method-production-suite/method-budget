@@ -156,31 +156,29 @@ pub fn save_version(
     note: Option<&str>,
     created: &str,
 ) -> EditResult<VersionId> {
-    s.edit(format!("Save version {}", name.trim()), |b| {
-        save(b, name, note, created)
-    })
+    let label = crate::messages::msg("engine.undo.save_version", &[("name", &name.trim())]);
+    s.edit(label, |b| save(b, name, note, created))
 }
 
 /// Restores version `id` (one undo step; the replaced content is kept as an
 /// automatic version too).
 pub fn restore_version(s: &mut Session, id: VersionId, created: &str) -> EditResult<VersionId> {
     let label = match s.budget().version(id) {
-        Some(v) => format!("Restore version {}", v.name),
-        None => "Restore a version".to_string(),
+        Some(v) => crate::messages::msg("engine.undo.restore_version", &[("name", &v.name)]),
+        None => crate::messages::word("engine.undo.restore_a_version"),
     };
     s.edit(label, |b| restore(b, id, created))
 }
 
 pub fn rename_version(s: &mut Session, id: VersionId, name: &str) -> EditResult {
-    s.edit(format!("Rename a version to {}", name.trim()), |b| {
-        rename(b, id, name)
-    })
+    let label = crate::messages::msg("engine.undo.rename_version", &[("name", &name.trim())]);
+    s.edit(label, |b| rename(b, id, name))
 }
 
 pub fn delete_version(s: &mut Session, id: VersionId) -> EditResult {
     let label = match s.budget().version(id) {
-        Some(v) => format!("Delete version {}", v.name),
-        None => "Delete a version".to_string(),
+        Some(v) => crate::messages::msg("engine.undo.delete_version", &[("name", &v.name)]),
+        None => crate::messages::word("engine.undo.delete_a_version"),
     };
     s.edit(label, |b| delete(b, id))
 }
