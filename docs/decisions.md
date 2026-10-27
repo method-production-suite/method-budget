@@ -5065,9 +5065,15 @@ the framework is built and adding a language is a table.
   the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
   words from the table, with no key showing in their place. The menu tests that match
   `src/menu.rs` to `shortcuts.js` still pass.
+- **Sharing's labels** (eighth pass): the labels the desktop's sharing writes into a
+  shared budget's log (granting and removing a person, invites made, cancelled and taken
+  up, "Put back {field} on {place}") are catalog labels (`engine.undo.set_role` and six
+  more), stored as the same English as before. A role in words is a phrase
+  (`engine.role.*`, its own group: only recognized nested, like a count phrase, and the only thing a `role` parameter can be, so `{name}: {role}` never takes a sentence that merely has a colon): English inside a label,
+  translated where the People list and the invite dialogs show it. A department's
+  categories and accounts stay as the budget names them.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
-  they come: the labels the desktop's sharing writes into a shared budget's log itself
-  (granting and removing a person, invites, "Put back {field} on {place}") and its undo
+  they come: the desktop sharing's undo
   notes ("Undid ...", "Nothing to put back for ..."); automatic version names
   ("Before restoring ..."), which are written into the file; Explain's steps and the
   totals' explanations; What Changed's change sentences and Merge's conflict sentences,

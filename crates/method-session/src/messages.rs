@@ -70,7 +70,8 @@ const fn plural(code: &'static str, one: &'static str, other: &'static str) -> M
 
 /// Parameters whose value is a message too: a noun the engine names
 /// (`engine.what.*`), a reason given after a colon, or a count phrase or a
-/// list of them (`engine.phrase.*`). Others are data.
+/// list of them (`engine.phrase.*`), or a role in words (`engine.role.*`).
+/// Others are data.
 pub const NESTED: &[&str] = &[
     "accounts",
     "added",
@@ -78,6 +79,7 @@ pub const NESTED: &[&str] = &[
     "changes",
     "dismissed",
     "merged",
+    "role",
     "rows",
     "source",
     "what",
@@ -86,6 +88,10 @@ pub const NESTED: &[&str] = &[
 
 /// Codes only recognized inside a nested parameter.
 pub const PHRASE: &str = "engine.phrase.";
+
+/// A role in words ("Edits everything"), only recognized inside a nested
+/// parameter, and the only thing a `role` parameter can be.
+pub const ROLE: &str = "engine.role.";
 
 /// Undo labels' codes, only recognized by [`recognize_label`].
 pub const UNDO: &str = "engine.undo.";
@@ -397,6 +403,15 @@ pub const MESSAGES: &[Message] = &[
     m("engine.review.shared_folder", "A budget shared through a folder can't be opened for review. Save a copy for sharing and review that."),
     m("engine.review.too_many", "A review file can have at most {max} comments."),
     m("engine.review.write_while_reviewing", "Comments are written while reviewing (File > Open for Review). Here you can merge or dismiss them."),
+    m("engine.role.actuals", "Actuals and notes"),
+    m("engine.role.admin", "Edits everything and sets what people may change"),
+    m("engine.role.co_owner", "Co-owner: edits everything and sets what people may change, admins included"),
+    m("engine.role.comment", "Notes only"),
+    m("engine.role.department", "Edits {scope}"),
+    m("engine.role.editor", "Edits everything"),
+    m("engine.role.owner", "Owner: edits everything and sets what people may change"),
+    m("engine.role.read_only", "Read only"),
+    m("engine.role.removed", "Removed: reads only, and later changes are left out"),
     m("engine.session.held_read_only", "This budget is open read-only here, so it can't be changed."),
     m("engine.session.read_only", "This is a copy saved for sharing, so it opens read-only. Make an editable copy to change it."),
     m("engine.session.reviewing", "This budget is open for review, so it can't be changed. Comments go in the review file beside it."),
@@ -429,6 +444,7 @@ pub const MESSAGES: &[Message] = &[
     m("engine.undo.apply_chart", "Apply a chart of accounts"),
     m("engine.undo.apply_tag_preset", "Apply a tag preset"),
     m("engine.undo.assign_rows", "Set {what} {value} on {rows}"),
+    m("engine.undo.cancel_invite", "Cancelled an invite: {role}"),
     m("engine.undo.change", "Change"),
     m("engine.undo.check_note", "Check off a note"),
     m("engine.undo.clear_baseline", "Clear the baseline"),
@@ -513,6 +529,8 @@ pub const MESSAGES: &[Message] = &[
     m("engine.undo.insert_line_block", "Insert a line block in {code}"),
     m("engine.undo.insert_separator", "Insert separator in {code}"),
     m("engine.undo.insert_subtotal", "Insert subtotal in {code}"),
+    m("engine.undo.invite", "Invited someone: {role}"),
+    m("engine.undo.join_from_invite", "Joined from an invite: {role}"),
     m("engine.undo.load_file_version", "Load the file's version"),
     m("engine.undo.lock_baseline", "Lock the baseline"),
     m("engine.undo.make_fringe_range", "Make a fringe range of {rows}"),
@@ -544,12 +562,15 @@ pub const MESSAGES: &[Message] = &[
     plural("engine.undo.paste_cells", "Paste {count} cell", "Paste {count} cells"),
     plural("engine.undo.paste_cells_in", "Paste {count} cell in {code}", "Paste {count} cells in {code}"),
     plural("engine.undo.paste_rows", "Paste {count} row", "Paste {count} rows"),
+    m("engine.undo.put_back_field", "Put back {field} on {place}"),
+    m("engine.undo.put_back_field_budget", "Put back {field} on the budget"),
     m("engine.undo.put_back_value", "Put back a value"),
     m("engine.undo.redo", "Redo"),
     m("engine.undo.remove_actuals_import", "Remove the import of {file}"),
     m("engine.undo.remove_an_actuals_import", "Remove an import of actuals"),
     m("engine.undo.remove_fringe_from_rows", "Remove fringe {name} from {rows}"),
     m("engine.undo.remove_group_from_rows", "Remove group {name} from {rows}"),
+    m("engine.undo.remove_person", "Removed {name}"),
     m("engine.undo.remove_tag_from_rows", "Remove tag {name} from {rows}"),
     m("engine.undo.rename_account", "Rename account {code}"),
     m("engine.undo.rename_budget", "Rename budget to {title}"),
@@ -578,6 +599,7 @@ pub const MESSAGES: &[Message] = &[
     m("engine.undo.set_etc", "Set the estimate to complete of {account}"),
     m("engine.undo.set_field_rows", "Set {what} on {rows}"),
     m("engine.undo.set_global", "Set global {name} = {formula}"),
+    m("engine.undo.set_role", "{name}: {role}"),
     m("engine.undo.set_tags_rows", "Set the tags on {rows}"),
     m("engine.undo.short_code", "Set the short code of {name}"),
     m("engine.undo.store_returned_copy", "Store a returned copy as version \"{name}\""),
@@ -775,9 +797,9 @@ pub fn recognize_label(text: &str) -> Option<Recognized> {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Among {
-    /// Messages: not phrases, not labels.
+    /// Messages: not phrases, roles or labels.
     Messages,
-    /// A nested parameter: messages and phrases.
+    /// A nested parameter: messages, phrases and roles.
     Nested,
     /// Undo labels only.
     Labels,
@@ -788,7 +810,7 @@ fn recognize_among(text: &str, among: Among) -> Option<Recognized> {
     for m in MESSAGES {
         let label = m.code.starts_with(UNDO);
         let skip = match among {
-            Among::Messages => label || m.code.starts_with(PHRASE),
+            Among::Messages => label || m.code.starts_with(PHRASE) || m.code.starts_with(ROLE),
             Among::Nested => label,
             Among::Labels => !label,
         };
@@ -863,6 +885,11 @@ fn match_pieces<'p, 't>(
                 {
                     continue;
                 }
+                // A role is one of the roles ("{name}: {role}" isn't any
+                // sentence with a colon in it).
+                if *name == "role" && !is_role(value) {
+                    continue;
+                }
                 let mark = params.len();
                 params.push((name, &text[..end]));
                 if match_pieces(rest, &text[end..], params) {
@@ -873,6 +900,14 @@ fn match_pieces<'p, 't>(
             false
         }
     }
+}
+
+/// Whether `text` is a role in words (`engine.role.*`).
+fn is_role(text: &str) -> bool {
+    MESSAGES
+        .iter()
+        .filter(|m| m.code.starts_with(ROLE))
+        .any(|m| match_pieces(&pieces(m.other), text, &mut Vec::new()))
 }
 
 #[cfg(test)]
@@ -944,6 +979,8 @@ mod tests {
                     .map(|(i, n)| {
                         let v = if *n == "count" {
                             count.to_string()
+                        } else if *n == "role" {
+                            word("engine.role.editor")
                         } else {
                             format!("Qz{i}")
                         };
@@ -956,11 +993,13 @@ mod tests {
                     .collect();
                 let text = msg(m.code, &refs);
                 assert_eq!(text, fill(english, &values));
-                let phrase = m.code.starts_with(PHRASE);
+                let phrase = m.code.starts_with(PHRASE) || m.code.starts_with(ROLE);
                 let label = m.code.starts_with(UNDO);
                 if phrase {
                     assert!(
-                        recognize(&text).is_none_or(|r| !r.code.starts_with(PHRASE)),
+                        recognize(&text).is_none_or(|r| {
+                            !r.code.starts_with(PHRASE) && !r.code.starts_with(ROLE)
+                        }),
                         "{text:?}: a phrase is only recognized nested"
                     );
                 }
@@ -1040,6 +1079,12 @@ mod tests {
         let r =
             recognize("This budget has no fringe X. Edit the preset, or add it first.").unwrap();
         assert_eq!(r.code, "engine.presets.missing_one");
+        assert_eq!(recognize("Edits everything"), None);
+        assert_eq!(
+            recognize_nested("Edits 2000 Production").unwrap().code,
+            "engine.role.department"
+        );
+        assert_eq!(recognize_label("Note: something else"), None);
         let r = recognize("Days: Qz goes to Days too.").unwrap();
         assert_eq!(r.code, "engine.days.goes_too_of");
         for m in MESSAGES {

@@ -1299,7 +1299,10 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   (and the name Save as Version offers from it), the Activity tab, a field's past
   values, the changes that just arrived or were left out. Names a person typed in a
   label (a version, a fringe, an account) are shown as typed. The labels sharing writes
-  itself for people and invites are still English.
+  itself (a role given, a person removed, an invite made, cancelled or taken up, a value
+  put back) are catalog labels too, with the role inside them as a phrase
+  (`engine.role.*`), which is also how the People list and the invite dialogs
+  word a role.
 - **The desktop's own words**: sharing's refusals, its write errors and an invite link's
   reasons (`src/shared.rs`, `shared.*`), and the window titles ("Tools", "Budget Setup",
   and the main window's "{name} - Method Budget" with its "(edited)" form, `window.*`)
@@ -1341,7 +1344,7 @@ longer in the history.", Review and its summary, What Changed's and Merge's refu
 side labels, actuals, the imports (spreadsheets, charts of accounts, budget exports,
 schedule days) with their summaries, Explain's refusal, and method-core's reasons for a
 formula's value or a number that doesn't read and its numbering pattern errors.
-Still English: the undo labels in the Edit menu and the History tab; Explain's steps;
+Still English: sharing's undo notes; Explain's steps;
 What Changed's change sentences and Merge's conflict sentences (written by method-core);
 method-core's formula parse errors ("expected `)` at position 4") and calculation errors
 ("account 1100 line 2: divide by zero"), and its other errors; method-format's import

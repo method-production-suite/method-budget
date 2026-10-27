@@ -44,6 +44,7 @@ use method_core::log::{
 };
 use method_core::{Budget, RowId};
 use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
+use method_session::messages::{msg, word};
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_with};
@@ -1453,7 +1454,7 @@ impl SharedDoc {
             changes: self.shared.log.frontier().get(&actor),
             role: role.key().to_string(),
             role_text: if removed {
-                "Removed: reads only, and later changes are left out".into()
+                crate::i18n::phrase(&word("engine.role.removed"))
             } else {
                 self.role_text(&role)
             },
@@ -1909,17 +1910,25 @@ impl SharedDoc {
 
     /// A role in words, as the People list shows it.
     pub fn role_text(&self, role: &Role) -> String {
+        crate::i18n::phrase(&self.role_words(role))
+    }
+
+    /// A role in the catalog's English, as a change's label holds it (the
+    /// label is stored, so it stays English; [`Self::role_text`] is what
+    /// the person reads).
+    fn role_words(&self, role: &Role) -> String {
         match role {
-            Role::Owner => "Owner: edits everything and sets what people may change".into(),
-            Role::CoOwner => {
-                "Co-owner: edits everything and sets what people may change, admins included".into()
-            }
-            Role::Admin => "Edits everything and sets what people may change".into(),
-            Role::Editor => "Edits everything".into(),
-            Role::Department(scope) => format!("Edits {}", self.scope_words(scope)),
-            Role::Actuals => "Actuals and notes".into(),
-            Role::Comment => "Notes only".into(),
-            Role::ReadOnly => "Read only".into(),
+            Role::Owner => word("engine.role.owner"),
+            Role::CoOwner => word("engine.role.co_owner"),
+            Role::Admin => word("engine.role.admin"),
+            Role::Editor => word("engine.role.editor"),
+            Role::Department(scope) => msg(
+                "engine.role.department",
+                &[("scope", &self.scope_words(scope))],
+            ),
+            Role::Actuals => word("engine.role.actuals"),
+            Role::Comment => word("engine.role.comment"),
+            Role::ReadOnly => word("engine.role.read_only"),
         }
     }
 
@@ -1952,7 +1961,13 @@ impl SharedDoc {
         if role.scope().is_some_and(|s| s.is_empty()) {
             return Err(tr("shared.pick_category"));
         }
-        let label = format!("{}: {}", self.name_of(who), self.role_text(&role));
+        let label = msg(
+            "engine.undo.set_role",
+            &[
+                ("name", &self.name_of(who)),
+                ("role", &self.role_words(&role)),
+            ],
+        );
         let me = self.role();
         self.shared
             .log
@@ -2144,7 +2159,7 @@ impl SharedDoc {
         if who == self.actor() {
             return Err(tr("shared.not_yourself"));
         }
-        let label = format!("Removed {}", self.name_of(who));
+        let label = msg("engine.undo.remove_person", &[("name", &self.name_of(who))]);
         let me = self.role();
         self.shared
             .log
@@ -2566,7 +2581,7 @@ impl SharedDoc {
             .map_or(0, |d| d.as_secs());
         let expires = method_core::log::invite::rfc3339_at((now + days * 86_400) as i64);
         let role_text = self.role_text(&given);
-        let label = format!("Invited someone: {role_text}");
+        let label = msg("engine.undo.invite", &[("role", &self.role_words(&given))]);
         self.shared
             .log
             .invite(
@@ -2692,7 +2707,10 @@ impl SharedDoc {
         if rec.cancelled.is_some() {
             return Ok(());
         }
-        let label = format!("Cancelled an invite: {}", self.role_text(&rec.role));
+        let label = msg(
+            "engine.undo.cancel_invite",
+            &[("role", &self.role_words(&rec.role))],
+        );
         self.shared
             .log
             .cancel_invite(uid, &label, &iso_now())
@@ -2759,7 +2777,10 @@ impl SharedDoc {
         // when the budget is opened; once more here in case it didn't).
         self.publish_key()?;
         let proof = flog::sign::claim_proof(&link.secret, link.invite, me);
-        let label = format!("Joined from an invite: {}", self.role_text(&rec.role));
+        let label = msg(
+            "engine.undo.join_from_invite",
+            &[("role", &self.role_words(&rec.role))],
+        );
         self.shared
             .log
             .claim(link.invite, proof, &label, &now)
@@ -2792,11 +2813,13 @@ impl SharedDoc {
         let history = self.shared.log.blame(uid, f);
         let (_, _, value) = history.get(index).ok_or_else(|| tr("shared.value_gone"))?;
         let place = self.place_of(uid, Some(f));
-        let label = format!(
-            "Put back {} on {}",
-            f.name(),
-            place.map(|p| p.text).unwrap_or_else(|| "the budget".into())
-        );
+        let label = match place {
+            Some(p) => msg(
+                "engine.undo.put_back_field",
+                &[("field", &f.name()), ("place", &p.text)],
+            ),
+            None => msg("engine.undo.put_back_field_budget", &[("field", &f.name())]),
+        };
         let id = self
             .shared
             .log
