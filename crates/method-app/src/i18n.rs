@@ -201,6 +201,12 @@ pub fn label(text: &str) -> String {
     fill(&words, &params)
 }
 
+/// A phrase of the engine's put into a sentence (a role in words, a count
+/// phrase) in the person's language; `text` as it is when it isn't one.
+pub fn phrase(text: &str) -> String {
+    translated(text, true).unwrap_or_else(|| text.to_string())
+}
+
 /// [`engine`] over an error, for a command's result.
 pub fn engine_err<T>(r: Result<T, String>) -> Result<T, String> {
     r.map_err(|e| engine(&e))
@@ -1036,6 +1042,84 @@ mod tests {
         };
         h.localize();
         assert_eq!(h.steps[0].label, made[0]);
+    }
+
+    /// Sharing's labels (a role given, a person removed, an invite, a value
+    /// put back): stored in the change log as the catalog's English, each
+    /// recognized as its own label, the role inside it as a phrase, and
+    /// shown back unchanged in English.
+    #[test]
+    fn sharing_labels_are_shown_through_the_table() {
+        let dept = msg(
+            "engine.phrase.role_department",
+            &[("scope", &"2000 Production")],
+        );
+        let made = [
+            (
+                msg(
+                    "engine.undo.set_role",
+                    &[("name", &"Morgan"), ("role", &dept)],
+                ),
+                "engine.undo.set_role",
+            ),
+            (
+                msg(
+                    "engine.undo.invite",
+                    &[("role", &msg("engine.phrase.role_editor", &[]))],
+                ),
+                "engine.undo.invite",
+            ),
+            (
+                msg(
+                    "engine.undo.cancel_invite",
+                    &[("role", &msg("engine.phrase.role_co_owner", &[]))],
+                ),
+                "engine.undo.cancel_invite",
+            ),
+            (
+                msg(
+                    "engine.undo.join_from_invite",
+                    &[("role", &msg("engine.phrase.role_read_only", &[]))],
+                ),
+                "engine.undo.join_from_invite",
+            ),
+            (
+                msg("engine.undo.remove_person", &[("name", &"Morgan")]),
+                "engine.undo.remove_person",
+            ),
+            (
+                msg(
+                    "engine.undo.put_back_field",
+                    &[("field", &"rate"), ("place", &"line 3 in 2400")],
+                ),
+                "engine.undo.put_back_field",
+            ),
+            (
+                msg("engine.undo.put_back_field_budget", &[("field", &"title")]),
+                "engine.undo.put_back_field_budget",
+            ),
+        ];
+        assert_eq!(made[0].0, "Morgan: Edits 2000 Production");
+        for (text, code) in &made {
+            let m = method_session::messages::recognize_label(text)
+                .unwrap_or_else(|| panic!("{text:?} is a label"));
+            assert_eq!(m.code, *code, "{text:?}");
+            if let Some((_, role)) = m.params.iter().find(|(n, _)| *n == "role") {
+                assert!(
+                    method_session::messages::recognize_nested(role).is_some(),
+                    "{role:?} is a role phrase"
+                );
+            }
+            assert_eq!(&label(text), text);
+        }
+        assert_eq!(phrase(&dept), dept);
+        let table = parse_table(EN).unwrap();
+        for m in MESSAGES
+            .iter()
+            .filter(|m| m.code.starts_with("engine.phrase.role_"))
+        {
+            assert!(table.contains_key(m.code), "{}", m.code);
+        }
     }
 
     /// Dialog words method-session also writes (for the browser build) are
