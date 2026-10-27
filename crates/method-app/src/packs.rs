@@ -86,7 +86,7 @@ impl Packs {
             .iter()
             .find(|(t, _)| *t == token)
             .map(|(_, p)| p.clone())
-            .ok_or_else(|| "The packs changed since. Look at the list again.".to_string())
+            .ok_or_else(|| crate::i18n::tr("packs.changed_since"))
     }
 }
 
@@ -184,7 +184,7 @@ fn describe_file(path: &Path, token: u64, place: &'static str) -> ListedPack {
                 }
                 None => {
                     out.title = b.title.clone();
-                    out.problem = Some("Not a setup pack: its items can still be imported.".into());
+                    out.problem = Some(crate::i18n::tr("packs.not_a_pack_items"));
                 }
             }
         }
@@ -268,7 +268,7 @@ pub fn import_into_library(
     let seen = lib_state.reviewed(token)?;
     let (done, _) = library::change(docs, &path, |lib| {
         if *lib != *seen {
-            return Err("The library changed since. Try again.".into());
+            return Err(crate::i18n::tr("library.changed_since"));
         }
         pack::import_pack(lib, src, picks, resolutions)
     })?;
@@ -303,7 +303,7 @@ fn export_source(
 /// Writes pack `p` to `path` atomically, refusing a file open in a tab.
 pub fn write_pack(docs: &Docs, path: &Path, p: &Budget) -> Result<(), String> {
     if docs.find_file(path).is_some() {
-        return Err("That file is open in a tab. Save the pack under another name.".into());
+        return Err(crate::i18n::tr("packs.open_in_tab"));
     }
     safety::write_atomically(
         path,
@@ -456,7 +456,7 @@ fn review_file(
         }
         "library" => {
             if library.path().is_some_and(|l| same_file(&l, path)) {
-                return Err("That is your library. Pick a pack to import into it.".into());
+                return Err(crate::i18n::tr("packs.is_your_library"));
             }
             let (label, src) = match docs.find_file(path) {
                 Some(id) => {

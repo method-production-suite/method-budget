@@ -1344,13 +1344,13 @@ longer in the history.", Review and its summary, What Changed's and Merge's refu
 side labels, actuals, the imports (spreadsheets, charts of accounts, budget exports,
 schedule days) with their summaries, Explain's refusal, and method-core's reasons for a
 formula's value or a number that doesn't read and its numbering pattern errors.
-Still English: sharing's undo notes; Explain's steps;
+Still English: Explain's steps;
 What Changed's change sentences and Merge's conflict sentences (written by method-core);
 method-core's formula parse errors ("expected `)` at position 4") and calculation errors
 ("account 1100 line 2: divide by zero"), and its other errors; method-format's import
 problems and export file-type names; lists inside a few messages (a tag preset's missing
-items, a schedule figure's keys); the Activity tab's reasons a change was left out; the
-other method-session modules (notes, versions, the Library, packs, rates, overtime,
+items, a schedule figure's keys); the reason method-core gives inside a note (a role
+refusal's detail, a step's skipped changes); the other method-session modules (notes, versions, the Library, packs, rates, overtime,
 Compare, reports, rename and renumber); key names in shortcut text; and the "Untitled"
 file name; docs/research/accessibility-audit.md, "Localization", lists them.
 

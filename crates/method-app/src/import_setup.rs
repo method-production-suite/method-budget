@@ -39,7 +39,7 @@ pub use method_session::import_setup::*;
 pub fn read_source(docs: &Docs, target: DocId, path: &Path) -> Result<(String, Budget), String> {
     if let Some(doc) = docs.find_file(path) {
         if doc == target {
-            return Err("That is this budget. Pick another file to import from.".into());
+            return Err(crate::i18n::tr("importsetup.same_budget"));
         }
         let s = docs.get(doc).ok_or("That budget has been closed.")?;
         return Ok((s.tab_label(), s.budget().clone()));

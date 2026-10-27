@@ -916,7 +916,9 @@ impl SharedDoc {
 
     /// Records the inverse of `step`, moving it to the other stack.
     fn reverse(&mut self, step: &Step, undoing: bool) -> (Budget, Option<String>) {
-        let what = if undoing { "Undid" } else { "Redid" };
+        // The label is stored in English; the note is shown, so it's in
+        // the person's language.
+        let shown = crate::i18n::label(&step.label);
         let (new, inv) = match self.shared.log.undo(step.id, &iso_now()) {
             Ok(r) => r,
             Err(e @ LogError::NotAllowed { .. }) => {
@@ -925,7 +927,11 @@ impl SharedDoc {
             Err(e) => {
                 return (
                     self.proj.budget.clone(),
-                    Some(format!("Couldn't {} this step: {e}", what.to_lowercase())),
+                    Some(if undoing {
+                        tr_with("shared.couldnt_undo", &[("why", e.to_string().as_str())])
+                    } else {
+                        tr_with("shared.couldnt_redo", &[("why", e.to_string().as_str())])
+                    }),
                 )
             }
         };
@@ -948,22 +954,26 @@ impl SharedDoc {
                 self.unwritten_since.get_or_insert(now);
                 self.last_change = now;
                 if !inv.skipped.is_empty() {
-                    note = Some(format!(
-                        "{what} \u{201c}{}\u{201d}. {}",
-                        step.label,
-                        self.skips(&inv.skipped)
-                    ));
+                    let params = [
+                        ("label", shown.as_str()),
+                        ("skips", &self.skips(&inv.skipped)),
+                    ];
+                    note = Some(if undoing {
+                        tr_with("shared.undid_skipped", &params)
+                    } else {
+                        tr_with("shared.redid_skipped", &params)
+                    });
                 }
             }
             None => {
-                note = Some(format!(
-                    "Nothing to put back for \u{201c}{}\u{201d}: {}",
-                    step.label,
-                    if inv.skipped.is_empty() {
-                        "it has been changed since.".to_string()
-                    } else {
-                        self.skips(&inv.skipped)
-                    }
+                let why = if inv.skipped.is_empty() {
+                    tr("shared.changed_since")
+                } else {
+                    self.skips(&inv.skipped)
+                };
+                note = Some(tr_with(
+                    "shared.nothing_to_put_back",
+                    &[("label", shown.as_str()), ("why", why.as_str())],
                 ));
             }
         }
@@ -1552,11 +1562,11 @@ impl SharedDoc {
     /// What signing means in this budget now, in a sentence.
     fn signed_text(&self) -> String {
         if self.shared.log.signing_started() {
-            "Changes are signed: each person\u{2019}s computer signs what they change with a key kept on that computer, and a change whose signature doesn\u{2019}t match is left out.".into()
+            tr("shared.signed.on")
         } else if self.shared.log.roles_started() {
-            "Changes aren\u{2019}t signed yet: they will be once the owner opens this budget in this version.".into()
+            tr("shared.signed.not_yet")
         } else {
-            "Changes are signed once the owner sets the first role.".into()
+            tr("shared.signed.after_first_role")
         }
     }
 
@@ -2901,57 +2911,51 @@ pub fn refused_why(reason: &str) -> String {
     if let Some(r) = reason.strip_prefix(method_core::log::refused::INVITE) {
         use method_core::log::invite::why;
         return match r {
-            why::NOT_FOUND => "It joined through an invite this budget doesn\u{2019}t have.".into(),
-            why::WRONG_SECRET => {
-                "It joined through an invite without the invite\u{2019}s secret.".into()
-            }
-            why::EXPIRED | why::BAD_TIME => {
-                "It joined through an invite after the invite expired.".into()
-            }
-            why::CANCELLED => {
-                "It joined through an invite that was cancelled before it arrived.".into()
-            }
-            why::USED => "It joined through an invite someone else had already used.".into(),
-            why::NOT_ALLOWED => {
-                "It joined through an invite whose maker could no longer give that role.".into()
-            }
-            why::OWNER => "The owner doesn\u{2019}t join through an invite.".into(),
-            _ => "Its invite couldn\u{2019}t be checked.".into(),
+            why::NOT_FOUND => tr("shared.refused.invite_not_found"),
+            why::WRONG_SECRET => tr("shared.refused.invite_wrong_secret"),
+            why::EXPIRED | why::BAD_TIME => tr("shared.refused.invite_expired"),
+            why::CANCELLED => tr("shared.refused.invite_cancelled"),
+            why::USED => tr("shared.refused.invite_used"),
+            why::NOT_ALLOWED => tr("shared.refused.invite_not_allowed"),
+            why::OWNER => tr("shared.refused.invite_owner"),
+            _ => tr("shared.refused.invite_unchecked"),
         };
     }
     use method_core::log::{refused, sign::why};
     if reason.starts_with(refused::FORK) || reason == method_core::log::FORK_SECOND {
-        return "Two different changes claim to be the same change by this person, so neither was taken in.".into();
+        return tr("shared.refused.fork");
     }
     if reason == method_core::log::FORK_REPLACED {
-        return "It claimed the place of one of this person\u{2019}s changes, which was taken in instead.".into();
+        return tr("shared.refused.fork_replaced");
     }
     if reason == method_core::log::FORK_REFUSED_TOO {
-        return "It claimed the same place as another of this person\u{2019}s changes, and neither fits.".into();
+        return tr("shared.refused.fork_refused_too");
     }
     if reason == method_core::log::FORK_WAITING {
-        return "It claims the place of one of this person\u{2019}s changes and waits for changes that haven\u{2019}t arrived.".into();
+        return tr("shared.refused.fork_waiting");
     }
     if let Some(r) = reason.strip_prefix(refused::NOT_ALLOWED) {
-        return format!("Their role doesn\u{2019}t allow it ({r}).");
+        return tr_with("shared.refused.not_allowed", &[("why", r)]);
     }
     if let Some(r) = reason.strip_prefix(refused::SIGNATURE) {
         return match r {
-            why::MISMATCH => "Its signature doesn\u{2019}t match the person\u{2019}s key, so it may have been changed in the folder or written in their name.".into(),
-            why::MISSING => "It isn\u{2019}t signed, and changes in this budget must be.".into(),
-            why::NO_KEY => "It is signed, but its author\u{2019}s key isn\u{2019}t in this budget.".into(),
-            why::NOT_PERSONS_KEY | why::PERSON_HAS_NO_KEY => "It came from a command line or agent that doesn\u{2019}t have its person\u{2019}s key.".into(),
-            why::TWO_KEYS => "It tried to give its author a second key.".into(),
-            _ => "Its signature couldn\u{2019}t be checked.".into(),
+            why::MISMATCH => tr("shared.refused.sig_mismatch"),
+            why::MISSING => tr("shared.refused.sig_missing"),
+            why::NO_KEY => tr("shared.refused.sig_no_key"),
+            why::NOT_PERSONS_KEY | why::PERSON_HAS_NO_KEY => {
+                tr("shared.refused.sig_not_persons_key")
+            }
+            why::TWO_KEYS => tr("shared.refused.sig_two_keys"),
+            _ => tr("shared.refused.sig_unchecked"),
         };
     }
     if reason.starts_with(refused::REMOVED) {
-        return "It was made after its author was removed.".into();
+        return tr("shared.refused.removed");
     }
     if reason.contains("first change") {
-        return "It wasn\u{2019}t made from this budget\u{2019}s shared history.".into();
+        return tr("shared.refused.not_this_history");
     }
-    "It didn\u{2019}t fit the budget as it stood.".into()
+    tr("shared.refused.didnt_fit")
 }
 
 #[cfg(test)]

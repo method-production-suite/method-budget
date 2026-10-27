@@ -148,7 +148,7 @@ impl SessionFiles for Session {
         me: crate::shared::Person,
     ) -> Result<(), String> {
         if self.is_shared() {
-            return Err("This budget is already shared.".into());
+            return Err(crate::i18n::tr("sharing.already_shared"));
         }
         if self.is_read_only() {
             return Err(read_only());
@@ -171,7 +171,7 @@ impl SessionFiles for Session {
         me: crate::shared::Person,
     ) -> Result<method_format::log::LoadReport, String> {
         if self.is_shared() {
-            return Err("This budget is already shared.".into());
+            return Err(crate::i18n::tr("sharing.already_shared"));
         }
         let path = self.path().ok_or("This budget has no file.")?.to_path_buf();
         let (doc, report) = SharedDoc::open(&path, actor, me)?;
