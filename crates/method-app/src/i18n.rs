@@ -1050,10 +1050,7 @@ mod tests {
     /// shown back unchanged in English.
     #[test]
     fn sharing_labels_are_shown_through_the_table() {
-        let dept = msg(
-            "engine.phrase.role_department",
-            &[("scope", &"2000 Production")],
-        );
+        let dept = msg("engine.role.department", &[("scope", &"2000 Production")]);
         let made = [
             (
                 msg(
@@ -1065,21 +1062,21 @@ mod tests {
             (
                 msg(
                     "engine.undo.invite",
-                    &[("role", &msg("engine.phrase.role_editor", &[]))],
+                    &[("role", &msg("engine.role.editor", &[]))],
                 ),
                 "engine.undo.invite",
             ),
             (
                 msg(
                     "engine.undo.cancel_invite",
-                    &[("role", &msg("engine.phrase.role_co_owner", &[]))],
+                    &[("role", &msg("engine.role.co_owner", &[]))],
                 ),
                 "engine.undo.cancel_invite",
             ),
             (
                 msg(
                     "engine.undo.join_from_invite",
-                    &[("role", &msg("engine.phrase.role_read_only", &[]))],
+                    &[("role", &msg("engine.role.read_only", &[]))],
                 ),
                 "engine.undo.join_from_invite",
             ),

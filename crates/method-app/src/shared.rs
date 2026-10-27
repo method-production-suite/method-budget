@@ -1454,7 +1454,7 @@ impl SharedDoc {
             changes: self.shared.log.frontier().get(&actor),
             role: role.key().to_string(),
             role_text: if removed {
-                crate::i18n::phrase(&word("engine.phrase.role_removed"))
+                crate::i18n::phrase(&word("engine.role.removed"))
             } else {
                 self.role_text(&role)
             },
@@ -1918,17 +1918,17 @@ impl SharedDoc {
     /// the person reads).
     fn role_words(&self, role: &Role) -> String {
         match role {
-            Role::Owner => word("engine.phrase.role_owner"),
-            Role::CoOwner => word("engine.phrase.role_co_owner"),
-            Role::Admin => word("engine.phrase.role_admin"),
-            Role::Editor => word("engine.phrase.role_editor"),
+            Role::Owner => word("engine.role.owner"),
+            Role::CoOwner => word("engine.role.co_owner"),
+            Role::Admin => word("engine.role.admin"),
+            Role::Editor => word("engine.role.editor"),
             Role::Department(scope) => msg(
-                "engine.phrase.role_department",
+                "engine.role.department",
                 &[("scope", &self.scope_words(scope))],
             ),
-            Role::Actuals => word("engine.phrase.role_actuals"),
-            Role::Comment => word("engine.phrase.role_comment"),
-            Role::ReadOnly => word("engine.phrase.role_read_only"),
+            Role::Actuals => word("engine.role.actuals"),
+            Role::Comment => word("engine.role.comment"),
+            Role::ReadOnly => word("engine.role.read_only"),
         }
     }
 

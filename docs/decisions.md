@@ -5069,7 +5069,7 @@ the framework is built and adding a language is a table.
   shared budget's log (granting and removing a person, invites made, cancelled and taken
   up, "Put back {field} on {place}") are catalog labels (`engine.undo.set_role` and six
   more), stored as the same English as before. A role in words is a phrase
-  (`engine.phrase.role_*`, the parameter `role` is nested): English inside a label,
+  (`engine.role.*`, its own group: only recognized nested, like a count phrase, and the only thing a `role` parameter can be, so `{name}: {role}` never takes a sentence that merely has a colon): English inside a label,
   translated where the People list and the invite dialogs show it. A department's
   categories and accounts stay as the budget names them.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as

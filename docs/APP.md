@@ -1301,7 +1301,7 @@ languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner
   label (a version, a fringe, an account) are shown as typed. The labels sharing writes
   itself (a role given, a person removed, an invite made, cancelled or taken up, a value
   put back) are catalog labels too, with the role inside them as a phrase
-  (`engine.phrase.role_*`), which is also how the People list and the invite dialogs
+  (`engine.role.*`), which is also how the People list and the invite dialogs
   word a role.
 - **The desktop's own words**: sharing's refusals, its write errors and an invite link's
   reasons (`src/shared.rs`, `shared.*`), and the window titles ("Tools", "Budget Setup",
