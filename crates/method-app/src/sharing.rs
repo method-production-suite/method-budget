@@ -79,7 +79,7 @@ pub async fn share_copy_save<R: Runtime>(
     };
     let path = with_budget_extension(picked.into_path().map_err(|e| e.to_string())?);
     if state.docs().find_file(&path).is_some() {
-        return Err("That file is open in a tab. Save the copy under another name.".into());
+        return Err(crate::i18n::tr("sharing.copy_open_in_tab"));
     }
     let text = method_format::to_string(&copy);
     safety::write_atomically(&path, text.as_bytes(), Access::Document)

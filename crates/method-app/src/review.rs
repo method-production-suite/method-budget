@@ -91,7 +91,7 @@ pub(crate) fn write_back(s: &mut Session) {
 fn close_writing(s: &mut Session) -> Result<(), String> {
     write_to_place(s, false).map_err(|e| format!("The review file stays open: {e}"))?;
     if s.review().is_some_and(|r| r.path.is_none()) && method_session::review::needs_write(s) {
-        return Err("The review file stays open: it has comments not saved anywhere yet. Use Save Review File As… first.".into());
+        return Err(crate::i18n::tr("review.unsaved_comments"));
     }
     close(s);
     Ok(())

@@ -570,7 +570,7 @@ pub fn update_status<R: Runtime>(app: AppHandle<R>, updates: State<'_, Updates>)
 #[tauri::command]
 pub fn update_restart<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     if !matches!(app.state::<Updates>().updater.phase(), Phase::Ready { .. }) {
-        return Err("No update is ready to install.".into());
+        return Err(crate::i18n::tr("updater.none_ready"));
     }
     let flushed = flush_for_restart(
         &app.state::<AppState>(),

@@ -143,11 +143,11 @@ mod platform {
         let done = tauri::async_runtime::spawn_blocking(move || rx.recv())
             .await
             .map_err(|e| e.to_string())?
-            .map_err(|_| "Printing stopped unexpectedly.".to_string())??;
+            .map_err(|_| crate::i18n::tr("report.printing_stopped"))??;
         if done {
             if let Some(p) = &path {
                 if !p.is_file() {
-                    return Err("The PDF could not be written there.".into());
+                    return Err(crate::i18n::tr("report.pdf_not_written"));
                 }
             }
         }

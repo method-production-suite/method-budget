@@ -219,7 +219,7 @@ impl Library {
             .as_ref()
             .filter(|(t, _)| *t == token)
             .map(|(_, b)| Arc::clone(b))
-            .ok_or_else(|| "The library changed since. Try again.".to_string())
+            .ok_or_else(|| crate::i18n::tr("library.changed_since"))
     }
 
     /// Forgets the review (the library was just written).
@@ -249,7 +249,7 @@ pub fn add_review(
     let path = lib_state.required()?;
     let (lib, tab) = read(docs, &path)?;
     if tab == Some(target) {
-        return Err("This budget is your library. Switch to another budget to add to it.".into());
+        return Err(crate::i18n::tr("library.is_your_library"));
     }
     let here = docs
         .get(target)
@@ -293,7 +293,7 @@ pub fn save_reviewed(
     let seen = lib_state.reviewed(token)?;
     let out = change(docs, &path, |lib| {
         if *lib != *seen {
-            return Err("The library changed since. Try again.".into());
+            return Err(crate::i18n::tr("library.changed_since"));
         }
         save_into(lib, source, picks, resolutions)
     })?;

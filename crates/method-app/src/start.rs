@@ -413,7 +413,7 @@ impl StartState {
             .iter()
             .find(|(t, _)| *t == token)
             .map(|(_, p)| p.clone())
-            .ok_or_else(|| "The list changed since. Look at it again.".to_string())
+            .ok_or_else(|| crate::i18n::tr("start.list_changed"))
     }
 
     /// Keeps `b` as the picked starting point; its token.
@@ -429,7 +429,7 @@ impl StartState {
         let g = lock(&self.inner);
         match (&g.picked, token) {
             (Some((t, b)), Some(want)) if *t == want => Ok(b.clone()),
-            _ => Err("Choose the budget file to start from again.".into()),
+            _ => Err(crate::i18n::tr("start.choose_file_again")),
         }
     }
 
@@ -446,7 +446,7 @@ impl StartState {
         let g = lock(&self.inner);
         match &g.folder {
             Some((t, dir)) if *t == token => Ok(dir.clone()),
-            _ => Err("Choose the folder to save in again.".into()),
+            _ => Err(crate::i18n::tr("start.choose_folder_again")),
         }
     }
 }
@@ -624,7 +624,11 @@ impl Lister<'_> {
             return (Ok(s.clone()), modified, true);
         }
         let Some(m) = meta else {
-            return (Err("Can't find this file.".to_string()), modified, false);
+            return (
+                Err(crate::i18n::tr("start.cant_find_file")),
+                modified,
+                false,
+            );
         };
         let stamp = (modified, m.len());
         let summary = match self.g.cache.get(path) {
@@ -720,7 +724,7 @@ impl Lister<'_> {
                 folder,
                 items: Vec::new(),
                 more: false,
-                problem: Some("Can't find this folder.".into()),
+                problem: Some(crate::i18n::tr("start.cant_find_folder")),
             };
         }
         let (files, more) = scan(dir);
@@ -1092,7 +1096,7 @@ pub fn build_with(
 ) -> Result<(Budget, String), String> {
     let title = text("The title", &spec.title, TITLE_MAX)?;
     if title.is_empty() {
-        return Err("Give the budget a title.".into());
+        return Err(crate::i18n::tr("start.give_a_title"));
     }
     let kind = KINDS
         .iter()
@@ -1453,10 +1457,10 @@ pub fn file_stem_for(typed: &str, title: &str) -> Result<String, String> {
         .chars()
         .any(|c| c.is_control() || "/\\:*?\"<>|".contains(c))
     {
-        return Err("A file name can't have / \\ : * ? \" < > or |.".into());
+        return Err(crate::i18n::tr("start.name_bad_characters"));
     }
     if typed.starts_with('.') {
-        return Err("A file name can't start with a dot.".into());
+        return Err(crate::i18n::tr("start.name_starts_with_dot"));
     }
     Ok(typed.to_string())
 }
@@ -1507,7 +1511,7 @@ pub fn save_new(
     stem: &str,
 ) -> Result<Made, String> {
     if !dir.is_dir() {
-        return Err("That folder isn't there any more. Choose another one.".into());
+        return Err(crate::i18n::tr("start.folder_gone"));
     }
     let path = dir.join(file_name(stem));
     let text = method_format::to_string(b);
@@ -1540,7 +1544,7 @@ pub fn save_new_project(
     stem: &str,
 ) -> Result<Made, String> {
     if !dir.is_dir() {
-        return Err("That folder isn't there any more. Choose another one.".into());
+        return Err(crate::i18n::tr("start.folder_gone"));
     }
     let free = || {
         free_name(stem, |s| {
@@ -1599,7 +1603,7 @@ pub fn save_new_free(
             Made::Taken(free) => name = free,
         }
     }
-    Err("Couldn't find a free name for the file. Try again.".into())
+    Err(crate::i18n::tr("start.no_free_name"))
 }
 
 /// Writes a duplicate of budget file `path` beside it, as the first free
@@ -1612,7 +1616,7 @@ pub fn duplicate(
     path: &Path,
 ) -> Result<(DocId, PathBuf), String> {
     if !is_budget_path(path) {
-        return Err("Only a budget file can be duplicated here.".into());
+        return Err(crate::i18n::tr("start.only_budget_duplicated"));
     }
     // Refuse what isn't a readable budget before copying it.
     crate::session::read_budget(path)?;
@@ -1643,7 +1647,7 @@ pub fn duplicate(
             }
         }
     }
-    Err("Couldn't find a free name for the duplicate. Try again.".into())
+    Err(crate::i18n::tr("start.no_free_duplicate_name"))
 }
 
 // ---------------------------------------------------------------------------
@@ -1677,7 +1681,7 @@ pub fn start_open<R: Runtime>(
 ) -> Result<View, String> {
     let path = start.listed(token)?;
     if !is_budget_path(&path) {
-        return Err("That isn't a budget file. Show in Folder shows it.".into());
+        return Err(crate::i18n::tr("start.not_a_budget_file"));
     }
     let opened = crate::safety_app::open_path(&state, &safety, &path);
     crate::safety_app::refresh_menu(window.app_handle());
@@ -1795,7 +1799,7 @@ pub fn start_project_folder(
 ) -> Result<FolderChoice, String> {
     let dir = start.listed(token)?;
     if !dir.is_dir() {
-        return Err("Can't find this folder.".into());
+        return Err(crate::i18n::tr("start.cant_find_folder"));
     }
     let folder = folder_text(Some(&dir), home().as_deref());
     let token = start.keep_folder(dir);
@@ -1954,7 +1958,7 @@ pub fn new_budget_create<R: Runtime>(
             schedules
                 .get(t)
                 .map(|(_, days)| days)
-                .map_err(|_| "Choose the schedule to link again.".to_string())
+                .map_err(|_| crate::i18n::tr("start.choose_schedule_again"))
         })
         .transpose()?;
     let (b, message) = build_with(&spec, template.as_ref(), &setup, schedule.as_deref())?;

@@ -5072,9 +5072,15 @@ the framework is built and adding a language is a table.
   (`engine.role.*`, its own group: only recognized nested, like a count phrase, and the only thing a `role` parameter can be, so `{name}: {role}` never takes a sentence that merely has a colon): English inside a label,
   translated where the People list and the invite dialogs show it. A department's
   categories and accounts stay as the budget names them.
+- **The desktop's own sentences** (ninth pass): sharing's undo and redo notes ("Undid
+  ...", "Nothing to put back for ...", with the step's label translated), the Activity
+  tab's reasons a change was left out, what signing means in this budget, and the errors
+  the start window, the Library, setup packs, templates, printing, the updater, Help and
+  sharing's setup gave as literals read the table through `tr()` (67 entries). They are
+  shown, never stored. What method-core says inside them (a role refusal's detail, the
+  changes a step skipped) is still its English.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
-  they come: the desktop sharing's undo
-  notes ("Undid ...", "Nothing to put back for ..."); automatic version names
+  they come: automatic version names
   ("Before restoring ..."), which are written into the file; Explain's steps and the
   totals' explanations; What Changed's change sentences and Merge's conflict sentences,
   which method-core's `diff` and `merge` write; method-core's formula parse errors and

@@ -180,8 +180,7 @@ What the slice built, against the list this audit gave:
    for people and invites, automatic version names, Explain's steps, What Changed's
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
-   message they sit in) and its other errors, method-format's import problems, the
-   Activity tab's reasons a change was left out, and the method-session modules not yet
+   message they sit in) and its other errors, method-format's import problems, and the method-session modules not yet
    converted (notes, versions, the Library, packs, rates, overtime, Compare, reports,
    rename, renumber).
 4. **The menu bar and native dialogs reading the same table**: the menu bar is built

@@ -353,7 +353,7 @@ fn opener(url: &str) -> (String, Vec<String>) {
 /// Waits for the opener (call it off the main thread).
 pub fn open_url(url: &str) -> Result<(), String> {
     if !allowed_url(url) {
-        return Err("That link isn't one the app opens.".into());
+        return Err(crate::i18n::tr("help.link_not_opened"));
     }
     let (program, args) = opener(url);
     let status = std::process::Command::new(&program)
@@ -367,7 +367,10 @@ pub fn open_url(url: &str) -> Result<(), String> {
     if status.success() || cfg!(target_os = "windows") {
         Ok(())
     } else {
-        Err(format!("Couldn't open the browser ({status})."))
+        Err(crate::i18n::tr_with(
+            "help.browser_not_opened",
+            &[("status", status.to_string().as_str())],
+        ))
     }
 }
 

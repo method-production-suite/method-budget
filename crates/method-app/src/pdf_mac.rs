@@ -190,10 +190,10 @@ pub unsafe fn run(
     done: Done,
 ) -> Result<(), String> {
     if webview.is_null() || window.is_null() {
-        return Err("The window isn't ready to print.".into());
+        return Err(crate::i18n::tr("report.window_not_ready"));
     }
     if !responds(webview, "printOperationWithPrintInfo:") {
-        return Err("Printing a report this way needs macOS 11 or later.".into());
+        return Err(crate::i18n::tr("report.needs_macos_11"));
     }
     // A copy, so the app-wide page setup isn't changed behind the user's back.
     let shared = send0(class("NSPrintInfo"), "sharedPrintInfo");
@@ -222,7 +222,7 @@ pub unsafe fn run(
 
     let op = send_id(webview, "printOperationWithPrintInfo:", info);
     if op.is_null() {
-        return Err("The page could not be printed.".into());
+        return Err(crate::i18n::tr("report.page_not_printed"));
     }
     send_id(op, "setJobTitle:", ns_string(&setup.title));
     send_bool(op, "setShowsPrintPanel:", pdf.is_none());

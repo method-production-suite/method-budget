@@ -125,7 +125,7 @@ pub async fn template_save<R: Runtime>(
     let text = {
         let docs = state.docs();
         if docs.find_file(&path).is_some() {
-            return Err("That file is open in a tab. Save the template under another name.".into());
+            return Err(crate::i18n::tr("templates.open_in_tab"));
         }
         let s = docs.get(id).ok_or("That budget has been closed.")?;
         let title = path

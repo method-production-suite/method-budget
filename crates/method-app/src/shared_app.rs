@@ -187,7 +187,7 @@ pub fn share_setup(
                 .into(),
         )
     } else if s.path().is_none() {
-        Some("Save the budget first, then share it.".into())
+        Some(crate::i18n::tr("sharing.save_first"))
     } else {
         None
     };
@@ -268,11 +268,11 @@ pub fn share_start<R: Runtime>(
     let actor = this_actor()?;
     let me = Person::tidy(&me.name, &me.color, actor);
     if me.name.is_empty() {
-        return Err("Type the name other people will see.".into());
+        return Err(crate::i18n::tr("sharing.type_name"));
     }
     let mut s = state.lock_doc(doc)?;
     if s.is_shared() {
-        return Err("This budget is already shared.".into());
+        return Err(crate::i18n::tr("sharing.already_shared"));
     }
     let from = s
         .path()
@@ -299,7 +299,7 @@ pub fn share_start<R: Runtime>(
                 ));
             }
             if s.docs().find_file(&target).is_some() {
-                return Err("That file is open in another tab.".into());
+                return Err(crate::i18n::tr("sharing.open_in_other_tab"));
             }
             if method_format::log::LogDir::for_budget(&target).exists() {
                 return Err(format!(
@@ -330,7 +330,7 @@ pub fn share_set_me(
     let actor = this_actor()?;
     let me = Person::tidy(&name, &color, actor);
     if me.name.is_empty() {
-        return Err("Type the name other people will see.".into());
+        return Err(crate::i18n::tr("sharing.type_name"));
     }
     shared::write_person(shared::person_path().as_deref(), &me);
     let mut docs = state.docs();
@@ -525,7 +525,7 @@ pub async fn share_join_from_link<R: Runtime>(
     let actor = this_actor()?;
     let me = Person::tidy(&me.name, &me.color, actor);
     if me.name.is_empty() {
-        return Err("Type the name other people will see.".into());
+        return Err(crate::i18n::tr("sharing.type_name"));
     }
     shared::write_person(shared::person_path().as_deref(), &me);
     // The budget open already (a second try): no dialog.
@@ -630,7 +630,7 @@ pub fn share_reopen<R: Runtime>(
     s.with_shared(|log, budget| {
         let any = method_session::collab::SharedLog::as_any_mut(log);
         let Some(sh) = any.downcast_mut::<shared::SharedDoc>() else {
-            return (Err("This budget isn't shared.".to_string()), false);
+            return (Err(crate::i18n::tr("sharing.not_shared")), false);
         };
         let opened = if trust {
             sh.trust_owner_key()
@@ -645,7 +645,7 @@ pub fn share_reopen<R: Runtime>(
             Err(e) => (Err(e), false),
         }
     })
-    .unwrap_or_else(|| Err("This budget isn't shared.".to_string()))?;
+    .unwrap_or_else(|| Err(crate::i18n::tr("sharing.not_shared")))?;
     Ok(finish(&window, &mut s, None))
 }
 
