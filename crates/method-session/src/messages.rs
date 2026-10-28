@@ -96,6 +96,10 @@ pub const ROLE: &str = "engine.role.";
 /// Undo labels' codes, only recognized by [`recognize_label`].
 pub const UNDO: &str = "engine.undo.";
 
+/// Names the engine gives things it saves (the automatic version before a
+/// restore), only recognized by [`recognize_name`].
+pub const NAME: &str = "engine.name.";
+
 /// Every engine message, by code (sorted, tested).
 pub const MESSAGES: &[Message] = &[
     m("engine.actuals.account_number_long", "An account number is too long."),
@@ -332,6 +336,7 @@ pub const MESSAGES: &[Message] = &[
     m("engine.move.select_accounts", "select one or more accounts first"),
     m("engine.move.select_rows", "select one or more rows first"),
     m("engine.move.select_topsheet_rows", "select one or more topsheet rows first"),
+    m("engine.name.before_restoring", "Before restoring \"{name}\""),
     m("engine.paste.accounts_into_category", "accounts are pasted into a category"),
     plural("engine.paste.base_currency_differs", "{count} line in {from}, the base currency where they were copied, will count in {to}, this budget's base currency.", "{count} lines in {from}, the base currency where they were copied, will count in {to}, this budget's base currency."),
     m("engine.paste.cant_copy", "can't copy `{what}`"),
@@ -788,6 +793,14 @@ pub fn recognize_nested(text: &str) -> Option<Recognized> {
     recognize_among(text, Among::Nested)
 }
 
+/// The code and parameters a name the engine gave something was made from
+/// (`engine.name.*`), when `text` is one: the Versions dialog translates
+/// the automatic version's name on display. The name itself stays this
+/// English.
+pub fn recognize_name(text: &str) -> Option<Recognized> {
+    recognize_among(text, Among::Names)
+}
+
 /// The code and parameters an undo label was made from (`engine.undo.*`),
 /// when `text` is one: what the History list, the Activity tab and the
 /// rest translate on display. The label itself stays this English.
@@ -803,16 +816,22 @@ enum Among {
     Nested,
     /// Undo labels only.
     Labels,
+    /// Names the engine gave things only.
+    Names,
 }
 
 fn recognize_among(text: &str, among: Among) -> Option<Recognized> {
     let mut best: Option<(usize, Recognized)> = None;
     for m in MESSAGES {
         let label = m.code.starts_with(UNDO);
+        let name = m.code.starts_with(NAME);
         let skip = match among {
-            Among::Messages => label || m.code.starts_with(PHRASE) || m.code.starts_with(ROLE),
-            Among::Nested => label,
+            Among::Messages => {
+                label || name || m.code.starts_with(PHRASE) || m.code.starts_with(ROLE)
+            }
+            Among::Nested => label || name,
             Among::Labels => !label,
+            Among::Names => !name,
         };
         if skip {
             continue;
@@ -995,6 +1014,7 @@ mod tests {
                 assert_eq!(text, fill(english, &values));
                 let phrase = m.code.starts_with(PHRASE) || m.code.starts_with(ROLE);
                 let label = m.code.starts_with(UNDO);
+                let name = m.code.starts_with(NAME);
                 if phrase {
                     assert!(
                         recognize(&text).is_none_or(|r| {
@@ -1013,6 +1033,20 @@ mod tests {
                             "{text:?}: a label is only recognized as one"
                         );
                     }
+                } else if name {
+                    for r in [
+                        recognize(&text),
+                        recognize_nested(&text),
+                        recognize_label(&text),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        assert!(
+                            !r.code.starts_with(NAME),
+                            "{text:?}: a name is only recognized as one"
+                        );
+                    }
                 } else {
                     assert!(
                         recognize_label(&text).is_none(),
@@ -1023,6 +1057,8 @@ mod tests {
                     recognize_nested(&text)
                 } else if label {
                     recognize_label(&text)
+                } else if name {
+                    recognize_name(&text)
                 } else {
                     recognize(&text)
                 }

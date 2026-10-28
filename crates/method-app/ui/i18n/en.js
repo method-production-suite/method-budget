@@ -1176,6 +1176,7 @@ export default {
   "engine.move.select_accounts": "select one or more accounts first",
   "engine.move.select_rows": "select one or more rows first",
   "engine.move.select_topsheet_rows": "select one or more topsheet rows first",
+  "engine.name.before_restoring": "Before restoring \"{name}\"",
   "engine.paste.accounts_into_category": "accounts are pasted into a category",
   "engine.paste.base_currency_differs": {"one": "{count} line in {from}, the base currency where they were copied, will count in {to}, this budget's base currency.", "other": "{count} lines in {from}, the base currency where they were copied, will count in {to}, this budget's base currency."},
   "engine.paste.cant_copy": "can't copy `{what}`",

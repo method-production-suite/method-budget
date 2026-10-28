@@ -5079,9 +5079,15 @@ the framework is built and adding a language is a table.
   sharing's setup gave as literals read the table through `tr()` (67 entries). They are
   shown, never stored. What method-core says inside them (a role refusal's detail, the
   changes a step skipped) is still its English.
+- **Automatic version names** (tenth pass): the version a restore saves first keeps its
+  English name in the file (`Before restoring "<name>"`, method-core's
+  `before_restore_name`), and the catalog has the same words as a name
+  (`engine.name.before_restoring`, its own group: only `recognize_name` finds it, so a
+  version the person named is never taken for one). The Versions dialog shows it
+  translated, the restored version's name kept as typed (`i18n::name()`, applied to the
+  view's `budget.versions`). A test holds method-core's words and the catalog's together.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
-  they come: automatic version names
-  ("Before restoring ..."), which are written into the file; Explain's steps and the
+  they come: Explain's steps and the
   totals' explanations; What Changed's change sentences and Merge's conflict sentences,
   which method-core's `diff` and `merge` write; method-core's formula parse errors and
   calculation errors (kept out on purpose, above), and its other errors (renumbering,

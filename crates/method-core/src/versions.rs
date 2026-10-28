@@ -88,7 +88,10 @@ pub fn add_version(
     id
 }
 
-/// The name given to the automatic version saved before a restore.
+/// The name given to the automatic version saved before a restore. Kept in
+/// English in the file; method-session's catalog has the same words
+/// (`engine.name.before_restoring`, tested there) so the app can show it
+/// translated.
 pub fn before_restore_name(restored: &str) -> String {
     format!("Before restoring \"{restored}\"")
 }

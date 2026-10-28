@@ -174,8 +174,24 @@ fn one_message(text: &str, nested: bool) -> Option<String> {
 /// rows phrase inside it translated too, the names the person typed kept
 /// as they are); otherwise `text` as it is. In English the result is `text`.
 pub fn label(text: &str) -> String {
-    use method_session::messages::{recognize_label, NESTED};
-    let Some(m) = recognize_label(text) else {
+    stored(text, method_session::messages::recognize_label)
+}
+
+/// A name the engine gave something it saved (the automatic version before
+/// a restore) in the person's language, the name inside it kept as it is;
+/// any other name as it is. In English the result is `text`.
+pub fn name(text: &str) -> String {
+    stored(text, method_session::messages::recognize_name)
+}
+
+/// Stored English (a label, a name) in the person's language, when
+/// `recognize` knows it.
+fn stored(
+    text: &str,
+    recognize: fn(&str) -> Option<method_session::messages::Recognized>,
+) -> String {
+    use method_session::messages::NESTED;
+    let Some(m) = recognize(text) else {
         return text.to_string();
     };
     let count = m
@@ -318,6 +334,20 @@ impl Localize for crate::view::View {
     fn localize(&mut self) {
         if let Some(c) = &mut self.cost {
             c.error.localize();
+        }
+        version_names(&mut self.budget);
+    }
+}
+
+/// The Versions dialog's list in a view's `budget`: the automatic
+/// version's name.
+fn version_names(budget: &mut serde_json::Value) {
+    let versions = budget
+        .get_mut("versions")
+        .and_then(serde_json::Value::as_array_mut);
+    for v in versions.into_iter().flatten() {
+        if let Some(n) = v.get("name").and_then(serde_json::Value::as_str) {
+            v["name"] = name(n).into();
         }
     }
 }
@@ -1048,6 +1078,26 @@ mod tests {
     /// put back): stored in the change log as the catalog's English, each
     /// recognized as its own label, the role inside it as a phrase, and
     /// shown back unchanged in English.
+    #[test]
+    fn the_automatic_version_name_is_shown_through_the_table() {
+        let auto = method_core::versions::before_restore_name("Approved");
+        let m = method_session::messages::recognize_name(&auto).expect("a name");
+        assert_eq!(m.code, "engine.name.before_restoring");
+        assert_eq!(name(&auto), auto);
+        // A name the person typed, even one shaped like a label, is theirs.
+        for typed in ["Approved", "Removed Morgan", "Before the shoot"] {
+            assert!(method_session::messages::recognize_name(typed).is_none());
+            assert_eq!(name(typed), typed);
+        }
+        let mut budget = serde_json::json!({ "versions": [
+            { "id": 1, "name": "Approved" },
+            { "id": 2, "name": auto },
+        ] });
+        version_names(&mut budget);
+        assert_eq!(budget["versions"][0]["name"], "Approved");
+        assert_eq!(budget["versions"][1]["name"], auto);
+    }
+
     #[test]
     fn sharing_labels_are_shown_through_the_table() {
         let dept = msg("engine.role.department", &[("scope", &"2000 Production")]);
