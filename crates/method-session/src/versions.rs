@@ -304,6 +304,11 @@ mod tests {
             .map(|v| v.name.as_str())
             .collect();
         assert_eq!(names, ["Approved", "Before restoring \"Approved\""]);
+        // The catalog has the same words, so the app can translate it.
+        assert_eq!(
+            names[1],
+            crate::messages::msg("engine.name.before_restoring", &[("name", &"Approved")])
+        );
         // The automatic version holds exactly what was replaced.
         assert_eq!(
             s.budget().version(auto).unwrap().budget.to_budget(),

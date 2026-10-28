@@ -176,8 +176,8 @@ What the slice built, against the list this audit gave:
    rows phrases): a label is stored in the history and in a shared budget's change log,
    so it stays English and is translated only on display (`i18n::label()`: the History
    tab, the Activity tab, a field's past values, arriving and left-out changes), with
-   the names a person typed kept as typed. Still sentences: the labels sharing writes
-   for people and invites, automatic version names, Explain's steps, What Changed's
+   the names a person typed kept as typed. Still sentences:
+   Explain's steps, What Changed's
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
    message they sit in) and its other errors, method-format's import problems, and the method-session modules not yet
