@@ -17,6 +17,7 @@ use crate::import_setup::{
     self, all_items, closure, describe, item_ref, ImportPreview, Imported, ItemRef, Resolution,
     What,
 };
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::view::View;
 
@@ -49,9 +50,7 @@ pub fn tab_name(docs: &Docs, id: DocId) -> String {
 
 /// The message for a change refused because the library is open as a tab.
 pub fn in_tab_refusal(name: &str) -> String {
-    format!(
-        "Your library is open as the budget tab \u{201c}{name}\u{201d}. Make the change there, or close that tab and try again."
-    )
+    msg("engine.library.in_tab", &[("name", &name)])
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +164,9 @@ pub fn review(
     for pick in picks {
         let w = What::parse(&pick.kind)?;
         if !library_kind(w) {
-            return Err(format!(
-                "A {} isn't kept in the library.",
-                w.key().replace('_', " ")
+            return Err(msg(
+                "engine.library.not_kept",
+                &[("kind", &w.key().replace('_', " "))],
             ));
         }
         let Some(it) = p
@@ -184,56 +183,65 @@ pub fn review(
         picked.push(pick.clone());
     }
     if picked.is_empty() {
-        return Err("Nothing to copy: that item never copies between budgets.".into());
+        return Err(word("engine.library.nothing_to_copy"));
     }
     p.items
         .retain(|it| keep.contains(&(it.kind.to_string(), it.name.clone())));
     Ok(LibraryPreview { preview: p, picked })
 }
 
-/// The sentence after a copy (`saving`: into the library).
-pub fn copied_message(c: &Imported, saving: bool) -> String {
-    let (head, nothing, holder) = if saving {
-        (
-            "Saved to the library",
-            "Nothing to save: the library already has what was picked.",
-            "the library",
-        )
-    } else {
-        (
-            "Added from the library",
-            "Nothing to add: this budget already has what was picked.",
-            "this budget",
-        )
-    };
-    if c.added == 0 && c.replaced == 0 {
-        return nothing.to_string();
-    }
-    let n = |k: usize| format!("{k} {}", if k == 1 { "item" } else { "items" });
+/// What a copy of setup items did, as count phrases joined by ", " ("2
+/// items added, 1 item kept as the library had it"): `into_library`, the
+/// library kept what it had; otherwise this budget did.
+pub fn copied_changes(c: &Imported, into_library: bool) -> String {
     let mut parts = Vec::new();
     if c.added > 0 {
-        parts.push(format!("{} added", n(c.added)));
+        parts.push(msg("engine.phrase.items_added", &[("count", &c.added)]));
     }
     if c.replaced > 0 {
-        parts.push(format!("{} replaced", n(c.replaced)));
-    }
-    if c.kept > 0 {
-        parts.push(format!(
-            "{} kept as {holder} had {}",
-            n(c.kept),
-            if c.kept == 1 { "it" } else { "them" }
+        parts.push(msg(
+            "engine.phrase.items_replaced",
+            &[("count", &c.replaced)],
         ));
     }
-    format!("{head}: {}.", parts.join(", "))
+    if c.kept > 0 {
+        let kept = if into_library {
+            "engine.phrase.items_kept_library"
+        } else {
+            "engine.phrase.items_kept_budget"
+        };
+        parts.push(msg(kept, &[("count", &c.kept)]));
+    }
+    parts.join(", ")
+}
+
+/// The sentence after a copy (`saving`: into the library).
+pub fn copied_message(c: &Imported, saving: bool) -> String {
+    if c.added == 0 && c.replaced == 0 {
+        return word(if saving {
+            "engine.library.nothing_to_save"
+        } else {
+            "engine.library.nothing_to_add"
+        });
+    }
+    let changes = copied_changes(c, saving);
+    msg(
+        if saving {
+            "engine.library.saved"
+        } else {
+            "engine.library.added"
+        },
+        &[("changes", &changes)],
+    )
 }
 
 /// Refuses picks of the budget settings (Rust checks what the page sends).
 pub fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
     for p in picks {
         if !library_kind(What::parse(&p.kind)?) {
-            return Err(format!(
-                "A {} isn't kept in the library.",
-                p.kind.replace('_', " ")
+            return Err(msg(
+                "engine.library.not_kept",
+                &[("kind", &p.kind.replace('_', " "))],
             ));
         }
     }
@@ -276,13 +284,21 @@ pub fn folder_op(
     to: Option<&str>,
 ) -> Result<String, String> {
     match action {
-        "create" => folders::add_folder(lib, kind, name).map(|n| format!("Made the folder {n}.")),
-        "rename" => folders::rename_folder(lib, kind, name, to.unwrap_or(""))
-            .map(|n| format!("Renamed the folder {name} to {n}.")),
+        "create" => folders::add_folder(lib, kind, name)
+            .map(|n| msg("engine.library.folder_made", &[("name", &n)])),
+        "rename" => folders::rename_folder(lib, kind, name, to.unwrap_or("")).map(|n| {
+            msg(
+                "engine.library.folder_renamed",
+                &[("from", &name), ("to", &n)],
+            )
+        }),
         "delete" => folders::delete_folder(lib, kind, name).map(|n| match n {
-            0 => format!("Deleted the folder {name}."),
-            1 => format!("Deleted the folder {name}; its item is unfiled now."),
-            n => format!("Deleted the folder {name}; its {n} items are unfiled now."),
+            0 => msg("engine.library.folder_deleted", &[("name", &name)]),
+            1 => msg("engine.library.folder_deleted_item", &[("name", &name)]),
+            n => msg(
+                "engine.library.folder_deleted_items",
+                &[("name", &name), ("count", &n)],
+            ),
         }),
         other => Err(format!("unknown folder action `{other}`")),
     }

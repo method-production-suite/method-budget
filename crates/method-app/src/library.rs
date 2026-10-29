@@ -54,7 +54,9 @@ const NO_LIBRARY: &str = "No library yet. Create one or choose a library file fi
 /// count), else read from the file. Also says which tab, if any.
 pub fn read(docs: &Docs, path: &Path) -> Result<(Budget, Option<DocId>), String> {
     if let Some(id) = docs.find_file(path) {
-        let s = docs.get(id).ok_or("That budget has been closed.")?;
+        let s = docs
+            .get(id)
+            .ok_or_else(|| method_session::messages::word("engine.docs.closed"))?;
         return Ok((s.budget().clone(), Some(id)));
     }
     let (b, _) = crate::session::read_budget(path)?;
@@ -253,7 +255,7 @@ pub fn add_review(
     }
     let here = docs
         .get(target)
-        .ok_or("That budget has been closed.")?
+        .ok_or_else(|| method_session::messages::word("engine.docs.closed"))?
         .budget();
     let mut p = review(here, &lib, 0, "your library", Some(picks))?;
     p.preview.token = lib_state.keep(lib);
@@ -273,7 +275,9 @@ pub fn save_review(
         return Err(in_tab_refusal(&tab_name(docs, id)));
     }
     let (lib, _) = crate::session::read_budget(&path)?;
-    let s = docs.get(source).ok_or("That budget has been closed.")?;
+    let s = docs
+        .get(source)
+        .ok_or_else(|| method_session::messages::word("engine.docs.closed"))?;
     let mut p = review(&lib, s.budget(), 0, &s.tab_label(), picks)?;
     p.preview.token = lib_state.keep(lib);
     Ok(p)
@@ -324,7 +328,9 @@ fn change_library(
 #[tauri::command]
 pub fn library_view(state: State<'_, AppState>, library: State<'_, Library>) -> LibraryView {
     let path = library.path();
-    library_view_at(&state.docs(), path.as_deref())
+    let mut view = library_view_at(&state.docs(), path.as_deref());
+    crate::i18n::Localize::localize(&mut view);
+    view
 }
 
 /// Asks for a folder (Rust's dialog) and makes `My Method Budget Library.mthd`
@@ -355,10 +361,10 @@ pub async fn library_create<R: Runtime>(
     } else {
         format!("Made your library in {}.", dir.display())
     };
-    Ok(Some(LibraryDone {
+    crate::i18n::engine_dto(Ok(Some(LibraryDone {
         library: library_view_at(&state.docs(), Some(&path)),
         message,
-    }))
+    })))
 }
 
 /// Asks for a library file (Rust's Open dialog) and uses it from now on.
@@ -382,14 +388,14 @@ pub async fn library_choose<R: Runtime>(
     else {
         return Ok(None);
     };
-    read(&state.docs(), &path)?;
+    crate::i18n::engine_err(read(&state.docs(), &path))?;
     library.set_path(path.clone())?;
     let view = library_view_at(&state.docs(), Some(&path));
     let message = format!("Using {} as your library.", view.name);
-    Ok(Some(LibraryDone {
+    crate::i18n::engine_dto(Ok(Some(LibraryDone {
         library: view,
         message,
-    }))
+    })))
 }
 
 /// The review for adding the picked library items to budget `doc`.
@@ -401,7 +407,7 @@ pub fn library_add_preview(
     picks: Vec<ItemRef>,
 ) -> Result<LibraryPreview, String> {
     let s = state.lock_doc(doc)?;
-    add_review(&library, s.docs(), s.id(), &picks)
+    crate::i18n::engine_err(add_review(&library, s.docs(), s.id(), &picks))
 }
 
 /// Adds what review `token` showed to budget `doc`, as one undo step.
@@ -417,10 +423,15 @@ pub fn library_add<R: Runtime>(
 ) -> Result<LibraryAdded, String> {
     let lib = library.reviewed(token)?;
     let mut s = state.lock_doc(doc)?;
-    let message = method_session::library::library_add(&mut s, &lib, &picks, &resolutions)?;
+    let message = crate::i18n::engine_err(method_session::library::library_add(
+        &mut s,
+        &lib,
+        &picks,
+        &resolutions,
+    ))?;
     Ok(LibraryAdded {
         view: finish(&window, &mut s, None),
-        message,
+        message: crate::i18n::engine(&message),
     })
 }
 
@@ -434,7 +445,7 @@ pub fn library_save_preview(
     picks: Option<Vec<ItemRef>>,
 ) -> Result<LibraryPreview, String> {
     let s = state.lock_doc(doc)?;
-    save_review(&library, s.docs(), s.id(), picks.as_deref())
+    crate::i18n::engine_err(save_review(&library, s.docs(), s.id(), picks.as_deref()))
 }
 
 /// Saves what review `token` showed from budget `doc` into the library file.
@@ -449,12 +460,19 @@ pub fn library_save(
 ) -> Result<LibraryDone, String> {
     let s = state.lock_doc(doc)?;
     let source = s.budget().clone();
-    let (counts, _) = save_reviewed(&library, s.docs(), &source, token, &picks, &resolutions)?;
+    let (counts, _) = crate::i18n::engine_err(save_reviewed(
+        &library,
+        s.docs(),
+        &source,
+        token,
+        &picks,
+        &resolutions,
+    ))?;
     let path = library.path();
-    Ok(LibraryDone {
+    crate::i18n::engine_dto(Ok(LibraryDone {
         library: library_view_at(s.docs(), path.as_deref()),
         message: copied_message(&counts, true),
-    })
+    }))
 }
 
 /// Makes, renames or deletes one of the library's folders of `kind`.
@@ -467,9 +485,9 @@ pub fn library_folder(
     name: String,
     to: Option<String>,
 ) -> Result<LibraryDone, String> {
-    change_library(&library, &state.docs(), |lib| {
+    crate::i18n::engine_dto(change_library(&library, &state.docs(), |lib| {
         folder_op(lib, &kind, &action, &name, to.as_deref())
-    })
+    }))
 }
 
 /// Moves library items of `kind` into `folder` (`None`: unfiled).
@@ -481,7 +499,7 @@ pub fn library_move(
     names: Vec<String>,
     folder: Option<String>,
 ) -> Result<LibraryDone, String> {
-    change_library(&library, &state.docs(), |lib| {
+    crate::i18n::engine_dto(change_library(&library, &state.docs(), |lib| {
         folders::move_items(lib, &kind, &names, folder.as_deref())?;
         let n = names.len();
         let what = if n == 1 {
@@ -493,7 +511,7 @@ pub fn library_move(
             Some(f) => format!("Moved {what} to {f}."),
             None => format!("Moved {what} out of its folder."),
         })
-    })
+    }))
 }
 
 #[cfg(test)]

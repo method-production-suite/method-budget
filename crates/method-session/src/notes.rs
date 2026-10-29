@@ -13,6 +13,7 @@ use method_core::{next_note_id, Budget, Note, NoteId, RowId, TopsheetRow, MAX_NO
 use serde::{Deserialize, Serialize};
 
 use crate::edit::EditResult;
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// Longest author name, in characters.
@@ -51,19 +52,20 @@ pub fn notes_mut<'a>(b: &'a mut Budget, owner: &NoteOwner) -> EditResult<&'a mut
     }
     Err(match owner {
         NoteOwner::Row(id) => crate::edit::row_gone(*id),
-        NoteOwner::Account(code) => format!("account {code} no longer exists"),
-        NoteOwner::Category(code) => format!("category {code} no longer exists"),
+        NoteOwner::Account(code) => msg("engine.edit.account_gone", &[("code", code)]),
+        NoteOwner::Category(code) => msg("engine.edit.category_gone", &[("code", code)]),
     })
 }
 
 fn check_text(text: &str) -> EditResult<String> {
     if text.trim().is_empty() {
-        return Err("a note needs some text".into());
+        return Err(word("engine.notes.needs_text"));
     }
     let len = text.chars().count();
     if len > MAX_NOTE_CHARS {
-        return Err(format!(
-            "that note is {len} characters; notes can be at most {MAX_NOTE_CHARS}"
+        return Err(msg(
+            "engine.notes.too_long",
+            &[("len", &len), ("max", &MAX_NOTE_CHARS)],
         ));
     }
     Ok(text.to_string())
@@ -72,7 +74,7 @@ fn check_text(text: &str) -> EditResult<String> {
 fn check_stamp(s: &str) -> EditResult<String> {
     let s = s.trim();
     if s.chars().count() > MAX_STAMP_CHARS {
-        return Err("that time is too long".into());
+        return Err(word("engine.notes.time_too_long"));
     }
     Ok(s.to_string())
 }
@@ -82,8 +84,9 @@ fn check_author(a: Option<&str>) -> EditResult<Option<String>> {
         return Ok(None);
     };
     if a.chars().count() > MAX_AUTHOR_CHARS {
-        return Err(format!(
-            "author names can be at most {MAX_AUTHOR_CHARS} characters"
+        return Err(msg(
+            "engine.notes.author_too_long",
+            &[("max", &MAX_AUTHOR_CHARS)],
         ));
     }
     Ok(Some(a.to_string()))
@@ -117,7 +120,7 @@ fn note_mut<'a>(b: &'a mut Budget, owner: &NoteOwner, id: NoteId) -> EditResult<
     notes_mut(b, owner)?
         .iter_mut()
         .find(|n| n.id == id)
-        .ok_or_else(|| "that note no longer exists".to_string())
+        .ok_or_else(|| word("engine.notes.gone"))
 }
 
 /// Changes a note's text, stamping `edited`. Blank text removes the note.
@@ -147,7 +150,7 @@ pub fn remove(b: &mut Budget, owner: &NoteOwner, id: NoteId) -> EditResult {
     let before = notes.len();
     notes.retain(|n| n.id != id);
     if notes.len() == before {
-        return Err("that note no longer exists".into());
+        return Err(word("engine.notes.gone"));
     }
     Ok(())
 }

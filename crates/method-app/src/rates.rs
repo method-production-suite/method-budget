@@ -61,7 +61,11 @@ pub fn rate_choices(
     unit: Option<String>,
 ) -> Result<RateChoices, String> {
     let s = state.lock_doc(doc)?;
-    method_session::rates::choices(s.budget(), row_id, unit.as_deref())
+    crate::i18n::engine_dto(method_session::rates::choices(
+        s.budget(),
+        row_id,
+        unit.as_deref(),
+    ))
 }
 
 /// Fills line `row_id`'s rate from `classification` of `table`, as one
@@ -139,7 +143,10 @@ pub async fn rate_import_pick<R: Runtime>(
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
     let s = state.lock_doc(doc)?;
-    method_session::rates::rate_import_pick(&s, &sources, name, &bytes).map(Some)
+    crate::i18n::engine_err(method_session::rates::rate_import_pick(
+        &s, &sources, name, &bytes,
+    ))
+    .map(Some)
 }
 
 /// Reads sheet `index` of the picked file again under `mapping` (the
@@ -155,7 +162,14 @@ pub fn rate_import_read(
     name: Option<String>,
 ) -> Result<RateImportRead, String> {
     let s = state.lock_doc(doc)?;
-    method_session::rates::rate_import_read(&s, &sources, token, index, mapping, name.as_deref())
+    crate::i18n::engine_err(method_session::rates::rate_import_read(
+        &s,
+        &sources,
+        token,
+        index,
+        mapping,
+        name.as_deref(),
+    ))
 }
 
 #[cfg(test)]

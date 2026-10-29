@@ -288,7 +288,9 @@ fn export_source(
 ) -> Result<(String, Budget), String> {
     match source {
         "budget" => {
-            let s = docs.get(doc).ok_or("That budget has been closed.")?;
+            let s = docs
+                .get(doc)
+                .ok_or_else(|| method_session::messages::word("engine.docs.closed"))?;
             Ok((s.tab_label(), s.budget().clone()))
         }
         "library" => {
@@ -356,7 +358,7 @@ pub fn pack_items(
     source: String,
 ) -> Result<PackItems, String> {
     let s = state.lock_doc(doc)?;
-    let (name, b) = export_source(s.docs(), &library, s.id(), &source)?;
+    let (name, b) = crate::i18n::engine_err(export_source(s.docs(), &library, s.id(), &source))?;
     Ok(items_of(name, &b))
 }
 
@@ -379,8 +381,8 @@ pub async fn pack_export<R: Runtime>(
     // Built (and checked) before the dialog, so a mistake shows at once.
     let (built, items) = {
         let s = state.lock_doc(doc)?;
-        let (_, b) = export_source(s.docs(), &library, s.id(), &source)?;
-        pack_build(&b, &picks, &details, &created)?
+        let (_, b) = crate::i18n::engine_err(export_source(s.docs(), &library, s.id(), &source))?;
+        crate::i18n::engine_err(pack_build(&b, &picks, &details, &created))?
     };
     let mut dialog = window
         .dialog()
@@ -410,7 +412,7 @@ pub async fn pack_export<R: Runtime>(
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let message = exported_message(&name, items);
+    let message = crate::i18n::engine(&exported_message(&name, items));
     Ok(Some(PackExported { name, message }))
 }
 
@@ -435,7 +437,10 @@ pub async fn pack_import_pick<R: Runtime>(
     else {
         return Ok(None);
     };
-    review_file(&state, &library, &sources, target, &path, &into).map(Some)
+    crate::i18n::engine_err(review_file(
+        &state, &library, &sources, target, &path, &into,
+    ))
+    .map(Some)
 }
 
 /// The review of importing pack file `path` into budget `target` or the
@@ -460,7 +465,9 @@ fn review_file(
             }
             let (label, src) = match docs.find_file(path) {
                 Some(id) => {
-                    let s = docs.get(id).ok_or("That budget has been closed.")?;
+                    let s = docs
+                        .get(id)
+                        .ok_or_else(|| method_session::messages::word("engine.docs.closed"))?;
                     (s.tab_label(), s.budget().clone())
                 }
                 None => {
@@ -499,7 +506,9 @@ pub fn pack_review(
 ) -> Result<PackReview, String> {
     let path = packs.listed(token)?;
     let target = state.lock_doc(doc)?.id();
-    review_file(&state, &library, &sources, target, &path, &into)
+    crate::i18n::engine_err(review_file(
+        &state, &library, &sources, target, &path, &into,
+    ))
 }
 
 /// Imports into budget `doc` what review `token` showed, stamped with the
@@ -515,11 +524,16 @@ pub fn pack_import<R: Runtime>(
     resolutions: Vec<Resolution>,
 ) -> Result<PackImported, String> {
     let mut s = state.lock_doc(doc)?;
-    let message =
-        method_session::packs::pack_import(&mut s, &sources, token, &picks, &resolutions)?;
+    let message = crate::i18n::engine_err(method_session::packs::pack_import(
+        &mut s,
+        &sources,
+        token,
+        &picks,
+        &resolutions,
+    ))?;
     Ok(PackImported {
         view: finish(&window, &mut s, None),
-        message,
+        message: crate::i18n::engine(&message),
     })
 }
 
@@ -537,17 +551,27 @@ pub fn pack_import_library(
 ) -> Result<PackIntoLibrary, String> {
     let (_, src) = sources
         .get(source_token)
-        .ok_or("Another file was picked since. Import again.")?;
+        .ok_or_else(|| method_session::messages::word("engine.import.picked_since"))?;
     let title = method_core::pack::info(&src)
         .map(|i| i.title.clone())
         .unwrap_or_default();
     let docs = state.docs();
-    let counts = import_into_library(&library, &docs, &src, token, &picks, &resolutions)?;
+    let counts = crate::i18n::engine_err(import_into_library(
+        &library,
+        &docs,
+        &src,
+        token,
+        &picks,
+        &resolutions,
+    ))?;
     let path = library.path();
-    Ok(PackIntoLibrary {
+    let mut done = PackIntoLibrary {
         library: library::library_view_at(&docs, path.as_deref()),
         message: imported_message(&counts, &title, true),
-    })
+    };
+    crate::i18n::Localize::localize(&mut done.library);
+    done.message = crate::i18n::engine(&done.message);
+    Ok(done)
 }
 
 #[cfg(test)]

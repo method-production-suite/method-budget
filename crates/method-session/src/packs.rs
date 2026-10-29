@@ -25,6 +25,7 @@ use serde::Serialize;
 use crate::docs::{DocId, Docs};
 use crate::import_setup::{self, ImportPreview, ImportSources, ItemRef, Resolution};
 use crate::library::{self, LibraryKind};
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::view::View;
 
@@ -64,7 +65,7 @@ pub fn review_into_budget(
 ) -> Result<PackReview, String> {
     let here = docs
         .get(target)
-        .ok_or("That budget has been closed.")?
+        .ok_or_else(|| word("engine.docs.closed"))?
         .budget();
     let preview = without_settings(import_setup::preview(here, &src, 0, &label, ""));
     let summary = pack::summary(&src);
@@ -81,9 +82,9 @@ pub fn review_into_budget(
 pub fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
     for p in picks {
         if !pack::pack_kind(What::parse(&p.kind)?) {
-            return Err(format!(
-                "A setup pack doesn't bring the budget setting {}.",
-                p.kind.replace('_', " ")
+            return Err(msg(
+                "engine.packs.no_settings",
+                &[("setting", &p.kind.replace('_', " "))],
             ));
         }
     }
@@ -92,35 +93,22 @@ pub fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
 
 /// The sentence after a pack import.
 pub fn imported_message(c: &import_setup::Imported, title: &str, into_library: bool) -> String {
-    let holder = if into_library {
-        "the library"
-    } else {
-        "this budget"
-    };
     if c.added == 0 && c.replaced == 0 {
-        return format!("Nothing to import: {holder} already has what was picked.");
+        return word(if into_library {
+            "engine.packs.nothing_library"
+        } else {
+            "engine.packs.nothing_budget"
+        });
     }
-    let n = |k: usize| import_setup::count(k, "item", "items");
-    let mut parts = Vec::new();
-    if c.added > 0 {
-        parts.push(format!("{} added", n(c.added)));
-    }
-    if c.replaced > 0 {
-        parts.push(format!("{} replaced", n(c.replaced)));
-    }
-    if c.kept > 0 {
-        parts.push(format!(
-            "{} kept as {holder} had {}",
-            n(c.kept),
-            if c.kept == 1 { "it" } else { "them" }
-        ));
-    }
-    let from = if title.is_empty() {
-        String::new()
+    let changes = library::copied_changes(c, into_library);
+    if title.is_empty() {
+        msg("engine.packs.imported", &[("changes", &changes)])
     } else {
-        format!(" from {title}")
-    };
-    format!("Imported{from}: {}.", parts.join(", "))
+        msg(
+            "engine.packs.imported_from",
+            &[("title", &title), ("changes", &changes)],
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -187,10 +175,7 @@ pub fn pack_build(
 
 /// The sentence after a pack named `name` is saved with `items` items.
 pub fn exported_message(name: &str, items: usize) -> String {
-    format!(
-        "Saved the setup pack {name}: {}.",
-        import_setup::count(items, "item", "items")
-    )
+    msg("engine.packs.saved", &[("name", &name), ("count", &items)])
 }
 
 /// Imports into budget `s` what review `token` showed, stamped with the
@@ -205,7 +190,7 @@ pub fn pack_import(
     check_picks(picks)?;
     let (_, src) = sources
         .get(token)
-        .ok_or("Another file was picked since. Import again.")?;
+        .ok_or_else(|| word("engine.import.picked_since"))?;
     let title = method_core::pack::info(&src)
         .map(|i| i.title.clone())
         .unwrap_or_default();

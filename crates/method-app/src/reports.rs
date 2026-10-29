@@ -57,7 +57,7 @@ pub fn bid_sheet(
     layout: Option<serde_json::Value>,
 ) -> Result<BidSheetDto, String> {
     let mut s = state.lock_doc(doc)?;
-    method_session::reports::bid_sheet(&mut s, layout)
+    crate::i18n::engine_err(method_session::reports::bid_sheet(&mut s, layout))
 }
 
 /// Prints what the main window's page shows for print media (the page has

@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use crate::diagnose::{error_message, lenient_recalc};
 use crate::docs::{AppState, DocId, Docs};
 use crate::host::FileIn;
+use crate::messages::{msg, word};
 
 /// Most budgets compared with the base at once.
 pub const MAX_OTHERS: usize = MAX_COMPARED - 1;
@@ -400,7 +401,7 @@ fn open_doc(
 ) -> Result<(SourceDto, Content), String> {
     let s = docs
         .get_mut(doc)
-        .ok_or("A budget in the comparison has been closed.")?;
+        .ok_or_else(|| word("engine.compare.source_closed"))?;
     let label = s.tab_label();
     let detail = s
         .path()
@@ -434,19 +435,17 @@ pub fn gather(
     sources: &[Source],
 ) -> Result<Gathered, String> {
     if sources.is_empty() {
-        return Err("Choose at least one budget to compare with.".into());
+        return Err(word("engine.compare.choose_one"));
     }
     if sources.len() > MAX_OTHERS {
-        return Err(format!(
-            "Up to {MAX_OTHERS} budgets can be compared with this one at a time."
-        ));
+        return Err(msg("engine.compare.too_many", &[("max", &MAX_OTHERS)]));
     }
     for (i, s) in sources.iter().enumerate() {
         if sources[..i].contains(s) {
-            return Err("That budget is in the comparison already.".into());
+            return Err(word("engine.compare.already_in"));
         }
         if *s == (Source::Tab { doc: base }) {
-            return Err("That is the budget being compared.".into());
+            return Err(word("engine.merge.same_budget"));
         }
     }
 
@@ -465,11 +464,13 @@ pub fn gather(
                 open_doc(docs, doc, "tab")?
             }
             Source::Version { id } => {
-                let base_doc = docs.get(base).ok_or("The budget has been closed.")?;
+                let base_doc = docs
+                    .get(base)
+                    .ok_or_else(|| word("engine.merge.budget_closed"))?;
                 let v = base_doc
                     .budget()
                     .version(id)
-                    .ok_or("That version has been deleted.")?;
+                    .ok_or_else(|| word("engine.merge.version_deleted"))?;
                 let src = SourceDto {
                     kind: "version",
                     label: v.name.clone(),
@@ -485,7 +486,7 @@ pub fn gather(
                 out.same_lineage = false;
                 let (label, path, b) = files
                     .get(token)
-                    .ok_or("That file is no longer at hand; add it again.")?;
+                    .ok_or_else(|| word("engine.compare.file_gone"))?;
                 let src = SourceDto {
                     kind: "file",
                     label,
