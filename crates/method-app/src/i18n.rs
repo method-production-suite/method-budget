@@ -330,6 +330,28 @@ impl Localize for method_session::session::History {
     }
 }
 
+impl Localize for method_session::rates::RateChoices {
+    fn localize(&mut self) {
+        for c in &mut self.choices {
+            c.problem.localize();
+        }
+    }
+}
+
+/// The Library tab: why the library couldn't be read.
+impl Localize for method_session::library::LibraryView {
+    fn localize(&mut self) {
+        self.problem.localize();
+    }
+}
+
+impl Localize for method_session::library::LibraryDone {
+    fn localize(&mut self) {
+        self.library.localize();
+        self.message.localize();
+    }
+}
+
 impl Localize for crate::view::View {
     fn localize(&mut self) {
         if let Some(c) = &mut self.cost {
@@ -1096,6 +1118,101 @@ mod tests {
         version_names(&mut budget);
         assert_eq!(budget["versions"][0]["name"], "Approved");
         assert_eq!(budget["versions"][1]["name"], auto);
+    }
+
+    /// The session modules converted in the eleventh pass (notes,
+    /// versions, the Library, packs, rates, Compare, reports): their
+    /// messages are recognized as their codes, a list of count phrases
+    /// inside one too, and come back unchanged in English.
+    #[test]
+    fn session_module_messages_are_shown_through_the_table() {
+        use method_session::messages::{recognize, recognize_nested, word};
+        let changes = [
+            msg("engine.phrase.items_added", &[("count", &2)]),
+            msg("engine.phrase.items_kept_library", &[("count", &1)]),
+        ]
+        .join(", ");
+        let made = [
+            (
+                msg("engine.library.saved", &[("changes", &changes)]),
+                "engine.library.saved",
+            ),
+            (
+                msg(
+                    "engine.library.folder_deleted_items",
+                    &[("name", &"Crew"), ("count", &3)],
+                ),
+                "engine.library.folder_deleted_items",
+            ),
+            (
+                msg(
+                    "engine.packs.imported_from",
+                    &[("title", &"Field Station"), ("changes", &changes)],
+                ),
+                "engine.packs.imported_from",
+            ),
+            (
+                msg("engine.notes.too_long", &[("len", &5001), ("max", &5000)]),
+                "engine.notes.too_long",
+            ),
+            (
+                word("engine.versions.needs_name"),
+                "engine.versions.needs_name",
+            ),
+            (
+                msg(
+                    "engine.rates.not_a_number",
+                    &[
+                        ("row", &2),
+                        ("classification", &"Grip, Key"),
+                        ("unit", &"Day"),
+                        ("value", &"lots"),
+                    ],
+                ),
+                "engine.rates.not_a_number",
+            ),
+            (
+                msg("engine.compare.too_many", &[("max", &15)]),
+                "engine.compare.too_many",
+            ),
+            (
+                msg(
+                    "engine.presets.gone",
+                    &[("what", &word("engine.what.report_preset"))],
+                ),
+                "engine.presets.gone",
+            ),
+            (
+                msg("engine.reports.cant_save", &[("why", &"the name is empty")]),
+                "engine.reports.cant_save",
+            ),
+        ];
+        assert_eq!(
+            made[0].0,
+            "Saved to the library: 2 items added, 1 item kept as the library had it."
+        );
+        assert_eq!(
+            made[1].0,
+            "Deleted the folder Crew; its 3 items are unfiled now."
+        );
+        assert_eq!(made[7].0, "That report preset no longer exists.");
+        for (text, code) in &made {
+            let m = recognize(text).unwrap_or_else(|| panic!("{text:?} is a message"));
+            assert_eq!(m.code, *code, "{text:?}");
+            assert_eq!(&engine(text), text);
+        }
+        let m = recognize(&made[0].0).unwrap();
+        assert_eq!(m.params, [("changes", changes.clone())]);
+        for part in changes.split(", ") {
+            assert!(
+                recognize_nested(part).is_some_and(|r| r.code.starts_with("engine.phrase.items_")),
+                "{part:?} is a count phrase"
+            );
+        }
+        assert_eq!(
+            engine_err::<()>(Err(word("engine.rates.line_gone"))),
+            Err("That line is no longer in the budget.".to_string())
+        );
     }
 
     #[test]

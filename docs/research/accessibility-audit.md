@@ -181,8 +181,7 @@ What the slice built, against the list this audit gave:
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
    message they sit in) and its other errors, method-format's import problems, and the method-session modules not yet
-   converted (notes, versions, the Library, packs, rates, overtime, Compare, reports,
-   rename, renumber).
+   converted (overtime, rename, renumber).
 4. **The menu bar and native dialogs reading the same table**: the menu bar is built
    (`src/menu.rs` takes every item's words from `menu.<id>`, and its menus' names, the app
    menu, Open Recent, Autosave, Revert to Backup and Check for Updates from the same

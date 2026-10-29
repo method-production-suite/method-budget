@@ -5086,6 +5086,22 @@ the framework is built and adding a language is a table.
   version the person named is never taken for one). The Versions dialog shows it
   translated, the restored version's name kept as typed (`i18n::name()`, applied to the
   view's `budget.versions`). A test holds method-core's words and the catalog's together.
+- **Notes, versions, the Library, packs, rates, Compare and reports** (eleventh pass):
+  these method-session modules' refusals and sentences come from the catalog, in new
+  groups (`engine.notes.*`, `engine.versions.*`, `engine.library.*`, `engine.packs.*`,
+  `engine.rates.*`, `engine.compare.*`, `engine.reports.*`), with the same English as
+  before. Where a sentence was already in the catalog it is reused: a note on a gone
+  account or category, a closed budget, a deleted version, a file picked since, and the
+  report preset refusals (`engine.presets.*` with `engine.what.report_preset`). What a
+  copy into or out of the Library or a pack did is a list of count phrases
+  (`engine.phrase.items_added`, `items_replaced`, and `items_kept_library` or
+  `items_kept_budget`, so "the library" and "this budget" are whole phrases), and a
+  folder deleted with items in it is a plural message. The desktop's commands for these
+  modules that work outside `apply` (the Library tab's, setup packs', Fill Rate's
+  choices, a rate table's import and the bid sheet's preview) put their errors and done
+  sentences through `i18n::engine()`. What method-core and method-format say inside them
+  (a report setup's or bid layout's reason, a rate table's missing rate) is still their
+  English.
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
   they come: Explain's steps and the
   totals' explanations; What Changed's change sentences and Merge's conflict sentences,
@@ -5100,8 +5116,7 @@ the framework is built and adding a language is a table.
   are written into the budget or the review file; Import Setup's done message; the
   rest of `src/shared.rs`: the Activity tab's reasons a change was left out, role names
   and the undo note "Nothing to put back"; the other method-session modules not listed
-  above (notes, versions, library, packs, rates, overtime, compare, reports, row styles,
-  rename and renumber, quick add, export, setup sheets, new budget, sharing's session
+  above (overtime, row styles, rename and renumber, quick add, export, setup sheets, new budget, sharing's session
   part); and errors that pass through no converted command (a few file errors in
   `src/safety_app.rs`, `src/start.rs` and the updater).
   A data value named as a noun in a message (an information field's label in "{what}

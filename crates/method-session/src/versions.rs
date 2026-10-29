@@ -14,6 +14,7 @@
 use method_core::{Budget, VersionId, MAX_NOTE_CHARS};
 
 use crate::edit::EditResult;
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// Longest version name, in characters.
@@ -23,15 +24,16 @@ pub const NAME_MAX_CHARS: usize = 200;
 pub fn check_name(name: &str) -> EditResult<String> {
     let name = name.trim();
     if name.is_empty() {
-        return Err("a version needs a name".into());
+        return Err(word("engine.versions.needs_name"));
     }
     if name.chars().any(char::is_control) {
-        return Err("a version name is one line, with no tabs".into());
+        return Err(word("engine.versions.name_one_line"));
     }
     let n = name.chars().count();
     if n > NAME_MAX_CHARS {
-        return Err(format!(
-            "that name is {n} characters; version names can be at most {NAME_MAX_CHARS}"
+        return Err(msg(
+            "engine.versions.name_too_long",
+            &[("len", &n), ("max", &NAME_MAX_CHARS)],
         ));
     }
     Ok(name.to_string())
@@ -44,8 +46,9 @@ pub fn check_note(note: Option<&str>) -> EditResult<Option<String>> {
     };
     let n = note.chars().count();
     if n > MAX_NOTE_CHARS {
-        return Err(format!(
-            "that note is {n} characters; notes can be at most {MAX_NOTE_CHARS}"
+        return Err(msg(
+            "engine.notes.too_long",
+            &[("len", &n), ("max", &MAX_NOTE_CHARS)],
         ));
     }
     Ok(Some(note.to_string()))

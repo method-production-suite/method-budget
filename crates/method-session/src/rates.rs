@@ -17,6 +17,7 @@ use method_format::setup::sheet::RowError;
 use serde::{Deserialize, Serialize};
 
 use crate::edit::{details, EditResult};
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::sheet_import::{read_book, SheetSources};
 
@@ -68,10 +69,14 @@ impl RateTableDto {
                     continue;
                 }
                 let n: Dec = v.replace(',', "").parse().map_err(|_| {
-                    format!(
-                        "Row {} ({}): the rate per {u}, \u{201c}{v}\u{201d}, isn't a number.",
-                        i + 1,
-                        classification
+                    msg(
+                        "engine.rates.not_a_number",
+                        &[
+                            ("row", &(i + 1)),
+                            ("classification", &classification),
+                            ("unit", u),
+                            ("value", &v),
+                        ],
                     )
                 })?;
                 rates.insert(u.trim().to_string(), n);
@@ -200,7 +205,7 @@ pub struct RateChoices {
 fn line(b: &Budget, row: RowId) -> EditResult<&Detail> {
     details(b)
         .find(|d| d.id == row)
-        .ok_or_else(|| "That line is no longer in the budget.".to_string())
+        .ok_or_else(|| word("engine.rates.line_gone"))
 }
 
 /// Every classification and period line `row` could take its rate from,
@@ -208,7 +213,7 @@ fn line(b: &Budget, row: RowId) -> EditResult<&Detail> {
 pub fn choices(b: &Budget, row: RowId, unit: Option<&str>) -> EditResult<RateChoices> {
     let d = line(b, row)?;
     if d.kind != RowKind::Line {
-        return Err("Only a line has a rate to fill.".into());
+        return Err(word("engine.rates.only_lines"));
     }
     let unit = unit
         .map(str::trim)
@@ -232,9 +237,7 @@ pub fn choices(b: &Budget, row: RowId, unit: Option<&str>) -> EditResult<RateCho
                 unit.clone()
             };
             let found = if u.is_empty() {
-                Err(rates::RateError(
-                    "The line has no unit: pick one for the rate.".into(),
-                ))
+                Err(rates::RateError(word("engine.rates.no_unit")))
             } else {
                 rates::rate_for(r, &u, &b.units, &t.name)
             };
@@ -287,7 +290,7 @@ pub fn rate_table_save(
     replacing: Option<&str>,
 ) -> EditResult {
     let t = table.table()?;
-    let label = crate::messages::msg("engine.undo.save_rate_table", &[("name", &t.name)]);
+    let label = msg("engine.undo.save_rate_table", &[("name", &t.name)]);
     s.edit(label, |b| {
         rates::save_table(b, t, replacing).map_err(|e| e.0)
     })
@@ -296,7 +299,7 @@ pub fn rate_table_save(
 /// Deletes the rate table `name`; lines filled from it keep their figures.
 /// One undo step.
 pub fn rate_table_delete(s: &mut Session, name: &str) -> EditResult {
-    let label = crate::messages::msg("engine.undo.delete_rate_table", &[("name", &name)]);
+    let label = msg("engine.undo.delete_rate_table", &[("name", &name)]);
     s.edit(label, |b| {
         rates::delete_table(b, name).map(|_| ()).map_err(|e| e.0)
     })
@@ -323,11 +326,11 @@ pub fn rate_fill(
     as_of: Option<&str>,
 ) -> EditResult<FilledDto> {
     let label = match crate::history::row_place(s.budget(), row_id) {
-        Some((code, n)) => crate::messages::msg(
+        Some((code, n)) => msg(
             "engine.undo.fill_rate_at",
             &[("code", &code), ("line", &n), ("table", &table)],
         ),
-        None => crate::messages::msg("engine.undo.fill_rate", &[("table", &table)]),
+        None => msg("engine.undo.fill_rate", &[("table", &table)]),
     };
     s.edit(label, |b| {
         let f = rates::fill(b, row_id, table, classification, unit, as_of).map_err(|e| e.0)?;
@@ -352,20 +355,23 @@ pub fn rate_update(s: &mut Session, rows: &[RowId]) -> EditResult<usize> {
         .collect();
     if changed.is_empty() {
         return Err(if rows.len() == 1 {
-            match details(s.budget()).find(|d| d.id == rows[0]).and_then(|d| rates::check(s.budget(), d)) {
-                Some(RateCheck::Current) => "That line already has its table's rate.".to_string(),
-                Some(RateCheck::Edited) => "That line's rate was changed by hand since it was filled: pick a classification again to fill it.".to_string(),
+            match details(s.budget())
+                .find(|d| d.id == rows[0])
+                .and_then(|d| rates::check(s.budget(), d))
+            {
+                Some(RateCheck::Current) => word("engine.rates.up_to_date"),
+                Some(RateCheck::Edited) => word("engine.rates.edited"),
                 Some(RateCheck::Missing(m)) => m,
-                _ => "That line's rate wasn't filled from a rate table.".to_string(),
+                _ => word("engine.rates.not_filled"),
             }
         } else {
-            "No line's table says anything different now.".to_string()
+            word("engine.rates.nothing_changed")
         });
     }
     let label = if changed.len() == 1 {
-        crate::messages::word("engine.undo.update_rate")
+        word("engine.undo.update_rate")
     } else {
-        crate::messages::msg("engine.undo.update_rates", &[("count", &changed.len())])
+        msg("engine.undo.update_rates", &[("count", &changed.len())])
     };
     s.edit(label, |b| {
         for id in &changed {
@@ -442,7 +448,7 @@ pub fn read_sheet(
     let t = book
         .tables
         .get(index)
-        .ok_or("That sheet is no longer in the file.")?;
+        .ok_or_else(|| word("engine.rates.sheet_gone"))?;
     let mapping = mapping.unwrap_or_else(|| sheet_rates::guess(t, &b.units));
     let name = match name.map(str::trim).filter(|n| !n.is_empty()) {
         Some(n) => n.to_string(),
@@ -481,7 +487,7 @@ pub fn rate_import_pick(
         .tables
         .iter()
         .position(|t| !t.hidden)
-        .ok_or("That file has no sheets to read.")?;
+        .ok_or_else(|| word("engine.rates.no_sheets"))?;
     let token = sources.keep(file.clone(), book);
     let (_, book) = sources.get(token)?;
     read_sheet(s.budget(), token, &file, &book, first, None, None)

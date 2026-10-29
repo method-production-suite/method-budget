@@ -10,6 +10,7 @@ use method_core::{Budget, ReportPreset, MAX_PRESETS};
 use serde::Serialize;
 
 use crate::edit::EditResult;
+use crate::messages::{msg, word};
 use crate::session::Session;
 
 /// Letter paper, portrait, in points: the size report.js lays pages out for.
@@ -29,11 +30,15 @@ pub fn apply_save_preset(
     preset.validate().map_err(|e| capitalize(&e.to_string()))?;
     if let Some(i) = index {
         if i >= b.report_presets.len() {
-            return Err("That report preset no longer exists.".into());
+            return Err(preset_gone());
         }
     } else if b.report_presets.len() >= MAX_PRESETS {
-        return Err(format!(
-            "A budget can keep at most {MAX_PRESETS} report presets."
+        return Err(msg(
+            "engine.presets.too_many",
+            &[
+                ("max", &MAX_PRESETS),
+                ("what", &word("engine.what.report_presets")),
+            ],
         ));
     }
     let key = preset.name.to_lowercase();
@@ -43,9 +48,12 @@ pub fn apply_save_preset(
         .enumerate()
         .any(|(j, p)| Some(j) != index && p.name.trim().to_lowercase() == key);
     if clash {
-        return Err(format!(
-            "There is already a report preset called \"{}\".",
-            preset.name
+        return Err(msg(
+            "engine.presets.name_taken",
+            &[
+                ("what", &word("engine.what.report_preset")),
+                ("name", &preset.name),
+            ],
         ));
     }
     if preset.default {
@@ -65,10 +73,18 @@ pub fn apply_save_preset(
     })
 }
 
+/// The refusal for a report preset that is gone.
+fn preset_gone() -> String {
+    msg(
+        "engine.presets.gone",
+        &[("what", &word("engine.what.report_preset"))],
+    )
+}
+
 /// Removes preset `index`.
 pub fn apply_delete_preset(b: &mut Budget, index: usize) -> EditResult {
     if index >= b.report_presets.len() {
-        return Err("That report preset no longer exists.".into());
+        return Err(preset_gone());
     }
     b.report_presets.remove(index);
     Ok(())
@@ -123,8 +139,8 @@ pub fn save_report_preset(
     preset: serde_json::Value,
 ) -> EditResult<usize> {
     let preset = method_format::report_preset_from_value(preset)
-        .map_err(|e| format!("That report setup can't be saved: {e}"))?;
-    let label = crate::messages::word(if index.is_some() {
+        .map_err(|e| msg("engine.reports.cant_save", &[("why", &e)]))?;
+    let label = word(if index.is_some() {
         "engine.undo.update_report_preset"
     } else {
         "engine.undo.save_report_preset"
@@ -143,7 +159,7 @@ pub fn bid_sheet(
     let layout = match layout {
         None | Some(serde_json::Value::Null) => method_core::BidLayout::example(),
         Some(v) => method_format::bid_layout_from_value(v)
-            .map_err(|e| format!("That bid layout can't be read: {e}"))?,
+            .map_err(|e| msg("engine.reports.cant_read_layout", &[("why", &e)]))?,
     };
     let (budget, outcome) = s.totals();
     let report = outcome
@@ -290,10 +306,9 @@ impl From<&method_core::BidSheet> for BidSheetDto {
 
 /// Removes preset `index`, as one undo step.
 pub fn delete_report_preset(s: &mut Session, index: usize) -> EditResult {
-    s.edit(
-        crate::messages::word("engine.undo.delete_report_preset"),
-        |b| apply_delete_preset(b, index),
-    )
+    s.edit(word("engine.undo.delete_report_preset"), |b| {
+        apply_delete_preset(b, index)
+    })
 }
 
 #[cfg(test)]
