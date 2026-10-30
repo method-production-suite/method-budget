@@ -17,18 +17,17 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-29. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-30. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.8.0, waiting on the owner's yes for its release commit.** The yes relayed on
-  2026-10-29 named 18bb047, which is still version 0.7.0 with no 0.8.0 notes, so the tag
-  can't go there. The "Release 0.8.0" pull request carries the bump and the notes (which
-  say plainly that 0.7.0 and older refuse a shared budget at log format 3 once its owner's
-  key is in, and at format 4 after its first invite). **Recommend: yes to tag and publish
-  v0.8.0 on that pull request's merge commit.** Signing, Remove, Start Again, muted cells,
-  access requests and invite links still need a live check in the app.
+- **0.8.0 is out** (published 2026-10-30, tagged on 5ef4238: the release commit plus the
+  Windows doctest fix; methodbudget.com follows it). It carries signed changes, the owner's
+  key and invite links (3.18), so 0.7.0 and older refuse a shared budget at log format 3
+  or 4; the notes say so. The next release needs the owner's yes as usual. Signing,
+  Remove, Start Again, muted cells, access requests and invite links still need a live
+  check in the app.
 - **Crate-age exceptions end**: webpki-roots on 2026-11-02 and rustls-webpki on
   2026-11-03 reach 14 days; their lines in the age-check exceptions come out then.
 
