@@ -5102,9 +5102,32 @@ the framework is built and adding a language is a table.
   sentences through `i18n::engine()`. What method-core and method-format say inside them
   (a report setup's or bid layout's reason, a rate table's missing rate) is still their
   English.
+- **Explain's steps** (twelfth pass): the working carries its codes instead of being
+  recognized, since recognizing finished English would translate a line the person
+  described as "Fringes". method-core keeps the English of each fixed sentence in its own
+  table (`explain::WORDING`, `engine.working.*`, 191 codes: labels, texts and titles)
+  and makes each with `say!(code, name = value)`, which gives the English and a
+  `Said { code, params }` from the one template, so they can't drift; it reads no other
+  table. Each `Step` has `label_said` and `text_said` and the `Explanation` a
+  `title_said`; `None` means the person's own text (a description, a fringe's, account's
+  or charge's name) or words not catalogued, shown as they are. Values are numbers as the
+  working writes them or the person's text, never translated. Sentences put together
+  from a fixed phrase (where fringes post, why a line is left out, a person's accounts
+  and cutoff) are flattened into one code per combination rather than nested. The
+  English is unchanged byte for byte (every exact-text test passes as before). method-session's catalog
+  has the same entries (a test holds them to core's table), `recognize()` and the other
+  recognizers skip the group, and `StepDto` and `ExplanationDto` carry the code and
+  values; the desktop puts the title and every step through the table by code
+  (`Localize for ExplanationDto`), English when the table has no entry. A test shows a
+  fixed "Fringes" label translated while a line described "Fringes" keeps its words.
+  Left as they come, on purpose: the Amount, X, 4X and Rate formulas (the person's
+  formula, globals and units, with the word "global"), a rate's source (written by
+  method-core's rates), a flat fringe's Count and Fringe sentences (built from many
+  clauses), the accounts a charge leaves out and why ("group Crew, account 2100"), the
+  "and" joining a person's accounts, and sentences of numbers only ("2,000.00 x 3 =
+  6,000.00").
 - **Not built** (3.14 stays partial): the rest of the engine's words. Still English as
-  they come: Explain's steps and the
-  totals' explanations; What Changed's change sentences and Merge's conflict sentences,
+  they come: the bits of Explain's working listed above; What Changed's change sentences and Merge's conflict sentences,
   which method-core's `diff` and `merge` write; method-core's formula parse errors and
   calculation errors (kept out on purpose, above), and its other errors (renumbering,
   rates, overtime, versions, what-if); method-format's import problems (a row skipped, a

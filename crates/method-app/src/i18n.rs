@@ -361,6 +361,49 @@ impl Localize for crate::view::View {
     }
 }
 
+/// Explain's working (twelfth pass): the title and each step's label and
+/// text that carry their code are put in the table's words, the person's
+/// own text (a description, a fringe's name) left as it is. Never
+/// recognized from the English: a line the person called "Fringes" stays
+/// theirs.
+impl Localize for method_session::explain::ExplanationDto {
+    fn localize(&mut self) {
+        explanation_words(self, &lookup);
+    }
+}
+
+type Lookup = dyn Fn(&str, Option<&str>) -> Option<String>;
+
+fn explanation_words(e: &mut method_session::explain::ExplanationDto, lookup: &Lookup) {
+    said_words(&mut e.title, e.title_said.as_ref(), lookup);
+    step_words(&mut e.root, lookup);
+}
+
+fn step_words(s: &mut method_session::explain::StepDto, lookup: &Lookup) {
+    said_words(&mut s.label, s.label_said.as_ref(), lookup);
+    said_words(&mut s.text, s.text_said.as_ref(), lookup);
+    for c in &mut s.children {
+        step_words(c, lookup);
+    }
+}
+
+/// `english` in the table's words for `said`, when it has a code the table
+/// has; otherwise as it is.
+fn said_words(
+    english: &mut String,
+    said: Option<&method_session::explain::SaidDto>,
+    lookup: &Lookup,
+) {
+    let Some(said) = said else {
+        return;
+    };
+    let count = said.params.get("count").map(String::as_str);
+    if let Some(words) = lookup(said.code, count) {
+        let params: Vec<(&str, &str)> = said.params.iter().map(|(n, v)| (*n, v.as_str())).collect();
+        *english = fill(&words, &params);
+    }
+}
+
 /// The Versions dialog's list in a view's `budget`: the automatic
 /// version's name.
 fn version_names(budget: &mut serde_json::Value) {
@@ -1317,5 +1360,69 @@ mod tests {
             tr_count("dialog.unsaved_many", 2, &[("list", "a\nb")]),
             "2 budgets have unsaved changes:\n\na\nb\n\nSave them before closing? If you don't, they will be lost."
         );
+    }
+
+    /// Explain's working (twelfth pass): a fixed label goes through the
+    /// table by its carried code, while a line the person described as
+    /// "Fringes" keeps its text, and in English nothing changes.
+    #[test]
+    fn explain_steps_are_shown_through_the_table() {
+        use method_session::explain::{explain_in, StepDto, TargetDto};
+        let mut b = method_core::starter::budget();
+        let id = {
+            let d = b
+                .categories_mut()
+                .flat_map(|c| &mut c.accounts)
+                .flat_map(|a| &mut a.details)
+                .find(|d| !d.fringes.is_empty())
+                .expect("the starter has a line with a fringe");
+            d.description = "Fringes".into();
+            d.id
+        };
+        let english = explain_in(&b, &TargetDto::Line { row_id: id }, false).unwrap();
+        fn find<'a>(s: &'a StepDto, code: &str) -> Option<&'a StepDto> {
+            if s.label_said.as_ref().is_some_and(|l| l.code == code) {
+                return Some(s);
+            }
+            s.children.iter().find_map(|c| find(c, code))
+        }
+        // The line's own label is the person's words; the note about its
+        // fringes is the engine's.
+        assert_eq!(english.root.label, "Fringes");
+        assert!(english.root.label_said.is_none());
+        let note = find(&english.root, "engine.working.label.fringes").expect("a fringes note");
+        assert_eq!(note.label, "Fringes");
+        assert!(english.title_said.is_some());
+        // Through a table that words the code otherwise.
+        let mut other = english.clone();
+        let table = |code: &str, _: Option<&str>| match code {
+            "engine.working.label.fringes" => Some("Lohnnebenkosten".to_string()),
+            "engine.working.title.line_described_total" => {
+                Some("{code} Zeile {line} ({description}): Summe".to_string())
+            }
+            _ => None,
+        };
+        explanation_words(&mut other, &table);
+        assert_eq!(other.root.label, "Fringes");
+        let note = find(&other.root, "engine.working.label.fringes").unwrap();
+        assert_eq!(note.label, "Lohnnebenkosten");
+        assert!(other.title.ends_with("(Fringes): Summe"), "{}", other.title);
+        // English, through the real table: unchanged, every code in it.
+        let table = parse_table(EN).unwrap();
+        fn codes(s: &StepDto, out: &mut Vec<&'static str>) {
+            out.extend(s.label_said.iter().chain(&s.text_said).map(|x| x.code));
+            for c in &s.children {
+                codes(c, out);
+            }
+        }
+        let mut all = Vec::new();
+        codes(&english.root, &mut all);
+        assert!(all.len() > 3, "{all:?}");
+        for code in all {
+            assert!(table.contains_key(code), "{code}");
+        }
+        let mut same = english.clone();
+        same.localize();
+        assert_eq!(same, english);
     }
 }

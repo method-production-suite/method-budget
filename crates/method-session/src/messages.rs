@@ -100,6 +100,13 @@ pub const UNDO: &str = "engine.undo.";
 /// restore), only recognized by [`recognize_name`].
 pub const NAME: &str = "engine.name.";
 
+/// The fixed words of Explain's working (`engine.working.*`, decision 94,
+/// twelfth pass). Each step carries its code and values
+/// (`method_core::explain::Said`), so they are never recognized: a line
+/// the person called "Fringes" is theirs. The English is method-core's
+/// `explain::WORDING` (tested).
+pub const WORKING: &str = "engine.working.";
+
 /// Every engine message, by code (sorted, tested).
 pub const MESSAGES: &[Message] = &[
     m("engine.actuals.account_number_long", "An account number is too long."),
@@ -724,6 +731,197 @@ pub const MESSAGES: &[Message] = &[
     m("engine.what.unit", "unit"),
     m("engine.what.x", "X"),
     m("engine.what.x4", "4X"),
+    m("engine.working.a_flat_fee", "a flat fee"),
+    m("engine.working.account_fringes", "fringes earned by the account's lines"),
+    m("engine.working.account_total", "account total"),
+    m("engine.working.adjustment_base", "the lines above, back to the previous adjustment (subtotal rows don't restart it)"),
+    m("engine.working.adjustment_base_doubles", "the lines above, back to the previous adjustment (subtotal rows don't restart it), added up in doubles"),
+    m("engine.working.after_last_level_neither", "categories after the last production total are neither above nor below the line"),
+    m("engine.working.applied_credit", "an applied credit"),
+    m("engine.working.at_least_minimum", "the rows' net spend {spend} is at least the minimum of {minimum}"),
+    m("engine.working.at_most", "at most {cap}: {capped}"),
+    m("engine.working.atl_btl_is", "above-the-line plus below-the-line"),
+    m("engine.working.atl_is", "the first production level, when a production total closes it"),
+    m("engine.working.below_minimum", "the rows' net spend {spend} is below the minimum of {minimum}, so the credit is 0"),
+    m("engine.working.blank_counts_as_0", "blank, counts as 0"),
+    m("engine.working.btl_is", "every later production level a production total closes"),
+    m("engine.working.cap_on_spend", "the spend the percent applies to is at most {cap}: {spend}"),
+    m("engine.working.category_fringe_account", "the category's fringe account (fringe posting: by category)"),
+    m("engine.working.category_fringes", "fringes earned in the category"),
+    m("engine.working.category_total", "category total"),
+    m("engine.working.charge_base", "every category with its fringes, wherever they post, plus the budget's fringe row: the grand total before charges (charges never apply to each other)"),
+    m("engine.working.charge_percent_of", "{percent}% of ({base} - {excluded}) = {exact}"),
+    m("engine.working.counted_lines_tagged", "counted lines tagged {group}, with their fringes"),
+    m("engine.working.currency", "{amount} {currency} x {rate} {base} per {currency} = {exact} {base}"),
+    m("engine.working.currency_unrounded", "{amount} {currency} (not rounded yet) x {rate} {base} per {currency} = {exact} {base}"),
+    m("engine.working.cutoff_factor", "the budget multiplies every percent cutoff by {factor}: {typed} x {factor} = {cutoff}"),
+    m("engine.working.cutoff_used_by_lines_above", "{fringe} stops at {cutoff} per earner, and the lines above in the range used it all, so this line takes nothing"),
+    m("engine.working.discount", "less {percent}%: {capped} x {keep} = {exact}"),
+    m("engine.working.earns_none", "this line earns none"),
+    m("engine.working.earns_nothing_from_it", "this line earns nothing from it"),
+    m("engine.working.every_applied_credit", "every applied credit"),
+    m("engine.working.every_line_of", "every line of {account}"),
+    m("engine.working.fee_converted", "{amount} {currency} x {rate} {base} per {currency} = {exact}"),
+    m("engine.working.fee_less", "less {fee}: {amount}"),
+    m("engine.working.fee_less_floor", "less {fee}, but never below zero: {taken} taken off, {amount}"),
+    m("engine.working.flat_cutoff_unused", "{cutoff} is kept on {fringe} but not used: cutoffs apply to percent fringes only"),
+    m("engine.working.flat_once_per_line", "flat, once per line"),
+    m("engine.working.flat_per_unit_amount", "flat, per {unit}, amount only"),
+    m("engine.working.flat_per_unit_counts", "flat, per {unit}, amount plus counts in X and 4X"),
+    m("engine.working.flat_per_unit_quantity", "flat, per {unit}, full quantity"),
+    m("engine.working.fringe_kind_flat", "a flat fringe, over every counted line"),
+    m("engine.working.fringe_kind_percent", "a percent fringe, no cutoff, over every counted line"),
+    m("engine.working.fringe_kind_percent_cutoff", "a percent fringe with a {cutoff} cutoff per earner, over every counted line"),
+    m("engine.working.fringe_kind_percent_factor", "a percent fringe with a {cutoff} cutoff per earner ({typed} x the budget's cutoff factor {factor}), over every counted line"),
+    m("engine.working.fringe_on_account_lines", "{fringe} on the account's lines"),
+    m("engine.working.fringe_range", "range {range}: lines {lines} earn as one person, so they share one cutoff, used up in line order"),
+    m("engine.working.fringes_by_line", "fringes earned by line {line}"),
+    m("engine.working.fringes_on_top", "earned on top of this total, shown in Fringe $ (not in it)"),
+    m("engine.working.grand_total_is", "above and below-the-line, the categories after the last production total, budget fringes and charges"),
+    m("engine.working.gross_account", "account {account} with its fringes, wherever fringes post"),
+    m("engine.working.gross_category", "category {category} with its fringes, wherever fringes post"),
+    m("engine.working.gross_no_account", "account {account} is not in the budget, so 0"),
+    m("engine.working.gross_no_category", "category {category} is not in the budget, so 0"),
+    m("engine.working.label.adjustment", "Adjustment"),
+    m("engine.working.label.after_last_level", "Categories after the last production total"),
+    m("engine.working.label.amount", "Amount"),
+    m("engine.working.label.atl", "Total above-the-line"),
+    m("engine.working.label.atl_btl", "Total above and below-the-line"),
+    m("engine.working.label.base", "Base"),
+    m("engine.working.label.brokers_fee", "Broker's fee"),
+    m("engine.working.label.btl", "Total below-the-line"),
+    m("engine.working.label.cap_on_spend", "Cap on spend"),
+    m("engine.working.label.charge", "Charge"),
+    m("engine.working.label.count", "Count"),
+    m("engine.working.label.credit", "Credit"),
+    m("engine.working.label.credit_cap", "Credit cap"),
+    m("engine.working.label.credits", "Credits"),
+    m("engine.working.label.currency", "Currency"),
+    m("engine.working.label.cutoff", "Cutoff"),
+    m("engine.working.label.cutoff_factor", "Cutoff factor"),
+    m("engine.working.label.cutoff_reached", "Cutoff reached"),
+    m("engine.working.label.cutoff_used_up", "Cutoff used up"),
+    m("engine.working.label.discount", "Discount"),
+    m("engine.working.label.earnings", "Earnings"),
+    m("engine.working.label.excluded", "Excluded"),
+    m("engine.working.label.excluded_amount", "Excluded amount"),
+    m("engine.working.label.excluded_fringes", "Excluded fringes"),
+    m("engine.working.label.fee", "Fee"),
+    m("engine.working.label.fringe", "Fringe"),
+    m("engine.working.label.fringe_range", "Fringe range"),
+    m("engine.working.label.fringes", "Fringes"),
+    m("engine.working.label.fringes_earned_here", "Fringes earned here"),
+    m("engine.working.label.grand_total", "Grand total"),
+    m("engine.working.label.gross", "Gross"),
+    m("engine.working.label.left_out", "Left out"),
+    m("engine.working.label.less_credits", "Less credits"),
+    m("engine.working.label.line", "Line"),
+    m("engine.working.label.line_n", "Line {line}"),
+    m("engine.working.label.lines", "Lines"),
+    m("engine.working.label.locations", "Locations"),
+    m("engine.working.label.minimum_spend", "Minimum spend"),
+    m("engine.working.label.net_spend", "Net spend"),
+    m("engine.working.label.net_total", "Net total"),
+    m("engine.working.label.no_fringes", "No fringes"),
+    m("engine.working.label.no_production_totals", "No production totals"),
+    m("engine.working.label.not_counted_here", "Not counted here"),
+    m("engine.working.label.not_rounded_yet", "Not rounded yet"),
+    m("engine.working.label.numbered_fringes", "{number} Fringes"),
+    m("engine.working.label.person", "Person"),
+    m("engine.working.label.quantity", "Quantity"),
+    m("engine.working.label.rate", "Rate"),
+    m("engine.working.label.rate_source", "Rate source"),
+    m("engine.working.label.rounding", "Rounding"),
+    m("engine.working.label.row_n", "Row {row}"),
+    m("engine.working.label.rows_added", "Rows added"),
+    m("engine.working.label.share", "Share"),
+    m("engine.working.label.shared_cap", "Shared cap"),
+    m("engine.working.label.subtotal", "Subtotal"),
+    m("engine.working.label.total_fringes", "Total fringes"),
+    m("engine.working.label.where_fringes_post", "Where fringes post"),
+    m("engine.working.label.x", "X"),
+    m("engine.working.label.x4", "4X"),
+    m("engine.working.left_out_adjustment_ungrouped", "the adjustment row has no group and the group rule leaves out lines with no group, so it shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.left_out_by_report", "the report leaves out group {groups}; counted, it would be {total}"),
+    m("engine.working.left_out_group_off", "group {groups} has In budget total off, so the line shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.left_out_group_off_conflict", "group {groups} has In budget total off (it is also in a counted group, and the group rule leaves out such conflicts), so the line shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.left_out_groups_off", "groups {groups} have In budget total off, so the line shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.left_out_groups_off_conflict", "groups {groups} have In budget total off (it is also in a counted group, and the group rule leaves out such conflicts), so the line shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.left_out_no_fringes", "the line doesn't count, so it earns no fringes"),
+    m("engine.working.left_out_not_shown", "the report shows only some groups, and this line has none of them; counted, it would be {total}"),
+    m("engine.working.left_out_ungrouped", "the line has no group and the group rule leaves out lines with no group, so it shows but counts as 0; counted, it would be {total}"),
+    m("engine.working.level_adds", "the categories since the previous production total"),
+    m("engine.working.lines_tagged", "lines tagged {group} plus their fringes"),
+    m("engine.working.net_total_is", "grand total less credits"),
+    m("engine.working.no_production_totals", "nothing is above or below the line until a production total closes the first level"),
+    m("engine.working.not_in_total_account", "not in this total: fringes post to each account's total"),
+    m("engine.working.not_in_total_budget", "not in this total: fringes post to the budget's one Total Fringes row"),
+    m("engine.working.not_in_total_category", "not in this total: fringes post to each category's fringe account"),
+    m("engine.working.not_in_total_level", "not in this total: fringes post above each production total"),
+    m("engine.working.only_lines_at", "only lines at {locations} count, with their fringes"),
+    m("engine.working.per_earner_left_not_reached", "{cutoff} per earner; {left} of it left after the lines above in the range, not reached"),
+    m("engine.working.per_earner_not_reached", "{cutoff} per earner, not reached"),
+    m("engine.working.per_person_not_reached", "{cutoff} per person, not reached: {person} is paid {pay} with {fringe}, so each line earns its own percent"),
+    m("engine.working.percent_of", "{percent}% of {base} = {exact}"),
+    m("engine.working.percent_of_budget", "{percent}% of the budget"),
+    m("engine.working.percent_of_capped", "{percent}% of {base} = {exact}, capped at {cap}: {credit}"),
+    m("engine.working.percent_of_rate", "{percent}% of {base} = {exact} (rate {formula})"),
+    m("engine.working.percent_with_cutoff", "{percent}% with a {cutoff} cutoff"),
+    m("engine.working.percent_with_cutoff_per_person", "{percent}% with a {cutoff} cutoff per person"),
+    plural("engine.working.person_paid_account", "{person} is paid on {count} line in account {accounts}, so they share one cutoff", "{person} is paid on {count} lines in account {accounts}, so they share one cutoff"),
+    plural("engine.working.person_paid_account_no_cutoff", "{person} is paid on {count} line in account {accounts}; {fringe} has no cutoff, so each line earns its own percent", "{person} is paid on {count} lines in account {accounts}; {fringe} has no cutoff, so each line earns its own percent"),
+    plural("engine.working.person_paid_accounts", "{person} is paid on {count} line in accounts {accounts}, so they share one cutoff", "{person} is paid on {count} lines in accounts {accounts}, so they share one cutoff"),
+    plural("engine.working.person_paid_accounts_no_cutoff", "{person} is paid on {count} line in accounts {accounts}; {fringe} has no cutoff, so each line earns its own percent", "{person} is paid on {count} lines in accounts {accounts}; {fringe} has no cutoff, so each line earns its own percent"),
+    m("engine.working.person_past_cutoff", "{person} is paid {pay} with {fringe}, past the {cutoff} cutoff, so {person} earns {percent}% of {cutoff} = {exact}"),
+    m("engine.working.person_past_cutoff_rate", "{person} is paid {pay} with {fringe}, past the {cutoff} cutoff, so {person} earns {percent}% of {cutoff} = {exact} (rate {formula})"),
+    m("engine.working.posted_above_level", "posted above the production total (fringe posting: by production level)"),
+    m("engine.working.posted_to_account", "posted to the account (fringe posting: by account)"),
+    m("engine.working.posting_account", "fringes post to each account's total (a budget setting)"),
+    m("engine.working.posting_budget", "fringes post to the budget's one Total Fringes row (a budget setting)"),
+    m("engine.working.posting_category", "fringes post to each category's fringe account (a budget setting)"),
+    m("engine.working.posting_level", "fringes post above each production total (a budget setting)"),
+    m("engine.working.rounded_once", "rows are added, capped and discounted before the one rounding"),
+    m("engine.working.rounds_double", "{amount} rounds to {rounded} (spreadsheet rounding: half up on the binary value)"),
+    m("engine.working.rounds_double_held", "{amount} is {held} as a binary double, so it rounds to {rounded} (spreadsheet rounding: half up on the binary value)"),
+    m("engine.working.rounds_exact", "{amount} rounds half away from zero to {rounded}"),
+    m("engine.working.row_adjustment", "{code} line {line}, adjustment"),
+    m("engine.working.row_line", "{code} line {line}, line"),
+    m("engine.working.row_line_left_out", "{code} line {line}, line, left out"),
+    m("engine.working.share", "this line's part of {person}'s {amount}, by pay: {amount} x {total} / {pay}, {floor} rounded down"),
+    m("engine.working.share_extra_cent", "this line's part of {person}'s {amount}, by pay: {amount} x {total} / {pay}, {floor} rounded down, plus one of the cents left over (shares rounded down; the left-over cents go to the largest remainders, then the lowest row id)"),
+    m("engine.working.shared_cap_missing", "{name} is not in the budget's shared caps, so it holds nothing down"),
+    m("engine.working.shared_cap_share", "{name} caps this credit and {others} at {cap} together; its share, in proportion to {capped}, is {share}"),
+    m("engine.working.shared_cap_within", "{name} caps the credits sharing it at {cap} together, which they are within"),
+    m("engine.working.stops_per_earner", "{fringe} stops at {cutoff} per earner"),
+    m("engine.working.stops_per_earner_left", "{fringe} stops at {cutoff} per earner; {left} of it left after the lines above in the range"),
+    m("engine.working.stops_per_person", "{fringe} stops at {cutoff} per person, so nothing is earned"),
+    m("engine.working.subtotal_adds", "the lines and adjustments since the previous subtotal row"),
+    m("engine.working.taken_off_base", "taken off the base"),
+    m("engine.working.taken_off_fee", "taken off the fee (typed amounts, and the lines of excluded groups, accounts and categories with their fringes)"),
+    m("engine.working.this_lines_total", "this line's total"),
+    m("engine.working.title.account_fringes", "Account {account}: fringes"),
+    m("engine.working.title.account_lines", "Account {account}: lines"),
+    m("engine.working.title.account_total", "Account {account}: total"),
+    m("engine.working.title.after_last_level_fringes", "Categories after the last production total: fringes"),
+    m("engine.working.title.after_last_level_total", "Categories after the last production total: total"),
+    m("engine.working.title.category_fringes", "Category {category}: fringes"),
+    m("engine.working.title.category_total", "Category {category}: total"),
+    m("engine.working.title.charge", "Charge {name}"),
+    m("engine.working.title.credit", "Credit {name}"),
+    m("engine.working.title.fringe_total", "Fringe {fringe}: total"),
+    m("engine.working.title.level_fringes", "{level}: fringes"),
+    m("engine.working.title.level_total", "{level}: total"),
+    m("engine.working.title.line_described_fringe", "{code} line {line} ({description}): {fringe}"),
+    m("engine.working.title.line_described_fringes", "{code} line {line} ({description}): fringes"),
+    m("engine.working.title.line_described_total", "{code} line {line} ({description}): total"),
+    m("engine.working.title.line_fringe", "{code} line {line}: {fringe}"),
+    m("engine.working.title.line_fringes", "{code} line {line}: fringes"),
+    m("engine.working.title.line_total", "{code} line {line}: total"),
+    m("engine.working.total_fringes_is", "every fringe in the budget, outside above and below-the-line (fringe posting: by budget)"),
+    m("engine.working.trailing_fringes_dropped", "no production total follows these categories, so their fringes post nowhere and count in no total (trailing level fringes: drop)"),
+    m("engine.working.typed_in", "typed in"),
+    m("engine.working.whole_units_half_away", "the budget rounds account totals to whole units: the lines come to {lines}, which rounds to the nearest whole unit, a half away from zero to {whole}"),
+    m("engine.working.whole_units_half_up", "the budget rounds account totals to whole units: the lines come to {lines}, which rounds to the nearest whole unit, a half up to {whole}"),
 ];
 
 /// The message with this code.
@@ -874,6 +1072,9 @@ fn recognize_among(text: &str, among: Among) -> Option<Recognized> {
     for m in MESSAGES {
         let label = m.code.starts_with(UNDO);
         let name = m.code.starts_with(NAME);
+        if m.code.starts_with(WORKING) {
+            continue;
+        }
         let skip = match among {
             Among::Messages => {
                 label || name || m.code.starts_with(PHRASE) || m.code.starts_with(ROLE)
@@ -1061,6 +1262,24 @@ mod tests {
                     .collect();
                 let text = msg(m.code, &refs);
                 assert_eq!(text, fill(english, &values));
+                if m.code.starts_with(WORKING) {
+                    // Carried with its code, never recognized.
+                    for r in [
+                        recognize(&text),
+                        recognize_nested(&text),
+                        recognize_label(&text),
+                        recognize_name(&text),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        assert!(
+                            !r.code.starts_with(WORKING),
+                            "{text:?}: the working's words are carried, not recognized"
+                        );
+                    }
+                    continue;
+                }
                 let phrase = m.code.starts_with(PHRASE) || m.code.starts_with(ROLE);
                 let label = m.code.starts_with(UNDO);
                 let name = m.code.starts_with(NAME);
@@ -1335,6 +1554,13 @@ mod tests {
                 }
             }
         }
+        // Explain's working is worded in method-core (tested below to
+        // agree with this catalog).
+        used.extend(
+            method_core::explain::WORDING
+                .iter()
+                .map(|w| w.code.to_string()),
+        );
         for code in &used {
             assert!(find(code).is_some(), "{code} is used but not in MESSAGES");
         }
@@ -1344,5 +1570,23 @@ mod tests {
             .filter(|c| !used.contains(*c))
             .collect();
         assert!(unused.is_empty(), "messages nothing makes: {unused:?}");
+    }
+
+    /// Explain's working: method-core's `WORDING` and this catalog's
+    /// `engine.working.*` entries are the same codes with the same words.
+    #[test]
+    fn the_working_matches_the_engines_words() {
+        let ours: Vec<(&str, Option<&str>, &str)> = MESSAGES
+            .iter()
+            .filter(|m| m.code.starts_with(WORKING))
+            .map(|m| (m.code, m.one, m.other))
+            .collect();
+        let core: Vec<(&str, Option<&str>, &str)> = method_core::explain::WORDING
+            .iter()
+            .map(|w| (w.code, w.one, w.other))
+            .collect();
+        assert_eq!(WORKING, method_core::explain::WORDING_PREFIX);
+        assert!(!core.is_empty());
+        assert_eq!(ours, core);
     }
 }

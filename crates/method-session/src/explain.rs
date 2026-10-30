@@ -12,7 +12,9 @@
 //! they are opened. A grand total of 5,000 lines sends a few dozen steps,
 //! not 50,000.
 
-use method_core::explain::{Explainer, Explanation, Link, Role, Step, Target};
+use std::collections::BTreeMap;
+
+use method_core::explain::{Explainer, Explanation, Link, Role, Said, Step, Target};
 use method_core::{Budget, Cents, RecalcOptions, RowId, TopsheetRow};
 use serde::{Deserialize, Serialize};
 
@@ -124,10 +126,38 @@ pub struct JumpDto {
     pub row_id: Option<RowId>,
 }
 
+/// Fixed words of the working as their code (`engine.working.*`) and
+/// values, so the desktop can show them in the person's language
+/// (decision 94, twelfth pass). The values are numbers as the working
+/// writes them and the person's own text, never translated.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SaidDto {
+    pub code: &'static str,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub params: BTreeMap<&'static str, String>,
+}
+
+impl From<&Said> for SaidDto {
+    fn from(s: &Said) -> SaidDto {
+        SaidDto {
+            code: s.code,
+            params: s.params.iter().cloned().collect(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct StepDto {
     pub label: String,
     pub text: String,
+    /// `label`'s code and values when it is fixed words; none when it is
+    /// the person's own text (a description, a fringe's name) or not
+    /// catalogued.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_said: Option<SaidDto>,
+    /// `text`'s code and values, the same way.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_said: Option<SaidDto>,
     pub amount: Option<Cents>,
     /// "sum", "value" or "note".
     pub role: &'static str,
@@ -144,6 +174,9 @@ pub struct StepDto {
 pub struct ExplanationDto {
     pub target: TargetDto,
     pub title: String,
+    /// `title`'s code and values (see [`StepDto::label_said`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title_said: Option<SaidDto>,
     pub reported: Cents,
     pub root: StepDto,
     /// Totals treat cells with problems as blank, and so does this.
@@ -199,6 +232,8 @@ pub fn step_dto(s: &Step, depth: usize, cats: &[(usize, &method_core::Category)]
     StepDto {
         label: s.label.clone(),
         text: s.text.clone(),
+        label_said: s.label_said.as_ref().map(SaidDto::from),
+        text_said: s.text_said.as_ref().map(SaidDto::from),
         amount: s.amount,
         role: match s.role {
             Role::Sum => "sum",
@@ -225,6 +260,7 @@ pub fn explanation_dto(b: &Budget, e: &Explanation, partial: bool) -> Explanatio
     ExplanationDto {
         target: TargetDto::from(&e.target),
         title: e.title.clone(),
+        title_said: e.title_said.as_ref().map(SaidDto::from),
         reported: e.reported,
         root: step_dto(&e.root, 0, &cats),
         partial,

@@ -45,6 +45,14 @@ use crate::model::{
 use crate::report::{Report, RowTotals};
 use crate::Cents;
 
+/// The working's fixed words for `code` with `name = value` parameters, as
+/// [`Words`]: the English and what it was made from.
+macro_rules! say {
+    ($code:literal $(, $name:ident = $v:expr)* $(,)?) => {
+        Words::said($code, vec![$((stringify!($name), ($v).to_string())),*])
+    };
+}
+
 // ---------------------------------------------------------------------------
 // What can be explained, and what comes back
 
@@ -126,6 +134,12 @@ pub struct Step {
     pub label: String,
     /// The working in plain words ("40 Days x 3 x 450.00 = 54,000.00").
     pub text: String,
+    /// `label` as a message code and its values, when it is fixed words
+    /// ("Rounding", "Line 3"); `None` when it is the person's own text (a
+    /// description, a fringe's name) or not catalogued: show it as it is.
+    pub label_said: Option<Said>,
+    /// `text` as a message code and its values, the same way.
+    pub text_said: Option<Said>,
     /// What it comes to. Always there for sums and values.
     pub amount: Option<Cents>,
     pub role: Role,
@@ -138,10 +152,14 @@ pub struct Step {
 }
 
 impl Step {
-    fn note(label: impl Into<String>, text: impl Into<String>) -> Step {
+    fn note(label: impl Into<Words>, text: impl Into<Words>) -> Step {
+        let label = label.into();
+        let text = text.into();
         Step {
-            label: label.into(),
-            text: text.into(),
+            label: label.text,
+            text: text.text,
+            label_said: label.said,
+            text_said: text.said,
             amount: None,
             role: Role::Note,
             minus: false,
@@ -151,14 +169,14 @@ impl Step {
         }
     }
 
-    fn note_amount(label: impl Into<String>, text: impl Into<String>, amount: Cents) -> Step {
+    fn note_amount(label: impl Into<Words>, text: impl Into<Words>, amount: Cents) -> Step {
         Step {
             amount: Some(amount),
             ..Step::note(label, text)
         }
     }
 
-    fn value(label: impl Into<String>, text: impl Into<String>, amount: Cents) -> Step {
+    fn value(label: impl Into<Words>, text: impl Into<Words>, amount: Cents) -> Step {
         Step {
             role: Role::Value,
             amount: Some(amount),
@@ -167,7 +185,7 @@ impl Step {
     }
 
     /// A sum of `children`; its amount is worked out from them.
-    fn sum(label: impl Into<String>, text: impl Into<String>, children: Vec<Step>) -> R<Step> {
+    fn sum(label: impl Into<Words>, text: impl Into<Words>, children: Vec<Step>) -> R<Step> {
         let mut total: Cents = 0;
         for c in &children {
             if let (Role::Sum | Role::Value, Some(a)) = (c.role, c.amount) {
@@ -185,6 +203,20 @@ impl Step {
             children,
             ..Step::note(label, text)
         })
+    }
+
+    /// Gives the step other words for its label.
+    fn relabel(&mut self, label: impl Into<Words>) {
+        let label = label.into();
+        self.label = label.text;
+        self.label_said = label.said;
+    }
+
+    /// Gives the step other words for its text.
+    fn retext(&mut self, text: impl Into<Words>) {
+        let text = text.into();
+        self.text = text.text;
+        self.text_said = text.said;
     }
 
     fn with_link(mut self, link: Link) -> Step {
@@ -245,6 +277,8 @@ pub struct Explanation {
     pub target: Target,
     /// What the number is ("Account 2100 Crew: total").
     pub title: String,
+    /// `title` as a message code and its values (see [`Step::label_said`]).
+    pub title_said: Option<Said>,
     /// The number as the budget reports it.
     pub reported: Cents,
     /// The arithmetic it is worked out in (the budget's).
@@ -328,6 +362,336 @@ pub fn explain(b: &Budget, opts: &RecalcOptions, target: &Target) -> R<Explanati
 }
 
 // ---------------------------------------------------------------------------
+// The working's fixed words (decisions.md, entry 94, twelfth pass)
+
+/// A fixed piece of the working as a message code and its values, so a
+/// front end can show it in the person's language. `label` and `text`
+/// keep the English.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Said {
+    pub code: &'static str,
+    /// Each `{name}` in the code's words and its value: a number as the
+    /// working writes it, or the person's own text (a description, a
+    /// fringe's name, an account), never translated.
+    pub params: Vec<(&'static str, String)>,
+}
+
+/// One of the working's fixed sentences: its code and its English, with a
+/// form for one when it counts something (picked by its `count`).
+/// method-session's message catalog has the same codes and words (tested
+/// there), and the app's table translates them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Wording {
+    pub code: &'static str,
+    pub one: Option<&'static str>,
+    pub other: &'static str,
+}
+
+const fn w(code: &'static str, english: &'static str) -> Wording {
+    Wording {
+        code,
+        one: None,
+        other: english,
+    }
+}
+
+const fn plural(code: &'static str, one: &'static str, other: &'static str) -> Wording {
+    Wording {
+        code,
+        one: Some(one),
+        other,
+    }
+}
+
+/// The codes of the working's words all start with this.
+pub const WORDING_PREFIX: &str = "engine.working.";
+
+/// Every fixed sentence of the working, by code (sorted, tested).
+#[rustfmt::skip]
+pub const WORDING: &[Wording] = &[
+    w("engine.working.a_flat_fee", "a flat fee"),
+    w("engine.working.account_fringes", "fringes earned by the account's lines"),
+    w("engine.working.account_total", "account total"),
+    w("engine.working.adjustment_base", "the lines above, back to the previous adjustment (subtotal rows don't restart it)"),
+    w("engine.working.adjustment_base_doubles", "the lines above, back to the previous adjustment (subtotal rows don't restart it), added up in doubles"),
+    w("engine.working.after_last_level_neither", "categories after the last production total are neither above nor below the line"),
+    w("engine.working.applied_credit", "an applied credit"),
+    w("engine.working.at_least_minimum", "the rows' net spend {spend} is at least the minimum of {minimum}"),
+    w("engine.working.at_most", "at most {cap}: {capped}"),
+    w("engine.working.atl_btl_is", "above-the-line plus below-the-line"),
+    w("engine.working.atl_is", "the first production level, when a production total closes it"),
+    w("engine.working.below_minimum", "the rows' net spend {spend} is below the minimum of {minimum}, so the credit is 0"),
+    w("engine.working.blank_counts_as_0", "blank, counts as 0"),
+    w("engine.working.btl_is", "every later production level a production total closes"),
+    w("engine.working.cap_on_spend", "the spend the percent applies to is at most {cap}: {spend}"),
+    w("engine.working.category_fringe_account", "the category's fringe account (fringe posting: by category)"),
+    w("engine.working.category_fringes", "fringes earned in the category"),
+    w("engine.working.category_total", "category total"),
+    w("engine.working.charge_base", "every category with its fringes, wherever they post, plus the budget's fringe row: the grand total before charges (charges never apply to each other)"),
+    w("engine.working.charge_percent_of", "{percent}% of ({base} - {excluded}) = {exact}"),
+    w("engine.working.counted_lines_tagged", "counted lines tagged {group}, with their fringes"),
+    w("engine.working.currency", "{amount} {currency} x {rate} {base} per {currency} = {exact} {base}"),
+    w("engine.working.currency_unrounded", "{amount} {currency} (not rounded yet) x {rate} {base} per {currency} = {exact} {base}"),
+    w("engine.working.cutoff_factor", "the budget multiplies every percent cutoff by {factor}: {typed} x {factor} = {cutoff}"),
+    w("engine.working.cutoff_used_by_lines_above", "{fringe} stops at {cutoff} per earner, and the lines above in the range used it all, so this line takes nothing"),
+    w("engine.working.discount", "less {percent}%: {capped} x {keep} = {exact}"),
+    w("engine.working.earns_none", "this line earns none"),
+    w("engine.working.earns_nothing_from_it", "this line earns nothing from it"),
+    w("engine.working.every_applied_credit", "every applied credit"),
+    w("engine.working.every_line_of", "every line of {account}"),
+    w("engine.working.fee_converted", "{amount} {currency} x {rate} {base} per {currency} = {exact}"),
+    w("engine.working.fee_less", "less {fee}: {amount}"),
+    w("engine.working.fee_less_floor", "less {fee}, but never below zero: {taken} taken off, {amount}"),
+    w("engine.working.flat_cutoff_unused", "{cutoff} is kept on {fringe} but not used: cutoffs apply to percent fringes only"),
+    w("engine.working.flat_once_per_line", "flat, once per line"),
+    w("engine.working.flat_per_unit_amount", "flat, per {unit}, amount only"),
+    w("engine.working.flat_per_unit_counts", "flat, per {unit}, amount plus counts in X and 4X"),
+    w("engine.working.flat_per_unit_quantity", "flat, per {unit}, full quantity"),
+    w("engine.working.fringe_kind_flat", "a flat fringe, over every counted line"),
+    w("engine.working.fringe_kind_percent", "a percent fringe, no cutoff, over every counted line"),
+    w("engine.working.fringe_kind_percent_cutoff", "a percent fringe with a {cutoff} cutoff per earner, over every counted line"),
+    w("engine.working.fringe_kind_percent_factor", "a percent fringe with a {cutoff} cutoff per earner ({typed} x the budget's cutoff factor {factor}), over every counted line"),
+    w("engine.working.fringe_on_account_lines", "{fringe} on the account's lines"),
+    w("engine.working.fringe_range", "range {range}: lines {lines} earn as one person, so they share one cutoff, used up in line order"),
+    w("engine.working.fringes_by_line", "fringes earned by line {line}"),
+    w("engine.working.fringes_on_top", "earned on top of this total, shown in Fringe $ (not in it)"),
+    w("engine.working.grand_total_is", "above and below-the-line, the categories after the last production total, budget fringes and charges"),
+    w("engine.working.gross_account", "account {account} with its fringes, wherever fringes post"),
+    w("engine.working.gross_category", "category {category} with its fringes, wherever fringes post"),
+    w("engine.working.gross_no_account", "account {account} is not in the budget, so 0"),
+    w("engine.working.gross_no_category", "category {category} is not in the budget, so 0"),
+    w("engine.working.label.adjustment", "Adjustment"),
+    w("engine.working.label.after_last_level", "Categories after the last production total"),
+    w("engine.working.label.amount", "Amount"),
+    w("engine.working.label.atl", "Total above-the-line"),
+    w("engine.working.label.atl_btl", "Total above and below-the-line"),
+    w("engine.working.label.base", "Base"),
+    w("engine.working.label.brokers_fee", "Broker's fee"),
+    w("engine.working.label.btl", "Total below-the-line"),
+    w("engine.working.label.cap_on_spend", "Cap on spend"),
+    w("engine.working.label.charge", "Charge"),
+    w("engine.working.label.count", "Count"),
+    w("engine.working.label.credit", "Credit"),
+    w("engine.working.label.credit_cap", "Credit cap"),
+    w("engine.working.label.credits", "Credits"),
+    w("engine.working.label.currency", "Currency"),
+    w("engine.working.label.cutoff", "Cutoff"),
+    w("engine.working.label.cutoff_factor", "Cutoff factor"),
+    w("engine.working.label.cutoff_reached", "Cutoff reached"),
+    w("engine.working.label.cutoff_used_up", "Cutoff used up"),
+    w("engine.working.label.discount", "Discount"),
+    w("engine.working.label.earnings", "Earnings"),
+    w("engine.working.label.excluded", "Excluded"),
+    w("engine.working.label.excluded_amount", "Excluded amount"),
+    w("engine.working.label.excluded_fringes", "Excluded fringes"),
+    w("engine.working.label.fee", "Fee"),
+    w("engine.working.label.fringe", "Fringe"),
+    w("engine.working.label.fringe_range", "Fringe range"),
+    w("engine.working.label.fringes", "Fringes"),
+    w("engine.working.label.fringes_earned_here", "Fringes earned here"),
+    w("engine.working.label.grand_total", "Grand total"),
+    w("engine.working.label.gross", "Gross"),
+    w("engine.working.label.left_out", "Left out"),
+    w("engine.working.label.less_credits", "Less credits"),
+    w("engine.working.label.line", "Line"),
+    w("engine.working.label.line_n", "Line {line}"),
+    w("engine.working.label.lines", "Lines"),
+    w("engine.working.label.locations", "Locations"),
+    w("engine.working.label.minimum_spend", "Minimum spend"),
+    w("engine.working.label.net_spend", "Net spend"),
+    w("engine.working.label.net_total", "Net total"),
+    w("engine.working.label.no_fringes", "No fringes"),
+    w("engine.working.label.no_production_totals", "No production totals"),
+    w("engine.working.label.not_counted_here", "Not counted here"),
+    w("engine.working.label.not_rounded_yet", "Not rounded yet"),
+    w("engine.working.label.numbered_fringes", "{number} Fringes"),
+    w("engine.working.label.person", "Person"),
+    w("engine.working.label.quantity", "Quantity"),
+    w("engine.working.label.rate", "Rate"),
+    w("engine.working.label.rate_source", "Rate source"),
+    w("engine.working.label.rounding", "Rounding"),
+    w("engine.working.label.row_n", "Row {row}"),
+    w("engine.working.label.rows_added", "Rows added"),
+    w("engine.working.label.share", "Share"),
+    w("engine.working.label.shared_cap", "Shared cap"),
+    w("engine.working.label.subtotal", "Subtotal"),
+    w("engine.working.label.total_fringes", "Total fringes"),
+    w("engine.working.label.where_fringes_post", "Where fringes post"),
+    w("engine.working.label.x", "X"),
+    w("engine.working.label.x4", "4X"),
+    w("engine.working.left_out_adjustment_ungrouped", "the adjustment row has no group and the group rule leaves out lines with no group, so it shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.left_out_by_report", "the report leaves out group {groups}; counted, it would be {total}"),
+    w("engine.working.left_out_group_off", "group {groups} has In budget total off, so the line shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.left_out_group_off_conflict", "group {groups} has In budget total off (it is also in a counted group, and the group rule leaves out such conflicts), so the line shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.left_out_groups_off", "groups {groups} have In budget total off, so the line shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.left_out_groups_off_conflict", "groups {groups} have In budget total off (it is also in a counted group, and the group rule leaves out such conflicts), so the line shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.left_out_no_fringes", "the line doesn't count, so it earns no fringes"),
+    w("engine.working.left_out_not_shown", "the report shows only some groups, and this line has none of them; counted, it would be {total}"),
+    w("engine.working.left_out_ungrouped", "the line has no group and the group rule leaves out lines with no group, so it shows but counts as 0; counted, it would be {total}"),
+    w("engine.working.level_adds", "the categories since the previous production total"),
+    w("engine.working.lines_tagged", "lines tagged {group} plus their fringes"),
+    w("engine.working.net_total_is", "grand total less credits"),
+    w("engine.working.no_production_totals", "nothing is above or below the line until a production total closes the first level"),
+    w("engine.working.not_in_total_account", "not in this total: fringes post to each account's total"),
+    w("engine.working.not_in_total_budget", "not in this total: fringes post to the budget's one Total Fringes row"),
+    w("engine.working.not_in_total_category", "not in this total: fringes post to each category's fringe account"),
+    w("engine.working.not_in_total_level", "not in this total: fringes post above each production total"),
+    w("engine.working.only_lines_at", "only lines at {locations} count, with their fringes"),
+    w("engine.working.per_earner_left_not_reached", "{cutoff} per earner; {left} of it left after the lines above in the range, not reached"),
+    w("engine.working.per_earner_not_reached", "{cutoff} per earner, not reached"),
+    w("engine.working.per_person_not_reached", "{cutoff} per person, not reached: {person} is paid {pay} with {fringe}, so each line earns its own percent"),
+    w("engine.working.percent_of", "{percent}% of {base} = {exact}"),
+    w("engine.working.percent_of_budget", "{percent}% of the budget"),
+    w("engine.working.percent_of_capped", "{percent}% of {base} = {exact}, capped at {cap}: {credit}"),
+    w("engine.working.percent_of_rate", "{percent}% of {base} = {exact} (rate {formula})"),
+    w("engine.working.percent_with_cutoff", "{percent}% with a {cutoff} cutoff"),
+    w("engine.working.percent_with_cutoff_per_person", "{percent}% with a {cutoff} cutoff per person"),
+    plural("engine.working.person_paid_account", "{person} is paid on {count} line in account {accounts}, so they share one cutoff", "{person} is paid on {count} lines in account {accounts}, so they share one cutoff"),
+    plural("engine.working.person_paid_account_no_cutoff", "{person} is paid on {count} line in account {accounts}; {fringe} has no cutoff, so each line earns its own percent", "{person} is paid on {count} lines in account {accounts}; {fringe} has no cutoff, so each line earns its own percent"),
+    plural("engine.working.person_paid_accounts", "{person} is paid on {count} line in accounts {accounts}, so they share one cutoff", "{person} is paid on {count} lines in accounts {accounts}, so they share one cutoff"),
+    plural("engine.working.person_paid_accounts_no_cutoff", "{person} is paid on {count} line in accounts {accounts}; {fringe} has no cutoff, so each line earns its own percent", "{person} is paid on {count} lines in accounts {accounts}; {fringe} has no cutoff, so each line earns its own percent"),
+    w("engine.working.person_past_cutoff", "{person} is paid {pay} with {fringe}, past the {cutoff} cutoff, so {person} earns {percent}% of {cutoff} = {exact}"),
+    w("engine.working.person_past_cutoff_rate", "{person} is paid {pay} with {fringe}, past the {cutoff} cutoff, so {person} earns {percent}% of {cutoff} = {exact} (rate {formula})"),
+    w("engine.working.posted_above_level", "posted above the production total (fringe posting: by production level)"),
+    w("engine.working.posted_to_account", "posted to the account (fringe posting: by account)"),
+    w("engine.working.posting_account", "fringes post to each account's total (a budget setting)"),
+    w("engine.working.posting_budget", "fringes post to the budget's one Total Fringes row (a budget setting)"),
+    w("engine.working.posting_category", "fringes post to each category's fringe account (a budget setting)"),
+    w("engine.working.posting_level", "fringes post above each production total (a budget setting)"),
+    w("engine.working.rounded_once", "rows are added, capped and discounted before the one rounding"),
+    w("engine.working.rounds_double", "{amount} rounds to {rounded} (spreadsheet rounding: half up on the binary value)"),
+    w("engine.working.rounds_double_held", "{amount} is {held} as a binary double, so it rounds to {rounded} (spreadsheet rounding: half up on the binary value)"),
+    w("engine.working.rounds_exact", "{amount} rounds half away from zero to {rounded}"),
+    w("engine.working.row_adjustment", "{code} line {line}, adjustment"),
+    w("engine.working.row_line", "{code} line {line}, line"),
+    w("engine.working.row_line_left_out", "{code} line {line}, line, left out"),
+    w("engine.working.share", "this line's part of {person}'s {amount}, by pay: {amount} x {total} / {pay}, {floor} rounded down"),
+    w("engine.working.share_extra_cent", "this line's part of {person}'s {amount}, by pay: {amount} x {total} / {pay}, {floor} rounded down, plus one of the cents left over (shares rounded down; the left-over cents go to the largest remainders, then the lowest row id)"),
+    w("engine.working.shared_cap_missing", "{name} is not in the budget's shared caps, so it holds nothing down"),
+    w("engine.working.shared_cap_share", "{name} caps this credit and {others} at {cap} together; its share, in proportion to {capped}, is {share}"),
+    w("engine.working.shared_cap_within", "{name} caps the credits sharing it at {cap} together, which they are within"),
+    w("engine.working.stops_per_earner", "{fringe} stops at {cutoff} per earner"),
+    w("engine.working.stops_per_earner_left", "{fringe} stops at {cutoff} per earner; {left} of it left after the lines above in the range"),
+    w("engine.working.stops_per_person", "{fringe} stops at {cutoff} per person, so nothing is earned"),
+    w("engine.working.subtotal_adds", "the lines and adjustments since the previous subtotal row"),
+    w("engine.working.taken_off_base", "taken off the base"),
+    w("engine.working.taken_off_fee", "taken off the fee (typed amounts, and the lines of excluded groups, accounts and categories with their fringes)"),
+    w("engine.working.this_lines_total", "this line's total"),
+    w("engine.working.title.account_fringes", "Account {account}: fringes"),
+    w("engine.working.title.account_lines", "Account {account}: lines"),
+    w("engine.working.title.account_total", "Account {account}: total"),
+    w("engine.working.title.after_last_level_fringes", "Categories after the last production total: fringes"),
+    w("engine.working.title.after_last_level_total", "Categories after the last production total: total"),
+    w("engine.working.title.category_fringes", "Category {category}: fringes"),
+    w("engine.working.title.category_total", "Category {category}: total"),
+    w("engine.working.title.charge", "Charge {name}"),
+    w("engine.working.title.credit", "Credit {name}"),
+    w("engine.working.title.fringe_total", "Fringe {fringe}: total"),
+    w("engine.working.title.level_fringes", "{level}: fringes"),
+    w("engine.working.title.level_total", "{level}: total"),
+    w("engine.working.title.line_described_fringe", "{code} line {line} ({description}): {fringe}"),
+    w("engine.working.title.line_described_fringes", "{code} line {line} ({description}): fringes"),
+    w("engine.working.title.line_described_total", "{code} line {line} ({description}): total"),
+    w("engine.working.title.line_fringe", "{code} line {line}: {fringe}"),
+    w("engine.working.title.line_fringes", "{code} line {line}: fringes"),
+    w("engine.working.title.line_total", "{code} line {line}: total"),
+    w("engine.working.total_fringes_is", "every fringe in the budget, outside above and below-the-line (fringe posting: by budget)"),
+    w("engine.working.trailing_fringes_dropped", "no production total follows these categories, so their fringes post nowhere and count in no total (trailing level fringes: drop)"),
+    w("engine.working.typed_in", "typed in"),
+    w("engine.working.whole_units_half_away", "the budget rounds account totals to whole units: the lines come to {lines}, which rounds to the nearest whole unit, a half away from zero to {whole}"),
+    w("engine.working.whole_units_half_up", "the budget rounds account totals to whole units: the lines come to {lines}, which rounds to the nearest whole unit, a half up to {whole}"),
+];
+
+/// Words in the working: the English, and the code and values it was made
+/// from when it is fixed words (`None`: the person's own text, or not
+/// catalogued).
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Words {
+    text: String,
+    said: Option<Said>,
+}
+
+impl Words {
+    /// `code`'s English with `params` filled in. Every `{name}` in it has a
+    /// value and every value a `{name}` (checked in debug builds).
+    fn said(code: &'static str, params: Vec<(&'static str, String)>) -> Words {
+        let Ok(i) = WORDING.binary_search_by(|w| w.code.cmp(code)) else {
+            debug_assert!(false, "{code} is not in WORDING");
+            return Words::from(code);
+        };
+        let w = WORDING[i];
+        let one = params.iter().any(|(n, v)| *n == "count" && v == "1");
+        let english = match w.one {
+            Some(o) if one => o,
+            _ => w.other,
+        };
+        let (text, used, missing) = fill(english, &params);
+        debug_assert!(
+            used.len() == params.len() && !missing,
+            "{code}: the values {params:?} don't fit {english:?}"
+        );
+        Words {
+            text,
+            said: Some(Said { code, params }),
+        }
+    }
+}
+
+impl From<String> for Words {
+    fn from(text: String) -> Words {
+        Words { text, said: None }
+    }
+}
+
+impl From<&str> for Words {
+    fn from(text: &str) -> Words {
+        Words::from(text.to_string())
+    }
+}
+
+impl From<&String> for Words {
+    fn from(text: &String) -> Words {
+        Words::from(text.clone())
+    }
+}
+
+/// `template` with each `{name}` replaced by its value in one pass, as
+/// method-session's `messages::fill` does, the names that were used, and
+/// whether a name had no value.
+fn fill(
+    template: &str,
+    params: &[(&'static str, String)],
+) -> (String, BTreeSet<&'static str>, bool) {
+    let mut out = String::with_capacity(template.len());
+    let mut used = BTreeSet::new();
+    let mut missing = false;
+    let mut rest = template;
+    while let Some(at) = rest.find('{') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        let name = after.find('}').map(|end| &after[..end]).filter(|n| {
+            !n.is_empty()
+                && n.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+        });
+        match name.and_then(|n| params.iter().find(|(p, _)| *p == n)) {
+            Some((p, v)) => {
+                out.push_str(v);
+                used.insert(*p);
+                rest = &after[p.len() + 1..];
+            }
+            None => {
+                missing |= name.is_some();
+                out.push('{');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    (out, used, missing)
+}
+
+// ---------------------------------------------------------------------------
 // Number formatting for the plain words
 
 /// `123456` cents as `1,234.56`, negatives with a minus sign.
@@ -384,27 +748,30 @@ fn rounding(m: impl Into<Money>, rounded: Cents) -> Option<Step> {
     let m = m.into();
     (!m.is_cents(rounded)).then(|| {
         let text = match m {
-            Money::Exact(_) => format!(
-                "{} rounds half away from zero to {}",
-                dmoney(m),
-                money(rounded)
+            Money::Exact(_) => say!(
+                "engine.working.rounds_exact",
+                amount = dmoney(m),
+                rounded = money(rounded)
             ),
             Money::F64(v) => {
                 let held = float_digits(v);
-                let held = if held == float_text(v) {
-                    String::new()
+                if held == float_text(v) {
+                    say!(
+                        "engine.working.rounds_double",
+                        amount = dmoney(m),
+                        rounded = money(rounded)
+                    )
                 } else {
-                    format!(" is {} as a binary double, so it", dmoney(held))
-                };
-                format!(
-                    "{}{held} rounds to {} (spreadsheet rounding: {})",
-                    dmoney(m),
-                    money(rounded),
-                    m.rule()
-                )
+                    say!(
+                        "engine.working.rounds_double_held",
+                        amount = dmoney(m),
+                        held = dmoney(held),
+                        rounded = money(rounded)
+                    )
+                }
             }
         };
-        Step::note("Rounding", text)
+        Step::note(say!("engine.working.label.rounding"), text)
     })
 }
 
@@ -621,7 +988,8 @@ impl<'a> Explainer<'a> {
         };
         Ok(Explanation {
             target: t.clone(),
-            title,
+            title: title.text,
+            title_said: title.said,
             reported,
             arithmetic: self.b.arithmetic,
             root,
@@ -631,12 +999,12 @@ impl<'a> Explainer<'a> {
     // -----------------------------------------------------------------------
     // Lines
 
-    fn line(&self, id: RowId) -> R<(String, Step)> {
+    fn line(&self, id: RowId) -> R<(Words, Step)> {
         let (ci, ai, i) = self.find_row(id)?;
         let acct = self.acct(ci, ai);
         let d = &acct.details[i];
         let r = &self.accounts[ci][ai].rows[i];
-        let title = format!("{}: total", row_name(&acct.code, i, d));
+        let title = row_title(&acct.code, i, d, RowPart::Total);
         match d.kind {
             RowKind::Separator => Err(ExplainError(
                 "a separator is a drawn rule: it has no total".into(),
@@ -648,12 +1016,12 @@ impl<'a> Explainer<'a> {
                     .iter()
                     .filter_map(|&k| calc.rows[k].value.clone())
                     .collect();
-                let s = Step::sum(
-                    d.description.trim().to_string().or("Subtotal"),
-                    "the lines and adjustments since the previous subtotal row",
-                    children,
-                )?
-                .with_link(Link::Row { ci, ai, row: id });
+                let label = match d.description.trim() {
+                    "" => say!("engine.working.label.subtotal"),
+                    t => Words::from(t),
+                };
+                let s = Step::sum(label, say!("engine.working.subtotal_adds"), children)?
+                    .with_link(Link::Row { ci, ai, row: id });
                 Ok((title, s))
             }
             RowKind::Line | RowKind::Adjustment => {
@@ -661,8 +1029,8 @@ impl<'a> Explainer<'a> {
                 if r.included && r.fringe_total != 0 {
                     s.children.push(
                         Step::note_amount(
-                            "Fringes",
-                            "earned on top of this total, shown in Fringe $ (not in it)",
+                            say!("engine.working.label.fringes"),
+                            say!("engine.working.fringes_on_top"),
                             r.fringe_total,
                         )
                         .with_expand(Target::LineFringes(id)),
@@ -681,49 +1049,48 @@ impl<'a> Explainer<'a> {
         let mut children: Vec<Step> = r.fringes.iter().map(|(_, s)| s.clone()).collect();
         if !r.included && !d.fringes.is_empty() {
             children.push(Step::note(
-                "Left out",
-                "the line doesn't count, so it earns no fringes",
+                say!("engine.working.label.left_out"),
+                say!("engine.working.left_out_no_fringes"),
             ));
         }
         Ok(Step::sum(
             line_label(i, d),
-            format!("fringes earned by line {}", i + 1),
+            say!("engine.working.fringes_by_line", line = i + 1),
             children,
         )?
         .with_link(Link::Row { ci, ai, row: d.id })
         .with_expand(Target::LineFringes(d.id)))
     }
 
-    fn line_fringes(&self, id: RowId) -> R<(String, Step)> {
+    fn line_fringes(&self, id: RowId) -> R<(Words, Step)> {
         let (ci, ai, i) = self.find_row(id)?;
         let acct = self.acct(ci, ai);
-        let title = format!("{}: fringes", row_name(&acct.code, i, &acct.details[i]));
+        let title = row_title(&acct.code, i, &acct.details[i], RowPart::Fringes);
         let mut s = self.row_fringes_step(ci, ai, i)?;
         s.expand = None;
         if s.children.is_empty() {
-            s.children
-                .push(Step::note("No fringes", "this line earns none"));
+            s.children.push(Step::note(
+                say!("engine.working.label.no_fringes"),
+                say!("engine.working.earns_none"),
+            ));
         }
         s.children.push(self.posting_note());
         Ok((title, s))
     }
 
-    fn line_fringe(&self, id: RowId, name: &str) -> R<(String, Step)> {
+    fn line_fringe(&self, id: RowId, name: &str) -> R<(Words, Step)> {
         let (ci, ai, i) = self.find_row(id)?;
         let acct = self.acct(ci, ai);
         let r = &self.accounts[ci][ai].rows[i];
-        let title = format!("{}: {name}", row_name(&acct.code, i, &acct.details[i]));
+        let title = row_title(&acct.code, i, &acct.details[i], RowPart::Fringe(name));
         let s = r
             .fringes
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, s)| s.clone())
             .unwrap_or_else(|| {
-                Step::value(name, "this line earns nothing from it", 0).with_link(Link::Row {
-                    ci,
-                    ai,
-                    row: id,
-                })
+                Step::value(name, say!("engine.working.earns_nothing_from_it"), 0)
+                    .with_link(Link::Row { ci, ai, row: id })
             });
         Ok((title, s))
     }
@@ -766,24 +1133,31 @@ impl<'a> Explainer<'a> {
                 .ok_or_else(ovf)?;
             let whole = super::arith::whole_units(self.b.arithmetic, lines).ok_or_else(ovf)?;
             if whole != lines {
-                let rule = match self.b.arithmetic {
-                    Arithmetic::Mmb => "to the nearest whole unit, a half up",
-                    Arithmetic::Exact => "to the nearest whole unit, a half away from zero",
+                let text = match self.b.arithmetic {
+                    Arithmetic::Mmb => say!(
+                        "engine.working.whole_units_half_up",
+                        lines = money(lines),
+                        whole = money(whole)
+                    ),
+                    Arithmetic::Exact => say!(
+                        "engine.working.whole_units_half_away",
+                        lines = money(lines),
+                        whole = money(whole)
+                    ),
                 };
                 children.push(Step::value(
-                    "Rounding",
-                    format!(
-                        "the budget rounds account totals to whole units: the lines come to {}, which rounds {rule} to {}",
-                        money(lines),
-                        money(whole)
-                    ),
+                    say!("engine.working.label.rounding"),
+                    text,
                     whole.checked_sub(lines).ok_or_else(ovf)?,
                 ));
             }
         }
         Ok(Step::sum(
-            "Lines",
-            format!("every line of {}", self.account_name(ci, ai)),
+            say!("engine.working.label.lines"),
+            say!(
+                "engine.working.every_line_of",
+                account = self.account_name(ci, ai)
+            ),
             children,
         )?
         .with_link(Link::Account { ci, ai })
@@ -800,7 +1174,7 @@ impl<'a> Explainer<'a> {
         }
         Ok(Step::sum(
             self.account_name(ci, ai),
-            "fringes earned by the account's lines",
+            say!("engine.working.account_fringes"),
             children,
         )?
         .with_link(Link::Account { ci, ai })
@@ -812,46 +1186,60 @@ impl<'a> Explainer<'a> {
         let mut children = vec![self.lines_step(ci, ai)?];
         if self.b.fringe_posting == FringePosting::Account {
             let mut f = self.account_fringes_step(ci, ai)?;
-            f.label = "Fringes".into();
-            f.text = "posted to the account (fringe posting: by account)".into();
+            f.relabel(say!("engine.working.label.fringes"));
+            f.retext(say!("engine.working.posted_to_account"));
             children.push(f);
         } else if self.accounts[ci][ai].fringe_total != 0 {
             children.push(
                 Step::note_amount(
-                    "Fringes earned here",
-                    format!("not in this total: {}", self.posting_words()),
+                    say!("engine.working.label.fringes_earned_here"),
+                    self.not_in_this_total(),
                     self.accounts[ci][ai].fringe_total,
                 )
                 .with_expand(Target::AccountFringes { ci, ai }),
             );
         }
-        Ok(
-            Step::sum(self.account_name(ci, ai), "account total", children)?
-                .with_link(Link::Account { ci, ai })
-                .with_expand(Target::Account { ci, ai }),
-        )
+        Ok(Step::sum(
+            self.account_name(ci, ai),
+            say!("engine.working.account_total"),
+            children,
+        )?
+        .with_link(Link::Account { ci, ai })
+        .with_expand(Target::Account { ci, ai }))
     }
 
-    fn account(&self, ci: usize, ai: usize) -> R<(String, Step)> {
+    fn account(&self, ci: usize, ai: usize) -> R<(Words, Step)> {
         self.check_account(ci, ai)?;
         let mut s = self.account_step(ci, ai)?;
         s.expand = None;
-        Ok((format!("Account {}: total", self.account_name(ci, ai)), s))
+        let title = say!(
+            "engine.working.title.account_total",
+            account = self.account_name(ci, ai)
+        );
+        Ok((title, s))
     }
 
-    fn account_lines(&self, ci: usize, ai: usize) -> R<(String, Step)> {
+    fn account_lines(&self, ci: usize, ai: usize) -> R<(Words, Step)> {
         self.check_account(ci, ai)?;
         let mut s = self.lines_step(ci, ai)?;
         s.expand = None;
-        Ok((format!("Account {}: lines", self.account_name(ci, ai)), s))
+        let title = say!(
+            "engine.working.title.account_lines",
+            account = self.account_name(ci, ai)
+        );
+        Ok((title, s))
     }
 
-    fn account_fringes(&self, ci: usize, ai: usize) -> R<(String, Step)> {
+    fn account_fringes(&self, ci: usize, ai: usize) -> R<(Words, Step)> {
         self.check_account(ci, ai)?;
         let mut s = self.account_fringes_step(ci, ai)?;
         s.expand = None;
         s.children.push(self.posting_note());
-        Ok((format!("Account {}: fringes", self.account_name(ci, ai)), s))
+        let title = say!(
+            "engine.working.title.account_fringes",
+            account = self.account_name(ci, ai)
+        );
+        Ok((title, s))
     }
 
     fn category_name(&self, ci: usize) -> String {
@@ -874,7 +1262,7 @@ impl<'a> Explainer<'a> {
             .collect::<R<Vec<_>>>()?;
         Ok(Step::sum(
             self.category_name(ci),
-            "fringes earned in the category",
+            say!("engine.working.category_fringes"),
             children,
         )?
         .with_link(Link::Category { ci })
@@ -902,8 +1290,14 @@ impl<'a> Explainer<'a> {
                     .map(|(n, _)| n.clone())
                     .unwrap_or_default();
                 let mut f = self.category_fringes_step(ci)?;
-                f.label = format!("{number} Fringes").trim().to_string();
-                f.text = "the category's fringe account (fringe posting: by category)".into();
+                f.relabel(match number.trim() {
+                    "" => say!("engine.working.label.fringes"),
+                    _ => say!(
+                        "engine.working.label.numbered_fringes",
+                        number = number.trim_start()
+                    ),
+                });
+                f.retext(say!("engine.working.category_fringe_account"));
                 children.push(f);
             }
             FringePosting::Account => {}
@@ -912,8 +1306,8 @@ impl<'a> Explainer<'a> {
                 if total != 0 {
                     children.push(
                         Step::note_amount(
-                            "Fringes earned here",
-                            format!("not in this total: {}", self.posting_words()),
+                            say!("engine.working.label.fringes_earned_here"),
+                            self.not_in_this_total(),
                             total,
                         )
                         .with_expand(Target::CategoryFringes(ci)),
@@ -921,11 +1315,13 @@ impl<'a> Explainer<'a> {
                 }
             }
         }
-        Ok(
-            Step::sum(self.category_name(ci), "category total", children)?
-                .with_link(Link::Category { ci })
-                .with_expand(Target::Category(ci)),
-        )
+        Ok(Step::sum(
+            self.category_name(ci),
+            say!("engine.working.category_total"),
+            children,
+        )?
+        .with_link(Link::Category { ci })
+        .with_expand(Target::Category(ci)))
     }
 
     fn category_fringe_total(&self, ci: usize) -> R<Cents> {
@@ -935,40 +1331,50 @@ impl<'a> Explainer<'a> {
             .ok_or_else(ovf)
     }
 
-    fn category(&self, ci: usize) -> R<(String, Step)> {
+    fn category(&self, ci: usize) -> R<(Words, Step)> {
         self.check_category(ci)?;
         let mut s = self.category_step(ci)?;
         s.expand = None;
-        Ok((format!("Category {}: total", self.category_name(ci)), s))
+        let title = say!(
+            "engine.working.title.category_total",
+            category = self.category_name(ci)
+        );
+        Ok((title, s))
     }
 
-    fn category_fringes(&self, ci: usize) -> R<(String, Step)> {
+    fn category_fringes(&self, ci: usize) -> R<(Words, Step)> {
         self.check_category(ci)?;
         let mut s = self.category_fringes_step(ci)?;
         s.expand = None;
         s.children.push(self.posting_note());
-        Ok((format!("Category {}: fringes", self.category_name(ci)), s))
+        let title = say!(
+            "engine.working.title.category_fringes",
+            category = self.category_name(ci)
+        );
+        Ok((title, s))
     }
 
     // -----------------------------------------------------------------------
     // Topsheet
 
-    fn posting_words(&self) -> String {
+    /// "not in this total: " and where fringes post.
+    fn not_in_this_total(&self) -> Words {
         match &self.b.fringe_posting {
-            FringePosting::Budget => "fringes post to the budget's one Total Fringes row".into(),
-            FringePosting::ProductionLevel => "fringes post above each production total".into(),
-            FringePosting::Category { .. } => {
-                "fringes post to each category's fringe account".into()
-            }
-            FringePosting::Account => "fringes post to each account's total".into(),
+            FringePosting::Budget => say!("engine.working.not_in_total_budget"),
+            FringePosting::ProductionLevel => say!("engine.working.not_in_total_level"),
+            FringePosting::Category { .. } => say!("engine.working.not_in_total_category"),
+            FringePosting::Account => say!("engine.working.not_in_total_account"),
         }
     }
 
     fn posting_note(&self) -> Step {
-        Step::note(
-            "Where fringes post",
-            format!("{} (a budget setting)", self.posting_words()),
-        )
+        let text = match &self.b.fringe_posting {
+            FringePosting::Budget => say!("engine.working.posting_budget"),
+            FringePosting::ProductionLevel => say!("engine.working.posting_level"),
+            FringePosting::Category { .. } => say!("engine.working.posting_category"),
+            FringePosting::Account => say!("engine.working.posting_account"),
+        };
+        Step::note(say!("engine.working.label.where_fringes_post"), text)
     }
 
     fn level_fringes_step(&self, li: usize) -> R<Step> {
@@ -980,9 +1386,8 @@ impl<'a> Explainer<'a> {
         let dropped = dropped_from(self.b).is_some_and(|d| lv.start >= d);
         let children = if dropped {
             vec![Step::note(
-                "Left out",
-                "no production total follows these categories, so their fringes post nowhere \
-                 and count in no total (trailing level fringes: drop)",
+                say!("engine.working.label.left_out"),
+                say!("engine.working.trailing_fringes_dropped"),
             )]
         } else if self.b.fringe_posting == FringePosting::ProductionLevel {
             (lv.start..lv.end)
@@ -992,17 +1397,19 @@ impl<'a> Explainer<'a> {
             Vec::new()
         };
         Ok(Step::sum(
-            "Fringes",
-            "posted above the production total (fringe posting: by production level)",
+            say!("engine.working.label.fringes"),
+            say!("engine.working.posted_above_level"),
             children,
         )?
         .with_expand(Target::LevelFringes(li)))
     }
 
-    fn level_name(&self, li: usize) -> String {
+    /// The production total's name, or `None` for the categories after the
+    /// last one.
+    fn level_name(&self, li: usize) -> Option<String> {
         match self.report.levels.get(li) {
-            Some(l) if !l.name.is_empty() => l.name.clone(),
-            _ => "Categories after the last production total".into(),
+            Some(l) if !l.name.is_empty() => Some(l.name.clone()),
+            _ => None,
         }
     }
 
@@ -1018,25 +1425,35 @@ impl<'a> Explainer<'a> {
         if self.b.fringe_posting == FringePosting::ProductionLevel {
             children.push(self.level_fringes_step(li)?);
         }
-        Ok(Step::sum(
-            self.level_name(li),
-            "the categories since the previous production total",
-            children,
-        )?
-        .with_expand(Target::Level(li)))
+        let label = match self.level_name(li) {
+            Some(n) => Words::from(n),
+            None => say!("engine.working.label.after_last_level"),
+        };
+        Ok(
+            Step::sum(label, say!("engine.working.level_adds"), children)?
+                .with_expand(Target::Level(li)),
+        )
     }
 
-    fn level(&self, li: usize) -> R<(String, Step)> {
+    fn level(&self, li: usize) -> R<(Words, Step)> {
         let mut s = self.level_step(li)?;
         s.expand = None;
-        Ok((format!("{}: total", self.level_name(li)), s))
+        let title = match self.level_name(li) {
+            Some(n) => say!("engine.working.title.level_total", level = n),
+            None => say!("engine.working.title.after_last_level_total"),
+        };
+        Ok((title, s))
     }
 
-    fn level_fringes(&self, li: usize) -> R<(String, Step)> {
+    fn level_fringes(&self, li: usize) -> R<(Words, Step)> {
         let mut s = self.level_fringes_step(li)?;
         s.expand = None;
         s.children.push(self.posting_note());
-        Ok((format!("{}: fringes", self.level_name(li)), s))
+        let title = match self.level_name(li) {
+            Some(n) => say!("engine.working.title.level_fringes", level = n),
+            None => say!("engine.working.title.after_last_level_fringes"),
+        };
+        Ok((title, s))
     }
 
     /// How many levels a real production total closes (the first is
@@ -1063,13 +1480,13 @@ impl<'a> Explainer<'a> {
             .collect::<R<Vec<_>>>()?;
         if split == 0 {
             children.push(Step::note(
-                "No production totals",
-                "nothing is above or below the line until a production total closes the first level",
+                say!("engine.working.label.no_production_totals"),
+                say!("engine.working.no_production_totals"),
             ));
         }
         Ok(Step::sum(
-            "Total above-the-line",
-            "the first production level, when a production total closes it",
+            say!("engine.working.label.atl"),
+            say!("engine.working.atl_is"),
             children,
         )?
         .with_expand(Target::Atl))
@@ -1083,13 +1500,13 @@ impl<'a> Explainer<'a> {
             .collect::<R<Vec<_>>>()?;
         if closed < self.report.levels.len() {
             children.push(Step::note(
-                "Not counted here",
-                "categories after the last production total are neither above nor below the line",
+                say!("engine.working.label.not_counted_here"),
+                say!("engine.working.after_last_level_neither"),
             ));
         }
         Ok(Step::sum(
-            "Total below-the-line",
-            "every later production level a production total closes",
+            say!("engine.working.label.btl"),
+            say!("engine.working.btl_is"),
             children,
         )?
         .with_expand(Target::Btl))
@@ -1105,29 +1522,29 @@ impl<'a> Explainer<'a> {
 
     fn atl_btl_step(&self) -> R<Step> {
         Ok(Step::sum(
-            "Total above and below-the-line",
-            "above-the-line plus below-the-line",
+            say!("engine.working.label.atl_btl"),
+            say!("engine.working.atl_btl_is"),
             vec![self.atl_step()?, self.btl_step()?],
         )?
         .with_expand(Target::AtlBtl))
     }
 
-    fn atl(&self) -> R<(String, Step)> {
+    fn atl(&self) -> R<(Words, Step)> {
         let mut s = self.atl_step()?;
         s.expand = None;
-        Ok(("Total above-the-line".into(), s))
+        Ok((say!("engine.working.label.atl"), s))
     }
 
-    fn btl(&self) -> R<(String, Step)> {
+    fn btl(&self) -> R<(Words, Step)> {
         let mut s = self.btl_step()?;
         s.expand = None;
-        Ok(("Total below-the-line".into(), s))
+        Ok((say!("engine.working.label.btl"), s))
     }
 
-    fn atl_btl(&self) -> R<(String, Step)> {
+    fn atl_btl(&self) -> R<(Words, Step)> {
         let mut s = self.atl_btl_step()?;
         s.expand = None;
-        Ok(("Total above and below-the-line".into(), s))
+        Ok((say!("engine.working.label.atl_btl"), s))
     }
 
     fn budget_fringes_step(&self) -> R<Step> {
@@ -1139,18 +1556,18 @@ impl<'a> Explainer<'a> {
             Vec::new()
         };
         Ok(Step::sum(
-            "Total fringes",
-            "every fringe in the budget, outside above and below-the-line (fringe posting: by budget)",
+            say!("engine.working.label.total_fringes"),
+            say!("engine.working.total_fringes_is"),
             children,
         )?
         .with_expand(Target::BudgetFringes))
     }
 
-    fn budget_fringes(&self) -> R<(String, Step)> {
+    fn budget_fringes(&self) -> R<(Words, Step)> {
         let mut s = self.budget_fringes_step()?;
         s.expand = None;
         s.children.push(self.posting_note());
-        Ok(("Total fringes".into(), s))
+        Ok((say!("engine.working.label.total_fringes"), s))
     }
 
     /// Everything before charges: above and below-the-line, the categories
@@ -1164,48 +1581,52 @@ impl<'a> Explainer<'a> {
         Ok(children)
     }
 
-    fn grand_total(&self) -> R<(String, Step)> {
+    fn grand_total(&self) -> R<(Words, Step)> {
         let mut children = self.before_charges_steps()?;
         for i in 0..self.report.charges.len() {
             children.push(self.charge_step(i)?);
         }
         let s = Step::sum(
-            "Grand total",
-            "above and below-the-line, the categories after the last production total, budget fringes and charges",
+            say!("engine.working.label.grand_total"),
+            say!("engine.working.grand_total_is"),
             children,
         )?;
-        Ok(("Grand total".into(), s))
+        Ok((say!("engine.working.label.grand_total"), s))
     }
 
     fn credits_total_step(&self) -> R<Step> {
         let children = (0..self.report.credits.len())
             .map(|i| self.credit_step(i))
             .collect::<R<Vec<_>>>()?;
-        Ok(Step::sum("Credits", "every applied credit", children)?
-            .with_expand(Target::CreditsTotal))
+        Ok(Step::sum(
+            say!("engine.working.label.credits"),
+            say!("engine.working.every_applied_credit"),
+            children,
+        )?
+        .with_expand(Target::CreditsTotal))
     }
 
-    fn credits_total(&self) -> R<(String, Step)> {
+    fn credits_total(&self) -> R<(Words, Step)> {
         let mut s = self.credits_total_step()?;
         s.expand = None;
-        Ok(("Credits".into(), s))
+        Ok((say!("engine.working.label.credits"), s))
     }
 
-    fn net_total(&self) -> R<(String, Step)> {
+    fn net_total(&self) -> R<(Words, Step)> {
         let (_, mut grand) = self.grand_total()?;
         grand.expand = Some(Target::GrandTotal);
         let mut credits = self.credits_total_step()?;
         credits.minus = true;
-        credits.label = "Less credits".into();
+        credits.relabel(say!("engine.working.label.less_credits"));
         let s = Step::sum(
-            "Net total",
-            "grand total less credits",
+            say!("engine.working.label.net_total"),
+            say!("engine.working.net_total_is"),
             vec![grand, credits],
         )?;
-        Ok(("Net total".into(), s))
+        Ok((say!("engine.working.label.net_total"), s))
     }
 
-    fn fringe(&self, name: &str) -> R<(String, Step)> {
+    fn fringe(&self, name: &str) -> R<(Words, Step)> {
         let f = self
             .b
             .fringes
@@ -1225,7 +1646,7 @@ impl<'a> Explainer<'a> {
                     accounts.push(
                         Step::sum(
                             self.account_name(ci, ai),
-                            format!("{name} on the account's lines"),
+                            say!("engine.working.fringe_on_account_lines", fringe = name),
                             lines,
                         )?
                         .with_link(Link::Account { ci, ai }),
@@ -1237,20 +1658,23 @@ impl<'a> Explainer<'a> {
             FringeKind::Percent { cutoff: Some(c) } => {
                 let factor = self.b.cutoff_factor;
                 match factored_cutoff(self.b.arithmetic, Some(*c), factor) {
-                    Some(Some(eff)) if factor != CutoffFactor::One => format!(
-                        "a percent fringe with a {} cutoff per earner ({} x the budget's cutoff factor {})",
-                        money(eff),
-                        money(*c),
-                        factor.name()
+                    Some(Some(eff)) if factor != CutoffFactor::One => say!(
+                        "engine.working.fringe_kind_percent_factor",
+                        cutoff = money(eff),
+                        typed = money(*c),
+                        factor = factor.name()
                     ),
-                    _ => format!("a percent fringe with a {} cutoff per earner", money(*c)),
+                    _ => say!(
+                        "engine.working.fringe_kind_percent_cutoff",
+                        cutoff = money(*c)
+                    ),
                 }
             }
-            FringeKind::Percent { cutoff: None } => "a percent fringe, no cutoff".into(),
-            FringeKind::Flat { .. } => "a flat fringe".into(),
+            FringeKind::Percent { cutoff: None } => say!("engine.working.fringe_kind_percent"),
+            FringeKind::Flat { .. } => say!("engine.working.fringe_kind_flat"),
         };
-        let s = Step::sum(name, format!("{kind}, over every counted line"), accounts)?;
-        Ok((format!("Fringe {name}: total"), s))
+        let s = Step::sum(name, kind, accounts)?;
+        Ok((say!("engine.working.title.fringe_total", fringe = name), s))
     }
 
     // -----------------------------------------------------------------------
@@ -1321,11 +1745,11 @@ impl<'a> Explainer<'a> {
         for (desc, amt) in &c.excluded_amounts {
             excluded = excluded.checked_add(*amt).ok_or_else(ovf)?;
             ex_children.push(Step::note_amount(
-                "Excluded amount",
+                say!("engine.working.label.excluded_amount"),
                 if desc.trim().is_empty() {
-                    "typed in".to_string()
+                    say!("engine.working.typed_in")
                 } else {
-                    desc.trim().to_string()
+                    Words::from(desc.trim())
                 },
                 *amt,
             ));
@@ -1353,30 +1777,37 @@ impl<'a> Explainer<'a> {
             ChargeKind::Percent(p) => {
                 let base = self.before_charges_total()?;
                 notes.push(Step::note_amount(
-                    "Base",
-                    "every category with its fringes, wherever they post, plus the budget's \
-                     fringe row: the grand total before charges (charges never apply to each other)",
+                    say!("engine.working.label.base"),
+                    say!("engine.working.charge_base"),
                     base,
                 ));
                 notes.push(
-                    Step::note_amount("Excluded", "taken off the base", excluded).with(ex_children),
+                    Step::note_amount(
+                        say!("engine.working.label.excluded"),
+                        say!("engine.working.taken_off_base"),
+                        excluded,
+                    )
+                    .with(ex_children),
                 );
                 let net = base.checked_sub(excluded).ok_or_else(ovf)?;
                 let arith = self.b.arithmetic;
                 let exact = percent_of(arith, net, Num::of(arith, *p)).ok_or_else(ovf)?;
                 let amount = exact.to_cents().ok_or_else(ovf)?;
                 notes.push(Step::note(
-                    "Charge",
-                    format!(
-                        "{}% of ({} - {}) = {}",
-                        num(*p),
-                        money(base),
-                        money(excluded),
-                        dmoney(exact)
+                    say!("engine.working.label.charge"),
+                    say!(
+                        "engine.working.charge_percent_of",
+                        percent = num(*p),
+                        base = money(base),
+                        excluded = money(excluded),
+                        exact = dmoney(exact)
                     ),
                 ));
                 notes.extend(rounding(exact, amount));
-                (amount, format!("{}% of the budget", num(*p)))
+                (
+                    amount,
+                    say!("engine.working.percent_of_budget", percent = num(*p)),
+                )
             }
             ChargeKind::Flat { amount, currency } => {
                 let base = match currency {
@@ -1393,32 +1824,42 @@ impl<'a> Explainer<'a> {
                             .ok_or_else(ovf)?;
                         let conv = exact.to_cents().ok_or_else(ovf)?;
                         notes.push(Step::note(
-                            "Fee",
-                            format!(
-                                "{} {cur} x {} {} per {cur} = {}",
-                                money(*amount),
-                                num(rate),
-                                self.b.base_currency,
-                                dmoney(exact)
+                            say!("engine.working.label.fee"),
+                            say!(
+                                "engine.working.fee_converted",
+                                amount = money(*amount),
+                                currency = cur,
+                                rate = num(rate),
+                                base = self.b.base_currency,
+                                exact = dmoney(exact)
                             ),
                         ));
                         notes.extend(rounding(exact, conv));
                         conv
                     }
                     _ => {
-                        notes.push(Step::note_amount("Fee", "a flat fee", *amount));
+                        notes.push(Step::note_amount(
+                            say!("engine.working.label.fee"),
+                            say!("engine.working.a_flat_fee"),
+                            *amount,
+                        ));
                         *amount
                     }
                 };
-                let ex_text = "taken off the fee (typed amounts, and the lines of excluded \
-                     groups, accounts and categories with their fringes)";
-                notes.push(Step::note_amount("Excluded", ex_text, excluded).with(ex_children));
+                notes.push(
+                    Step::note_amount(
+                        say!("engine.working.label.excluded"),
+                        say!("engine.working.taken_off_fee"),
+                        excluded,
+                    )
+                    .with(ex_children),
+                );
                 let amount = base.checked_sub(excluded).ok_or_else(ovf)?;
                 notes.push(Step::note(
-                    "Charge",
+                    say!("engine.working.label.charge"),
                     format!("{} - {} = {}", money(base), money(excluded), money(amount)),
                 ));
-                (amount, "a flat fee".to_string())
+                (amount, say!("engine.working.a_flat_fee"))
             }
         };
         Ok(Step::value(&c.name, label_text, amount)
@@ -1426,11 +1867,11 @@ impl<'a> Explainer<'a> {
             .with_expand(Target::Charge(i)))
     }
 
-    fn charge(&self, i: usize) -> R<(String, Step)> {
+    fn charge(&self, i: usize) -> R<(Words, Step)> {
         let c = self.applied_charge(i)?;
         let mut s = self.charge_step(i)?;
         s.expand = None;
-        Ok((format!("Charge {}", c.name), s))
+        Ok((say!("engine.working.title.charge", name = c.name), s))
     }
 
     fn applied_credit(&self, i: usize) -> R<&crate::model::Credit> {
@@ -1453,18 +1894,19 @@ impl<'a> Explainer<'a> {
         if !c.locations.is_empty() {
             let names = c.locations.iter().cloned().collect::<Vec<_>>();
             notes.push(Step::note(
-                "Locations",
-                format!(
-                    "only lines at {} count, with their fringes",
-                    names.join(", ")
-                ),
+                say!("engine.working.label.locations"),
+                say!("engine.working.only_lines_at", locations = names.join(", ")),
             ));
         }
         for (k, cr) in c.rows.iter().enumerate() {
             let mut row_notes = Vec::new();
             let (gross, excluded) = match &cr.source {
                 CreditSource::Flat(g) => {
-                    row_notes.push(Step::note_amount("Gross", "typed in", *g));
+                    row_notes.push(Step::note_amount(
+                        say!("engine.working.label.gross"),
+                        say!("engine.working.typed_in"),
+                        *g,
+                    ));
                     (*g, 0)
                 }
                 CreditSource::Group { group } => {
@@ -1493,7 +1935,7 @@ impl<'a> Explainer<'a> {
                         .map(|(&(ci, ai), &(v, _))| {
                             Step::note_amount(
                                 self.account_name(ci, ai),
-                                format!("counted lines tagged {group}, with their fringes"),
+                                say!("engine.working.counted_lines_tagged", group = group),
                                 v,
                             )
                             .with_link(Link::Account { ci, ai })
@@ -1501,15 +1943,19 @@ impl<'a> Explainer<'a> {
                         .collect();
                     row_notes.push(
                         Step::note_amount(
-                            "Gross",
-                            format!("lines tagged {group} plus their fringes"),
+                            say!("engine.working.label.gross"),
+                            say!("engine.working.lines_tagged", group = group),
                             gross,
                         )
                         .with(lines),
                     );
                     if !excluded_fringes.is_empty() {
                         let names = excluded_fringes.iter().cloned().collect::<Vec<_>>();
-                        row_notes.push(Step::note_amount("Excluded fringes", names.join(", "), ex));
+                        row_notes.push(Step::note_amount(
+                            say!("engine.working.label.excluded_fringes"),
+                            names.join(", "),
+                            ex,
+                        ));
                     }
                     (gross, ex)
                 }
@@ -1538,24 +1984,28 @@ impl<'a> Explainer<'a> {
                     }
                     let gross_note = match found {
                         Some(ci) => Step::note_amount(
-                            "Gross",
-                            format!(
-                                "category {} with its fringes, wherever fringes post",
-                                self.category_name(ci)
+                            say!("engine.working.label.gross"),
+                            say!(
+                                "engine.working.gross_category",
+                                category = self.category_name(ci)
                             ),
                             gross,
                         )
                         .with_link(Link::Category { ci }),
                         None => Step::note_amount(
-                            "Gross",
-                            format!("category {category} is not in the budget, so 0"),
+                            say!("engine.working.label.gross"),
+                            say!("engine.working.gross_no_category", category = category),
                             gross,
                         ),
                     };
                     row_notes.push(gross_note);
                     if !excluded_fringes.is_empty() {
                         let names = excluded_fringes.iter().cloned().collect::<Vec<_>>();
-                        row_notes.push(Step::note_amount("Excluded fringes", names.join(", "), ex));
+                        row_notes.push(Step::note_amount(
+                            say!("engine.working.label.excluded_fringes"),
+                            names.join(", "),
+                            ex,
+                        ));
                     }
                     (gross, ex)
                 }
@@ -1586,31 +2036,35 @@ impl<'a> Explainer<'a> {
                     }
                     let gross_note = match found {
                         Some((ci, ai)) => Step::note_amount(
-                            "Gross",
-                            format!(
-                                "account {} with its fringes, wherever fringes post",
-                                self.account_name(ci, ai)
+                            say!("engine.working.label.gross"),
+                            say!(
+                                "engine.working.gross_account",
+                                account = self.account_name(ci, ai)
                             ),
                             gross,
                         )
                         .with_link(Link::Account { ci, ai }),
                         None => Step::note_amount(
-                            "Gross",
-                            format!("account {account} is not in the budget, so 0"),
+                            say!("engine.working.label.gross"),
+                            say!("engine.working.gross_no_account", account = account),
                             gross,
                         ),
                     };
                     row_notes.push(gross_note);
                     if !excluded_fringes.is_empty() {
                         let names = excluded_fringes.iter().cloned().collect::<Vec<_>>();
-                        row_notes.push(Step::note_amount("Excluded fringes", names.join(", "), ex));
+                        row_notes.push(Step::note_amount(
+                            say!("engine.working.label.excluded_fringes"),
+                            names.join(", "),
+                            ex,
+                        ));
                     }
                     (gross, ex)
                 }
             };
             let net = gross.checked_sub(excluded).ok_or_else(ovf)?;
             row_notes.push(Step::note_amount(
-                "Net spend",
+                say!("engine.working.label.net_spend"),
                 format!("{} - {}", money(gross), money(excluded)),
                 net,
             ));
@@ -1624,12 +2078,12 @@ impl<'a> Explainer<'a> {
             match cr.cap {
                 CreditCap::None => {
                     row_notes.push(Step::note(
-                        "Credit",
-                        format!(
-                            "{}% of {} = {}",
-                            num(cr.percent),
-                            money(net),
-                            dmoney(credit)
+                        say!("engine.working.label.credit"),
+                        say!(
+                            "engine.working.percent_of",
+                            percent = num(cr.percent),
+                            base = money(net),
+                            exact = dmoney(credit)
                         ),
                     ));
                 }
@@ -1638,51 +2092,54 @@ impl<'a> Explainer<'a> {
                         .checked_min(Money::cents(arith, cap))
                         .ok_or_else(ovf)?;
                     row_notes.push(Step::note(
-                        "Cap on spend",
-                        format!(
-                            "the spend the percent applies to is at most {}: {}",
-                            money(cap),
-                            dmoney(spend)
+                        say!("engine.working.label.cap_on_spend"),
+                        say!(
+                            "engine.working.cap_on_spend",
+                            cap = money(cap),
+                            spend = dmoney(spend)
                         ),
                     ));
                     row_notes.push(Step::note(
-                        "Credit",
-                        format!(
-                            "{}% of {} = {}",
-                            num(cr.percent),
-                            dmoney(spend),
-                            dmoney(credit)
+                        say!("engine.working.label.credit"),
+                        say!(
+                            "engine.working.percent_of",
+                            percent = num(cr.percent),
+                            base = dmoney(spend),
+                            exact = dmoney(credit)
                         ),
                     ));
                 }
                 CreditCap::Credit(cap) => {
                     let uncapped = pct(net_x).ok_or_else(ovf)?;
                     row_notes.push(Step::note(
-                        "Credit",
-                        format!(
-                            "{}% of {} = {}, capped at {}: {}",
-                            num(cr.percent),
-                            money(net),
-                            dmoney(uncapped),
-                            money(cap),
-                            dmoney(credit)
+                        say!("engine.working.label.credit"),
+                        say!(
+                            "engine.working.percent_of_capped",
+                            percent = num(cr.percent),
+                            base = money(net),
+                            exact = dmoney(uncapped),
+                            cap = money(cap),
+                            credit = dmoney(credit)
                         ),
                     ));
                 }
             }
             row_notes.push(Step::note(
-                "Not rounded yet",
-                "rows are added, capped and discounted before the one rounding",
+                say!("engine.working.label.not_rounded_yet"),
+                say!("engine.working.rounded_once"),
             ));
             total = total.checked_add(credit).ok_or_else(ovf)?;
             let label = if cr.description.trim().is_empty() {
-                format!("Row {}", k + 1)
+                say!("engine.working.label.row_n", row = k + 1)
             } else {
-                cr.description.trim().to_string()
+                Words::from(cr.description.trim())
             };
             notes.push(Step::note(label, dmoney(credit)).with(row_notes));
         }
-        notes.push(Step::note("Rows added", dmoney(total)));
+        notes.push(Step::note(
+            say!("engine.working.label.rows_added"),
+            dmoney(total),
+        ));
         // The engine's own figures for what comes after the rows
         // (decisions.md, entry 88): the minimum, the shared cap and the fee.
         let reported = self
@@ -1698,29 +2155,33 @@ impl<'a> Explainer<'a> {
             }
             if reported.below_minimum {
                 notes.push(Step::note(
-                    "Minimum spend",
-                    format!(
-                        "the rows' net spend {} is below the minimum of {}, so the credit is 0",
-                        money(qualified),
-                        money(min)
+                    say!("engine.working.label.minimum_spend"),
+                    say!(
+                        "engine.working.below_minimum",
+                        spend = money(qualified),
+                        minimum = money(min)
                     ),
                 ));
                 capped = Money::cents(arith, 0);
             } else {
                 notes.push(Step::note(
-                    "Minimum spend",
-                    format!(
-                        "the rows' net spend {} is at least the minimum of {}",
-                        money(qualified),
-                        money(min)
+                    say!("engine.working.label.minimum_spend"),
+                    say!(
+                        "engine.working.at_least_minimum",
+                        spend = money(qualified),
+                        minimum = money(min)
                     ),
                 ));
             }
         }
         if let Some(cap) = c.cap.filter(|_| !reported.below_minimum) {
             notes.push(Step::note(
-                "Credit cap",
-                format!("at most {}: {}", money(cap), dmoney(capped)),
+                say!("engine.working.label.credit_cap"),
+                say!(
+                    "engine.working.at_most",
+                    cap = money(cap),
+                    capped = dmoney(capped)
+                ),
             ));
         }
         if let Some(name) = c.shared_cap.as_deref() {
@@ -1736,32 +2197,29 @@ impl<'a> Explainer<'a> {
                         .map(|o| o.name.as_str())
                         .collect();
                     notes.push(Step::note(
-                        "Shared cap",
-                        format!(
-                            "{} caps this credit and {} at {} together; its share, in proportion to {}, is {}",
-                            quoted(name),
-                            others.join(", "),
-                            money(*cap),
-                            dmoney(capped),
-                            money(share)
+                        say!("engine.working.label.shared_cap"),
+                        say!(
+                            "engine.working.shared_cap_share",
+                            name = quoted(name),
+                            others = others.join(", "),
+                            cap = money(*cap),
+                            capped = dmoney(capped),
+                            share = money(share)
                         ),
                     ));
                     capped = Money::cents(arith, share);
                 }
                 (Some(cap), None) => notes.push(Step::note(
-                    "Shared cap",
-                    format!(
-                        "{} caps the credits sharing it at {} together, which they are within",
-                        quoted(name),
-                        money(*cap)
+                    say!("engine.working.label.shared_cap"),
+                    say!(
+                        "engine.working.shared_cap_within",
+                        name = quoted(name),
+                        cap = money(*cap)
                     ),
                 )),
                 (None, _) => notes.push(Step::note(
-                    "Shared cap",
-                    format!(
-                        "{} is not in the budget's shared caps, so it holds nothing down",
-                        quoted(name)
-                    ),
+                    say!("engine.working.label.shared_cap"),
+                    say!("engine.working.shared_cap_missing", name = quoted(name)),
                 )),
             }
         }
@@ -1769,13 +2227,13 @@ impl<'a> Explainer<'a> {
         let exact = capped.checked_mul_money(keep).ok_or_else(ovf)?;
         if !c.discount_percent.is_zero() {
             notes.push(Step::note(
-                "Discount",
-                format!(
-                    "less {}%: {} x {} = {}",
-                    num(c.discount_percent),
-                    dmoney(capped),
-                    keep,
-                    dmoney(exact)
+                say!("engine.working.label.discount"),
+                say!(
+                    "engine.working.discount",
+                    percent = num(c.discount_percent),
+                    capped = dmoney(capped),
+                    keep = keep,
+                    exact = dmoney(exact)
                 ),
             ));
         }
@@ -1784,61 +2242,93 @@ impl<'a> Explainer<'a> {
         let amount = rounded.checked_sub(reported.fee).ok_or_else(ovf)?;
         if c.broker_fee != 0 {
             let text = if reported.fee == c.broker_fee {
-                format!("less {}: {}", money(c.broker_fee), money(amount))
+                say!(
+                    "engine.working.fee_less",
+                    fee = money(c.broker_fee),
+                    amount = money(amount)
+                )
             } else {
-                format!(
-                    "less {}, but never below zero: {} taken off, {}",
-                    money(c.broker_fee),
-                    money(reported.fee),
-                    money(amount)
+                say!(
+                    "engine.working.fee_less_floor",
+                    fee = money(c.broker_fee),
+                    taken = money(reported.fee),
+                    amount = money(amount)
                 )
             };
-            notes.push(Step::note("Broker's fee", text));
+            notes.push(Step::note(say!("engine.working.label.brokers_fee"), text));
         }
-        Ok(Step::value(&c.name, "an applied credit", amount)
-            .with(notes)
-            .with_expand(Target::Credit(i)))
+        Ok(
+            Step::value(&c.name, say!("engine.working.applied_credit"), amount)
+                .with(notes)
+                .with_expand(Target::Credit(i)),
+        )
     }
 
-    fn credit(&self, i: usize) -> R<(String, Step)> {
+    fn credit(&self, i: usize) -> R<(Words, Step)> {
         let c = self.applied_credit(i)?;
         let mut s = self.credit_step(i)?;
         s.expand = None;
-        Ok((format!("Credit {}", c.name), s))
-    }
-}
-
-trait OrText {
-    fn or(self, fallback: &str) -> String;
-}
-
-impl OrText for String {
-    fn or(self, fallback: &str) -> String {
-        if self.is_empty() {
-            fallback.to_string()
-        } else {
-            self
-        }
+        Ok((say!("engine.working.title.credit", name = c.name), s))
     }
 }
 
 /// "Key grip" or "Line 3" when it has no description.
-fn line_label(i: usize, d: &Detail) -> String {
+fn line_label(i: usize, d: &Detail) -> Words {
     let t = d.description.trim();
     if t.is_empty() {
-        format!("Line {}", i + 1)
+        say!("engine.working.label.line_n", line = i + 1)
     } else {
-        t.to_string()
+        Words::from(t)
     }
 }
 
-/// "2100 line 3 (Key grip)".
-fn row_name(code: &str, i: usize, d: &Detail) -> String {
+/// What of a row an explanation's title names.
+enum RowPart<'a> {
+    Total,
+    Fringes,
+    Fringe(&'a str),
+}
+
+/// "2100 line 3 (Key grip): total", "2100 line 3: FICA".
+fn row_title(code: &str, i: usize, d: &Detail, part: RowPart<'_>) -> Words {
     let t = d.description.trim();
-    if t.is_empty() {
-        format!("{code} line {}", i + 1)
-    } else {
-        format!("{code} line {} ({t})", i + 1)
+    let line = i + 1;
+    match (t.is_empty(), part) {
+        (true, RowPart::Total) => {
+            say!("engine.working.title.line_total", code = code, line = line)
+        }
+        (false, RowPart::Total) => say!(
+            "engine.working.title.line_described_total",
+            code = code,
+            line = line,
+            description = t
+        ),
+        (true, RowPart::Fringes) => {
+            say!(
+                "engine.working.title.line_fringes",
+                code = code,
+                line = line
+            )
+        }
+        (false, RowPart::Fringes) => say!(
+            "engine.working.title.line_described_fringes",
+            code = code,
+            line = line,
+            description = t
+        ),
+        (true, RowPart::Fringe(f)) => say!(
+            "engine.working.title.line_fringe",
+            code = code,
+            line = line,
+            fringe = f
+        ),
+        (false, RowPart::Fringe(f)) => say!(
+            "engine.working.title.line_described_fringe",
+            code = code,
+            line = line,
+            description = t,
+            fringe = f
+        ),
     }
 }
 
@@ -1910,8 +2400,10 @@ fn formula_words(ctx: &Ctx, f: &Formula, value: Num) -> String {
     }
 }
 
-/// Why a line is left out, in words.
-fn left_out(ctx: &Ctx, d: &Detail) -> String {
+/// Why a line is left out, in words, and what it would be counted
+/// (`total`): "...; counted, it would be 1,200.00".
+fn left_out(ctx: &Ctx, d: &Detail, total: Cents) -> Words {
+    let total = money(total);
     let rules = ctx.b.group_rules;
     let counted = d
         .groups
@@ -1920,14 +2412,14 @@ fn left_out(ctx: &Ctx, d: &Detail) -> String {
     match rules.counts(counted) {
         Ok(()) => {}
         Err(LeftOut::Ungrouped) => {
-            let what = if d.kind == RowKind::Adjustment {
-                "the adjustment row has no group"
+            return if d.kind == RowKind::Adjustment {
+                say!(
+                    "engine.working.left_out_adjustment_ungrouped",
+                    total = total
+                )
             } else {
-                "the line has no group"
+                say!("engine.working.left_out_ungrouped", total = total)
             };
-            return format!(
-                "{what} and the group rule leaves out lines with no group, so it shows but counts as 0"
-            );
         }
         Err(LeftOut::GroupOff) => {
             let off: Vec<&str> = d
@@ -1936,17 +2428,30 @@ fn left_out(ctx: &Ctx, d: &Detail) -> String {
                 .filter(|g| ctx.b.groups.get(*g).is_some_and(|x| !x.in_budget_total))
                 .map(String::as_str)
                 .collect();
-            let s = if off.len() == 1 { "" } else { "s" };
-            let conflict = if off.len() < d.groups.len() {
-                " (it is also in a counted group, and the group rule leaves out such conflicts)"
-            } else {
-                ""
+            let groups = off.join(", ");
+            let conflict = off.len() < d.groups.len();
+            return match (off.len() == 1, conflict) {
+                (true, false) => say!(
+                    "engine.working.left_out_group_off",
+                    groups = groups,
+                    total = total
+                ),
+                (false, false) => say!(
+                    "engine.working.left_out_groups_off",
+                    groups = groups,
+                    total = total
+                ),
+                (true, true) => say!(
+                    "engine.working.left_out_group_off_conflict",
+                    groups = groups,
+                    total = total
+                ),
+                (false, true) => say!(
+                    "engine.working.left_out_groups_off_conflict",
+                    groups = groups,
+                    total = total
+                ),
             };
-            return format!(
-                "group{s} {} {} In budget total off{conflict}, so the line shows but counts as 0",
-                off.join(", "),
-                if off.len() == 1 { "has" } else { "have" }
-            );
         }
     }
     let ex: Vec<&str> = d
@@ -1956,9 +2461,13 @@ fn left_out(ctx: &Ctx, d: &Detail) -> String {
         .map(String::as_str)
         .collect();
     if !ex.is_empty() {
-        return format!("the report leaves out group {}", ex.join(", "));
+        return say!(
+            "engine.working.left_out_by_report",
+            groups = ex.join(", "),
+            total = total
+        );
     }
-    "the report shows only some groups, and this line has none of them".into()
+    say!("engine.working.left_out_not_shown", total = total)
 }
 
 fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail]) -> R<AccountCalc> {
@@ -2018,18 +2527,18 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
 
         // Amount, X and 4X.
         let amount_text = if d.amount.is_blank() {
-            "blank, counts as 0".to_string()
+            say!("engine.working.blank_counts_as_0")
         } else {
-            format!(
+            Words::from(format!(
                 "{}{}",
                 formula_words(ctx, &d.amount, amount),
                 unit_words(ctx.b, &d.unit, shown(amount)?)
-            )
+            ))
         };
-        notes.push(Step::note("Amount", amount_text));
+        notes.push(Step::note(say!("engine.working.label.amount"), amount_text));
         if !d.x.is_blank() {
             notes.push(Step::note(
-                "X",
+                say!("engine.working.label.x"),
                 format!(
                     "{}{}",
                     formula_words(ctx, &d.x, x),
@@ -2039,7 +2548,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         }
         if !d.x4.is_blank() {
             notes.push(Step::note(
-                "4X",
+                say!("engine.working.label.x4"),
                 format!(
                     "{}{}",
                     formula_words(ctx, &d.x4, x4),
@@ -2056,7 +2565,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                 parts.push(nwords(x4));
             }
             notes.push(Step::note(
-                "Quantity",
+                say!("engine.working.label.quantity"),
                 format!("{} = {}", parts.join(" x "), nwords(quantity)),
             ));
         }
@@ -2080,22 +2589,23 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     })
                     .collect();
                 let base_text = match ctx.arith {
-                    Arithmetic::Exact => {
-                        "the lines above, back to the previous adjustment (subtotal rows don't restart it)"
-                    }
-                    Arithmetic::Mmb => {
-                        "the lines above, back to the previous adjustment (subtotal rows don't restart it), added up in doubles"
-                    }
+                    Arithmetic::Exact => say!("engine.working.adjustment_base"),
+                    Arithmetic::Mmb => say!("engine.working.adjustment_base_doubles"),
                 };
                 notes.push(
-                    Step::note_amount("Base", base_text, since_adjustment.cents).with(window),
+                    Step::note_amount(
+                        say!("engine.working.label.base"),
+                        base_text,
+                        since_adjustment.cents,
+                    )
+                    .with(window),
                 );
                 let base_words = match ctx.arith {
                     Arithmetic::Exact => money(since_adjustment.cents),
                     Arithmetic::Mmb => dmoney(since_adjustment.money(ctx.arith)),
                 };
                 notes.push(Step::note(
-                    "Adjustment",
+                    say!("engine.working.label.adjustment"),
                     format!(
                         "{base_words} x {} ({}%) = {}",
                         nwords(quantity),
@@ -2109,19 +2619,19 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
             _ => {
                 let rate = ctx.eval(&d.rate, Dec::ZERO, &blank_at)?;
                 let rate_text = if d.rate.is_blank() {
-                    "blank, counts as 0".to_string()
+                    say!("engine.working.blank_counts_as_0")
                 } else {
-                    format!(
+                    Words::from(format!(
                         "{}{}",
                         formula_words(ctx, &d.rate, rate),
                         unit_words(ctx.b, &d.unit3, Dec::ONE)
-                    )
+                    ))
                 };
-                notes.push(Step::note("Rate", rate_text));
+                notes.push(Step::note(say!("engine.working.label.rate"), rate_text));
                 // Where the rate came from, when it was filled from a rate
                 // table (decisions.md, entry 90): words only.
                 if let Some(words) = crate::rates::source_words(ctx.b, d) {
-                    notes.push(Step::note("Rate source", words));
+                    notes.push(Step::note(say!("engine.working.label.rate_source"), words));
                 }
                 let line = Money::num(quantity).checked_mul(rate).ok_or_else(ovf)?;
                 let local = line.to_cents().ok_or_else(ovf)?;
@@ -2131,7 +2641,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                 };
                 let cur_words = cur_code.map(|c| format!(" {c}")).unwrap_or_default();
                 notes.push(Step::note(
-                    "Line",
+                    say!("engine.working.label.line"),
                     format!(
                         "{} x {} = {}{cur_words}",
                         nwords(quantity),
@@ -2154,19 +2664,26 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                             .ok_or_else(|| gone(&format!("currency {c}")))?;
                         let exact = converted(ctx.arith, line, local, cur.rate).ok_or_else(ovf)?;
                         let t = exact.to_cents().ok_or_else(ovf)?;
-                        let from = if rounds_here || line.is_cents(local) {
-                            format!("{} {c}", money(local))
+                        let text = if rounds_here || line.is_cents(local) {
+                            say!(
+                                "engine.working.currency",
+                                amount = money(local),
+                                currency = c,
+                                rate = num(cur.rate),
+                                base = base,
+                                exact = dmoney(exact)
+                            )
                         } else {
-                            format!("{} {c} (not rounded yet)", dmoney(line))
+                            say!(
+                                "engine.working.currency_unrounded",
+                                amount = dmoney(line),
+                                currency = c,
+                                rate = num(cur.rate),
+                                base = base,
+                                exact = dmoney(exact)
+                            )
                         };
-                        notes.push(Step::note(
-                            "Currency",
-                            format!(
-                                "{from} x {} {base} per {c} = {} {base}",
-                                num(cur.rate),
-                                dmoney(exact)
-                            ),
-                        ));
+                        notes.push(Step::note(say!("engine.working.label.currency"), text));
                         notes.extend(rounding(exact, t));
                         t
                     }
@@ -2177,12 +2694,8 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         let total_counted = if included { total } else { 0 };
         if !included {
             notes.push(Step::note_amount(
-                "Left out",
-                format!(
-                    "{}; counted, it would be {}",
-                    left_out(ctx, d),
-                    money(total)
-                ),
+                say!("engine.working.label.left_out"),
+                left_out(ctx, d, total),
                 0,
             ));
         }
@@ -2195,21 +2708,21 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         }
         sub_rows.push(i);
 
-        let what = if d.kind == RowKind::Adjustment {
-            "adjustment"
+        let text = if d.kind == RowKind::Adjustment {
+            say!("engine.working.row_adjustment", code = code, line = i + 1)
         } else if included {
-            "line"
+            say!("engine.working.row_line", code = code, line = i + 1)
         } else {
-            "line, left out"
+            say!(
+                "engine.working.row_line_left_out",
+                code = code,
+                line = i + 1
+            )
         };
-        let value = Step::value(
-            line_label(i, d),
-            format!("{code} line {}, {what}", i + 1),
-            total_counted,
-        )
-        .with(notes)
-        .with_link(link)
-        .with_expand(Target::Line(d.id));
+        let value = Step::value(line_label(i, d), text, total_counted)
+            .with(notes)
+            .with_link(link)
+            .with_expand(Target::Line(d.id));
         factors.push(Factors {
             amount,
             x,
@@ -2265,13 +2778,14 @@ fn fringes_calc(
             rates.insert(name.as_str(), ctx.eval(&f.rate, Dec::ZERO, &blank_at)?);
         }
     }
-    let rate_words = |name: &str, rate: Num| -> String {
+    // A fringe's rate when it is a formula: " (rate SAG_PCT = 18.5)".
+    let rate_formula = |name: &str, rate: Num| -> Option<String> {
         let f = &ctx.b.fringes[name];
         let src = f.rate.0.trim();
         if src.parse::<Dec>().is_ok() {
-            String::new()
+            None
         } else {
-            format!(" (rate {})", formula_words(ctx, &f.rate, rate))
+            Some(formula_words(ctx, &f.rate, rate))
         }
     };
     let earns: Vec<bool> = details
@@ -2332,73 +2846,82 @@ fn fringes_calc(
                 if let Some(n) = range {
                     let others: Vec<String> = lines.iter().map(|&j| (j + 1).to_string()).collect();
                     notes.push(Step::note(
-                        "Fringe range",
-                        format!(
-                            "range {n}: lines {} earn as one person, so they share one cutoff, used up in line order",
-                            others.join(", ")
+                        say!("engine.working.label.fringe_range"),
+                        say!(
+                            "engine.working.fringe_range",
+                            range = n,
+                            lines = others.join(", ")
                         ),
                     ));
                 }
-                notes.push(Step::note_amount("Earnings", "this line's total", total));
+                notes.push(Step::note_amount(
+                    say!("engine.working.label.earnings"),
+                    say!("engine.working.this_lines_total"),
+                    total,
+                ));
                 if let (Some(t), Some(c)) = (typed, cutoff) {
                     if ctx.b.cutoff_factor != CutoffFactor::One {
-                        notes.push(Step::note(
-                            "Cutoff factor",
-                            format!(
-                                "the budget multiplies every percent cutoff by {}: {} x {} = {}",
-                                ctx.b.cutoff_factor.name(),
-                                money(t),
-                                ctx.b.cutoff_factor.name(),
-                                money(c)
-                            ),
-                        ));
+                        notes.push(cutoff_factor_note(ctx.b.cutoff_factor, t, c));
                     }
                 }
                 if let (Some(c), Some(l)) = (cutoff, before) {
-                    let above = if k == 0 {
-                        String::new()
-                    } else {
-                        format!(
-                            "; {} of it left after the lines above in the range",
-                            money(l.max(0))
-                        )
-                    };
+                    let cutoff = money(c);
+                    let left = money(l.max(0));
                     if l <= 0 && k > 0 {
                         notes.push(Step::note_amount(
-                            "Cutoff used up",
-                            format!(
-                                "{name} stops at {} per earner, and the lines above in the range used it all, so this line takes nothing",
-                                money(c)
+                            say!("engine.working.label.cutoff_used_up"),
+                            say!(
+                                "engine.working.cutoff_used_by_lines_above",
+                                fringe = name,
+                                cutoff = cutoff
                             ),
                             0,
                         ));
                     } else if total > l || l <= 0 {
+                        let text = if k == 0 {
+                            say!(
+                                "engine.working.stops_per_earner",
+                                fringe = name,
+                                cutoff = cutoff
+                            )
+                        } else {
+                            say!(
+                                "engine.working.stops_per_earner_left",
+                                fringe = name,
+                                cutoff = cutoff,
+                                left = left
+                            )
+                        };
                         notes.push(Step::note_amount(
-                            "Cutoff reached",
-                            format!("{name} stops at {} per earner{above}", money(c)),
+                            say!("engine.working.label.cutoff_reached"),
+                            text,
                             taken,
                         ));
                     } else {
-                        notes.push(Step::note(
-                            "Cutoff",
-                            format!("{} per earner{above}, not reached", money(c)),
-                        ));
+                        let text = if k == 0 {
+                            say!("engine.working.per_earner_not_reached", cutoff = cutoff)
+                        } else {
+                            say!(
+                                "engine.working.per_earner_left_not_reached",
+                                cutoff = cutoff,
+                                left = left
+                            )
+                        };
+                        notes.push(Step::note(say!("engine.working.label.cutoff"), text));
                     }
                 }
                 notes.push(Step::note(
-                    "Fringe",
-                    format!(
-                        "{}% of {} = {}{}",
-                        nwords(rate),
-                        money(taken),
-                        dmoney(exact),
-                        rate_words(name, rate)
-                    ),
+                    say!("engine.working.label.fringe"),
+                    percent_words(rate, money(taken), exact, rate_formula(name, rate)),
                 ));
                 notes.extend(rounding(exact, amount));
                 let kind_text = match cutoff {
-                    Some(c) => format!("{}% with a {} cutoff", nwords(rate), money(c)),
-                    None => format!("{}%", nwords(rate)),
+                    Some(c) => say!(
+                        "engine.working.percent_with_cutoff",
+                        percent = nwords(rate),
+                        cutoff = money(c)
+                    ),
+                    None => Words::from(format!("{}%", nwords(rate))),
                 };
                 let s = Step::value(name, kind_text, amount)
                     .with(notes)
@@ -2430,8 +2953,11 @@ fn fringes_calc(
             let amount = c.amount(rate).ok_or_else(ovf)?;
             let exact = c.exact_amount(rate).ok_or_else(ovf)?;
             let (mut notes, text) = flat_words(ctx.b, name, d, unit.as_deref(), &c, rate, exact)?;
-            if let Some(n) = notes.last_mut() {
-                n.text.push_str(&rate_words(name, rate));
+            if let (Some(n), Some(formula)) = (notes.last_mut(), rate_formula(name, rate)) {
+                // The flat fringe's working is not catalogued (`text_said`
+                // stays `None`), so its English can grow.
+                debug_assert!(n.text_said.is_none());
+                n.text.push_str(&format!(" (rate {formula})"));
             }
             notes.extend(rounding(exact, amount));
             let s = Step::value(name.as_str(), text, amount)
@@ -2534,44 +3060,54 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
                     codes.push(c);
                 }
             }
-            let shared = match cutoff {
-                Some(_) => ", so they share one cutoff".to_string(),
-                None => format!("; {name} has no cutoff, so each line earns its own percent"),
+            let count = lines.len();
+            let accounts = and_list(&codes);
+            let who = match (codes.len() == 1, cutoff.is_some()) {
+                (true, true) => say!(
+                    "engine.working.person_paid_account",
+                    person = person,
+                    count = count,
+                    accounts = accounts
+                ),
+                (false, true) => say!(
+                    "engine.working.person_paid_accounts",
+                    person = person,
+                    count = count,
+                    accounts = accounts
+                ),
+                (true, false) => say!(
+                    "engine.working.person_paid_account_no_cutoff",
+                    person = person,
+                    count = count,
+                    accounts = accounts,
+                    fringe = name
+                ),
+                (false, false) => say!(
+                    "engine.working.person_paid_accounts_no_cutoff",
+                    person = person,
+                    count = count,
+                    accounts = accounts,
+                    fringe = name
+                ),
             };
-            let who = format!(
-                "{person} is paid on {} {} in {} {}{shared}",
-                lines.len(),
-                if lines.len() == 1 { "line" } else { "lines" },
-                if codes.len() == 1 {
-                    "account"
-                } else {
-                    "accounts"
-                },
-                and_list(&codes)
-            );
-            let rate_words = if f.rate.0.trim().parse::<Dec>().is_ok() {
-                String::new()
+            let rate_formula = if f.rate.0.trim().parse::<Dec>().is_ok() {
+                None
             } else {
-                format!(" (rate {})", formula_words(ctx, &f.rate, rate))
+                Some(formula_words(ctx, &f.rate, rate))
             };
             for (l, share) in lines.iter().zip(&shares) {
                 let (ci, ai, i, id, total) = *l;
                 let mut notes = vec![
-                    Step::note("Person", who.clone()),
-                    Step::note_amount("Earnings", "this line's total", total),
+                    Step::note(say!("engine.working.label.person"), who.clone()),
+                    Step::note_amount(
+                        say!("engine.working.label.earnings"),
+                        say!("engine.working.this_lines_total"),
+                        total,
+                    ),
                 ];
                 if let (Some(t), Some(c)) = (typed, cutoff) {
                     if ctx.b.cutoff_factor != CutoffFactor::One {
-                        notes.push(Step::note(
-                            "Cutoff factor",
-                            format!(
-                                "the budget multiplies every percent cutoff by {}: {} x {} = {}",
-                                ctx.b.cutoff_factor.name(),
-                                money(t),
-                                ctx.b.cutoff_factor.name(),
-                                money(c)
-                            ),
-                        ));
+                        notes.push(cutoff_factor_note(ctx.b.cutoff_factor, t, c));
                     }
                 }
                 let pay: Cents = input
@@ -2582,34 +3118,32 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
                     Split::Own => {
                         if let Some(c) = cutoff {
                             notes.push(Step::note_amount(
-                                "Cutoff",
-                                format!(
-                                    "{} per person, not reached: {person} is paid {} with {name}, so each line earns its own percent",
-                                    money(c),
-                                    money(pay)
+                                say!("engine.working.label.cutoff"),
+                                say!(
+                                    "engine.working.per_person_not_reached",
+                                    cutoff = money(c),
+                                    person = person,
+                                    pay = money(pay),
+                                    fringe = name
                                 ),
                                 pay,
                             ));
                         }
                         let exact = percent_of(ctx.arith, total, rate).ok_or_else(ovf)?;
                         notes.push(Step::note(
-                            "Fringe",
-                            format!(
-                                "{}% of {} = {}{rate_words}",
-                                nwords(rate),
-                                money(total),
-                                dmoney(exact)
-                            ),
+                            say!("engine.working.label.fringe"),
+                            percent_words(rate, money(total), exact, rate_formula.clone()),
                         ));
                         notes.extend(rounding(exact, share.amount));
                     }
                     Split::Nothing => {
                         let c = cutoff.unwrap_or(0);
                         notes.push(Step::note_amount(
-                            "Cutoff used up",
-                            format!(
-                                "{name} stops at {} per person, so nothing is earned",
-                                money(c)
+                            say!("engine.working.label.cutoff_used_up"),
+                            say!(
+                                "engine.working.stops_per_person",
+                                fringe = name,
+                                cutoff = money(c)
                             ),
                             0,
                         ));
@@ -2620,16 +3154,30 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
                         exact,
                         amount,
                     } => {
-                        notes.push(Step::note_amount(
-                            "Cutoff reached",
-                            format!(
-                                "{person} is paid {} with {name}, past the {} cutoff, so {person} earns {}% of {} = {}{rate_words}",
-                                money(pay),
-                                money(c),
-                                nwords(rate),
-                                money(c),
-                                dmoney(exact)
+                        let text = match &rate_formula {
+                            None => say!(
+                                "engine.working.person_past_cutoff",
+                                person = person,
+                                pay = money(pay),
+                                fringe = name,
+                                cutoff = money(c),
+                                percent = nwords(rate),
+                                exact = dmoney(exact)
                             ),
+                            Some(formula) => say!(
+                                "engine.working.person_past_cutoff_rate",
+                                person = person,
+                                pay = money(pay),
+                                fringe = name,
+                                cutoff = money(c),
+                                percent = nwords(rate),
+                                exact = dmoney(exact),
+                                formula = formula
+                            ),
+                        };
+                        notes.push(Step::note_amount(
+                            say!("engine.working.label.cutoff_reached"),
+                            text,
                             amount,
                         ));
                         notes.extend(rounding(exact, amount));
@@ -2638,27 +3186,31 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
                         } else {
                             share.amount
                         };
-                        let extra = if share.extra_cent {
-                            ", plus one of the cents left over (shares rounded down; the left-over cents go to the largest remainders, then the lowest row id)"
+                        let code = if share.extra_cent {
+                            "engine.working.share_extra_cent"
                         } else {
-                            ""
+                            "engine.working.share"
                         };
-                        notes.push(Step::note(
-                            "Share",
-                            format!(
-                                "this line's part of {person}'s {}, by pay: {} x {} / {}, {} rounded down{extra}",
-                                money(amount),
-                                money(amount),
-                                money(total),
-                                money(pay),
-                                money(floor)
-                            ),
-                        ));
+                        let text = Words::said(
+                            code,
+                            vec![
+                                ("person", person.to_string()),
+                                ("amount", money(amount)),
+                                ("total", money(total)),
+                                ("pay", money(pay)),
+                                ("floor", money(floor)),
+                            ],
+                        );
+                        notes.push(Step::note(say!("engine.working.label.share"), text));
                     }
                 }
                 let kind_text = match cutoff {
-                    Some(c) => format!("{}% with a {} cutoff per person", nwords(rate), money(c)),
-                    None => format!("{}%", nwords(rate)),
+                    Some(c) => say!(
+                        "engine.working.percent_with_cutoff_per_person",
+                        percent = nwords(rate),
+                        cutoff = money(c)
+                    ),
+                    None => Words::from(format!("{}%", nwords(rate))),
                 };
                 let s = Step::value(name, kind_text, share.amount)
                     .with(notes)
@@ -2695,6 +3247,44 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
     Ok(())
 }
 
+/// The budget's cutoff factor applied to `typed`, giving `cutoff`.
+fn cutoff_factor_note(factor: CutoffFactor, typed: Cents, cutoff: Cents) -> Step {
+    Step::note(
+        say!("engine.working.label.cutoff_factor"),
+        say!(
+            "engine.working.cutoff_factor",
+            factor = factor.name(),
+            typed = money(typed),
+            cutoff = money(cutoff)
+        ),
+    )
+}
+
+/// "18.5% of 1,000.00 = 185.00", with the rate's formula after it when it
+/// has one.
+fn percent_words(
+    rate: Num,
+    base: String,
+    exact: impl fmt::Display,
+    formula: Option<String>,
+) -> Words {
+    match formula {
+        None => say!(
+            "engine.working.percent_of",
+            percent = nwords(rate),
+            base = base,
+            exact = dmoney(exact)
+        ),
+        Some(formula) => say!(
+            "engine.working.percent_of_rate",
+            percent = nwords(rate),
+            base = base,
+            exact = dmoney(exact),
+            formula = formula
+        ),
+    }
+}
+
 /// `1 hour`, `12 hours`.
 fn hours_words(h: Dec) -> String {
     if h == Dec::ONE {
@@ -2726,7 +3316,7 @@ fn flat_words(
     c: &FlatCount,
     rate: Num,
     exact: Money,
-) -> R<(Vec<Step>, String)> {
+) -> R<(Vec<Step>, Words)> {
     let fu = unit.map(str::trim).filter(|u| !u.is_empty());
     let fu_text = fu.unwrap_or("line");
     let count = c.count().ok_or_else(ovf)?;
@@ -2888,22 +3478,26 @@ fn flat_words(
     };
     let mut notes = Vec::new();
     if !clauses.is_empty() {
-        notes.push(Step::note("Count", clauses.join("; ")));
+        notes.push(Step::note(
+            say!("engine.working.label.count"),
+            clauses.join("; "),
+        ));
     }
     if let FringeKind::Flat {
         cutoff: Some(cut), ..
     } = &b.fringes[name].kind
     {
         notes.push(Step::note(
-            "Cutoff",
-            format!(
-                "{} is kept on {name} but not used: cutoffs apply to percent fringes only",
-                money(*cut)
+            say!("engine.working.label.cutoff"),
+            say!(
+                "engine.working.flat_cutoff_unused",
+                cutoff = money(*cut),
+                fringe = name
             ),
         ));
     }
     notes.push(Step::note(
-        "Fringe",
+        say!("engine.working.label.fringe"),
         format!(
             "{name} {} per {fu_text} x {count_text} ({}) = {}",
             dmoney(Money::num(rate)),
@@ -2911,9 +3505,15 @@ fn flat_words(
             dmoney(exact)
         ),
     ));
-    let text = match (&c.from, fu) {
-        (CountFrom::PerLine, _) | (_, None) => "flat, once per line".to_string(),
-        (_, Some(u)) => format!("flat, per {u}, {}", basis_words(c.basis)),
+    let text = match (&c.from, fu, c.basis) {
+        (CountFrom::PerLine, _, _) | (_, None, _) => say!("engine.working.flat_once_per_line"),
+        (_, Some(u), FlatBasis::Amount) => say!("engine.working.flat_per_unit_amount", unit = u),
+        (_, Some(u), FlatBasis::AmountCounts) => {
+            say!("engine.working.flat_per_unit_counts", unit = u)
+        }
+        (_, Some(u), FlatBasis::Quantity) => {
+            say!("engine.working.flat_per_unit_quantity", unit = u)
+        }
     };
     Ok((notes, text))
 }
@@ -3068,6 +3668,72 @@ mod tests {
         assert_eq!(dmoney(Exact::new(-5_400_000, 2)), "-54,000.00");
         assert_eq!(num("1234567.25".parse().unwrap()), "1,234,567.25");
         assert_eq!(num("-12".parse().unwrap()), "-12");
+    }
+
+    /// The working's words: sorted, each code written here once or more,
+    /// every code written here in the table, and each one filled with
+    /// values for all its names.
+    #[test]
+    fn the_wording_table_is_sorted_and_every_code_is_used() {
+        for pair in WORDING.windows(2) {
+            assert!(
+                pair[0].code < pair[1].code,
+                "{} is out of order",
+                pair[1].code
+            );
+        }
+        let src = include_str!("explain.rs");
+        let body = &src[..src.find("pub const WORDING").unwrap()];
+        let rest = &src[src.find("/// Words in the working").unwrap()..];
+        let mut used = BTreeSet::new();
+        for part in [body, rest] {
+            for (at, _) in part.match_indices("\"engine.working.") {
+                let code = &part[at + 1..];
+                let code = &code[..code.find('"').unwrap()];
+                if code != WORDING_PREFIX {
+                    used.insert(code);
+                }
+            }
+        }
+        for code in &used {
+            assert!(
+                WORDING.iter().any(|w| w.code == *code),
+                "{code} is used but not in WORDING"
+            );
+        }
+        for w in WORDING {
+            assert!(w.code.starts_with(WORDING_PREFIX), "{}", w.code);
+            assert!(used.contains(w.code), "{} is never said", w.code);
+            for english in w.one.into_iter().chain([w.other]) {
+                assert!(!english.contains('\u{2014}') && !english.contains('!'));
+                let mut names = Vec::new();
+                let mut t = english;
+                while let Some(at) = t.find('{') {
+                    let end = t[at..].find('}').unwrap() + at;
+                    let name: &'static str = Box::leak(t[at + 1..end].to_string().into_boxed_str());
+                    if !names.contains(&name) {
+                        names.push(name);
+                    }
+                    t = &t[end + 1..];
+                }
+                let params: Vec<(&'static str, String)> = names
+                    .iter()
+                    .map(|n| {
+                        (
+                            *n,
+                            if *n == "count" {
+                                "2".into()
+                            } else {
+                                format!("<{n}>")
+                            },
+                        )
+                    })
+                    .collect();
+                let words = Words::said(w.code, params.clone());
+                assert_eq!(words.said.as_ref().unwrap().params, params);
+                assert!(!words.text.contains('{'), "{}: {}", w.code, words.text);
+            }
+        }
     }
 
     #[test]
