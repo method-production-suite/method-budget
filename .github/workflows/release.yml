@@ -159,8 +159,22 @@ jobs:
         # Every release tests each system before anything is built for it or signed
         # (SUITE-STANDARDS.md section 6). On macOS this runs the Apple silicon code; the
         # Intel half is tested under Rosetta before the tag (docs/RELEASING.md).
+        # Windows: Tauri's build script for method-app writes an empty msvcrt.lib stand-in
+        # and puts its folder on the link path, and cargo hands that path to every doctest
+        # in the same run. The windows-2025-vs2026 image's linker from 2026-10-21 on rejects
+        # the stand-in, so there the doctests run in a pass of their own without method-app
+        # (its doctests still run on macOS and Linux).
         shell: bash
-        run: cargo test --workspace --locked --no-fail-fast
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" != Windows ]; then
+            cargo test --workspace --locked --no-fail-fast
+            exit 0
+          fi
+          status=0
+          cargo test --workspace --locked --no-fail-fast --lib --bins --tests --examples || status=$?
+          cargo test --workspace --locked --no-fail-fast --doc --exclude method-app || status=$?
+          exit "$status"
 
       - name: Install Tauri CLI (pinned, prebuilt)
         # Its release download, checked against the SHA-256 pinned in the script, instead

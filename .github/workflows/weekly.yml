@@ -143,10 +143,20 @@ jobs:
 
       - name: Test (macOS and Windows)
         # Every test binary runs even after one fails, so a run shows everything a
-        # system breaks, not only the first crate's failures.
+        # system breaks, not only the first crate's failures. On Windows the doctests run
+        # in a pass of their own without method-app: release.yml's test step says why.
         if: runner.os != 'Linux'
         shell: bash
-        run: cargo test --workspace --locked --no-fail-fast
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" != Windows ]; then
+            cargo test --workspace --locked --no-fail-fast
+            exit 0
+          fi
+          status=0
+          cargo test --workspace --locked --no-fail-fast --lib --bins --tests --examples || status=$?
+          cargo test --workspace --locked --no-fail-fast --doc --exclude method-app || status=$?
+          exit "$status"
 
       # Saved after the tests (the debug build), before the release compile below, and only
       # from main, when the key is new.
