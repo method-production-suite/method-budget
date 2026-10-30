@@ -176,8 +176,13 @@ What the slice built, against the list this audit gave:
    rows phrases): a label is stored in the history and in a shared budget's change log,
    so it stays English and is translated only on display (`i18n::label()`: the History
    tab, the Activity tab, a field's past values, arriving and left-out changes), with
-   the names a person typed kept as typed. Still sentences:
-   Explain's steps, What Changed's
+   the names a person typed kept as typed. The twelfth pass did Explain's steps: each
+   step carries its code and values (`engine.working.*`, 191, worded in method-core and
+   held to the catalog by a test) and is never recognized, so a line the person
+   described as "Fringes" keeps its words; left as they come are the formulas in the
+   Amount, X, 4X and Rate notes, a rate's source, a flat fringe's Count and Fringe
+   sentences, a charge's excluded accounts and why, and sentences of numbers only.
+   Still sentences: What Changed's
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
    message they sit in) and its other errors, method-format's import problems, and the method-session modules not yet
@@ -198,7 +203,8 @@ What the slice built, against the list this audit gave:
 Still English, and why:
 
 - **Words that come from Rust as data**: the engine's messages outside the edits (item
-  3), import problems and warnings, Explain's steps, a diff's conflict text, sharing's
+  3), import problems and warnings, the few pieces of Explain's working listed in item
+  3, a diff's conflict text, sharing's
   refusals and file errors. The page shows them as they arrive; a chart group's name and a diff's change kind,
   which arrive as ids, are worded through the table.
 - **Inline on purpose**: key names in shortcut text (`dom.js`'s "Enter", "Ctrl", as in
