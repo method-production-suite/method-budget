@@ -88,8 +88,9 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
   BRAND.md's pencil amber, #8A5A00 (5.9:1). The share panel's "warn" text uses it too.
 - [x] Fixed here: a focused item in a popup menu showed only the selection tint (1.1:1
   against the menu); it now also has the accent ring.
-- [ ] Left: the grid's own focus is shown by its cursor ring; an empty grid (an account
-  with no lines) shows focus only by a faint border. The sharing palette's green and amber
+- [x] Fixed later (2026-11-02): an empty grid (an account with no lines) showed focus only
+  by a faint border; with no cursor cell it now shows the 2-pixel accent ring itself.
+- [ ] Left: the sharing palette's green and amber
   dots are below 3:1 in light but always sit beside a text label. Other per-file colors
   were not swept one by one.
 
@@ -98,14 +99,20 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
 - A real screen reader: VoiceOver on macOS, Narrator or NVDA on Windows, Orca on Linux.
   The tree is right in Chrome; what each reader says in each system web view needs hands
   (listed for the owner in docs/ROADMAP.md).
-- Windows high contrast (`forced-colors`) and reduced motion.
+- Windows high contrast and reduced motion on a real system. Checked headless since
+  (2026-11-02): under emulated `forced-colors` a selected row takes the system highlight and
+  the cursor keeps a solid 2-pixel ring (`scripts/web-smoke.mjs`); the flagged-cell ring,
+  the adjustment and comment bars as borders and the target pane's marker follow the same
+  block in `styles.css`. The only motion, sharing's wash and busy dot, already stops under
+  reduced motion (`shared.css`). Left: a look with a real contrast theme on Windows.
 - The printed reports and the spreadsheet export (not screen content).
 
 ## Localization: where the words live
 
 The framework is built and English is its only language (decision 94; how it works:
 docs/APP.md, "Languages"). Adding a language is a table: `ui/i18n/<code>.js`, imported in
-`ui/js/i18n.js`. Which languages come first is the owner's call (docs/ROADMAP.md,
+`ui/js/i18n.js`. The owner settled it on 2026-11-01: English only for now, and the
+remaining passes below are parked until a language is asked for (docs/ROADMAP.md,
 "Waiting on the owner").
 
 What the slice built, against the list this audit gave:

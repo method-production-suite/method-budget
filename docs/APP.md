@@ -1245,18 +1245,25 @@ The keys above are the same with a screen reader on; nothing here changes them (
   Escape cancels and focus goes back to what opened it.
 - **Contrast**: text and focus rings follow docs/BRAND.md's rules (4.5:1 for text, 3:1
   for focus rings and borders that carry meaning) in light and dark. Every focused control
-  shows a 2-pixel accent ring.
+  shows a 2-pixel accent ring; a grid with no cursor cell (an account with no lines) rings
+  itself.
+- **High contrast and motion**: under a high contrast theme (Windows' contrast themes,
+  CSS `forced-colors`) selected rows and ranges take the system's highlight, the cursor
+  keeps a solid ring, a flagged cell gets a dashed one, and the adjustment and comment
+  bars become borders. With reduced motion on, the sharing animations (a remote change's
+  wash, the busy dot) don't play.
 
 `scripts/web-smoke.mjs` checks this headless in the browser build, through Chrome's
 accessibility tree: every control has a name, the grid's roles and the cursor cell's name,
-the announcement after an edit, and a dialog's role, its hold on focus and focus coming
-back.
+the announcement after an edit, an empty grid's focus ring, selection and the cursor under
+emulated forced colors, and a dialog's role, its hold on focus and focus coming back.
 
 ### Languages
 
 English is the only language for now (decision 94). The app's words are kept apart from
-its code, so another language is a table to fill in, not a change to the screens; which
-languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
+its code, so another language is a table to fill in, not a change to the screens. The
+owner settled it on 2026-11-01: English only for now, no new language unless asked for
+(docs/ROADMAP.md, "Waiting on the owner").
 
 - **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
   `footer.selected_rows`...), about 4,560 of them. After its `export default` line it is

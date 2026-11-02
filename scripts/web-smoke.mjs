@@ -297,6 +297,49 @@ async function main() {
     }
     console.log(`web-smoke: the cursor cell keeps its id (${keptId}) across a redraw`);
 
+    // 2a'. Focus stays visible: a grid with no cursor cell (an empty account)
+    // rings itself, and under a high contrast theme (forced-colors) a selected
+    // row takes the system highlight and the cursor keeps a solid ring.
+    const emptyRing = await evaluate(`(() => {
+      const host = document.getElementById('grid-host');
+      const id = host.getAttribute('aria-activedescendant');
+      host.removeAttribute('aria-activedescendant');
+      host.focus();
+      const s = getComputedStyle(host);
+      const ring = s.outlineStyle + ' ' + s.outlineWidth;
+      if (id) host.setAttribute('aria-activedescendant', id);
+      return ring;
+    })()`);
+    if (emptyRing !== 'solid 2px') fail(`a focused grid with no cursor cell has outline "${emptyRing}", not a 2px ring`);
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }] });
+    const contrast = await evaluate(`(() => {
+      const host = document.getElementById('grid-host');
+      host.focus();
+      const cursor = document.getElementById(host.getAttribute('aria-activedescendant'));
+      const row = cursor.parentElement;
+      const had = row.classList.contains('sel');
+      row.classList.add('sel');
+      const probe = document.createElement('div');
+      probe.style.cssText = 'forced-color-adjust: none; background: Highlight';
+      document.body.append(probe);
+      const highlight = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const other = [...row.cells].find((td) => td !== cursor);
+      const c = getComputedStyle(cursor);
+      const out = {
+        forced: matchMedia('(forced-colors: active)').matches,
+        selected: getComputedStyle(other).backgroundColor === highlight,
+        ring: c.outlineStyle + ' ' + c.outlineWidth,
+      };
+      if (!had) row.classList.remove('sel');
+      return out;
+    })()`);
+    await send('Emulation.setEmulatedMedia', { features: [] });
+    if (!contrast.forced) fail('the forced-colors emulation did not take');
+    if (!contrast.selected) fail('under forced colors a selected row does not take the system highlight');
+    if (contrast.ring !== 'solid 2px') fail(`under forced colors the cursor cell's ring is "${contrast.ring}"`);
+    console.log('web-smoke: focus shows on an empty grid, and under forced colors selection and the cursor stay visible');
+
     // 2b. A dialog (Rename budget, on the topsheet): a named modal dialog
     // with focus inside and the page behind inert; Escape closes it and
     // focus goes back to the button that opened it.

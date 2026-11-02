@@ -1592,3 +1592,58 @@ body.panel-resizing {
   padding: 10px;
   color: var(--text-muted);
 }
+
+/* ------------------------------------------------------------------------ */
+/* An empty grid (an account with no lines) has no cursor cell to ring, so
+   the grid itself shows that it has focus. */
+
+.grid-host:focus:not([aria-activedescendant]) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* High contrast (Windows' contrast themes, forced-colors): the system replaces
+   every color and drops box-shadow, so selection tints and inset bars would
+   vanish. Selection uses the system's highlight; the bars become borders. */
+
+@media (forced-colors: active) {
+  .grid tbody tr.sel td,
+  .grid tbody tr.sel:hover td,
+  .grid tbody tr td.in-range {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  /* A flagged cell's dashed ring; the cursor's ring, later, wins on the
+     cursor cell. */
+  .grid td.has-error {
+    outline: 1px dashed CanvasText;
+    outline-offset: -3px;
+  }
+
+  .grid td.cursor {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+
+  .grid-host:focus-within td.cursor,
+  .grid-host:focus:not([aria-activedescendant]) {
+    outline-color: Highlight;
+  }
+
+  /* On the highlight itself, the ring takes the highlight's text color. */
+  .grid tbody tr.sel td.cursor,
+  .grid tbody tr td.in-range.cursor {
+    outline-color: HighlightText;
+  }
+
+  .grid tr.adjustment td.c-num,
+  .grid td.has-comment {
+    border-left: 3px solid CanvasText;
+  }
+
+  .pane.is-target > .tabbar {
+    border-top: 2px solid Highlight;
+  }
+}
