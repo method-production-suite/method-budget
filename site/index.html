@@ -68,7 +68,7 @@
           <img src="assets/brand/wordmark.svg" alt="Method Budget" width="660" height="98">
         </picture>
       </h1>
-      <p class="status"><span class="badge alpha">Alpha</span> Ready for testing. Version 0.5 is out and changing fast. <a href="#help">Found a bug? Tell us.</a></p>
+      <p class="status"><span class="badge alpha">Alpha</span> Alpha, ready for testing, and changing fast. <a href="#help">Found a bug? Tell us.</a></p>
       <p class="pitch">Film and TV budgeting that shows its working.</p>
       <p class="lede">A free, open-source desktop app for production budgets: topsheet,
         fringes, globals, charges, versions and cost reports. Your budgets are open files on
@@ -283,8 +283,7 @@
         </div>
       </div>
       <p class="fine">Method Budget reads only the open files other apps export for their
-        users, never their native files. It is independent and not affiliated with
-        Entertainment Partners or Movie Magic Budgeting, a trademark of its owner.</p>
+        users, never their native files.</p>
     </div>
   </section>
 
@@ -357,7 +356,7 @@
         </details>
         <details class="group" id="g-editor">
           <summary>
-            <span class="group-head"><span class="group-title">Editing, split view and history</span> <span class="group-count">9</span></span>
+            <span class="group-head"><span class="group-title">Editing, split view and history</span> <span class="group-count">10</span></span>
             <span class="group-teaser">Keyboard-first grid, Type-ahead and add on the fly, Never lose work, and more</span>
           </summary>
           <ul class="feats">
@@ -370,6 +369,7 @@
             <li><strong>Copy rows with everything on them</strong> Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change.</li>
             <li><strong>Notes</strong> Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.</li>
             <li><strong>Signed and notarized Mac app</strong> The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.</li>
+            <li><strong>Work on a budget together</strong> Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.</li>
           </ul>
         </details>
         <details class="group" id="g-versions">
@@ -400,7 +400,7 @@
         </details>
         <details class="group" id="g-reports">
           <summary>
-            <span class="group-head"><span class="group-title">Reports, PDF and spreadsheets</span> <span class="group-count">6</span></span>
+            <span class="group-head"><span class="group-title">Reports, PDF and spreadsheets</span> <span class="group-count">7</span></span>
             <span class="group-teaser">Reports saved in the budget, Live preview, More than the topsheet, and more</span>
           </summary>
           <ul class="feats">
@@ -410,6 +410,7 @@
             <li><strong>Spreadsheet export</strong> One spreadsheet (.xlsx) with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.</li>
             <li><strong>Spreadsheet import</strong> Turn any department's spreadsheet (.xlsx), CSV or tab-delimited file into budget lines with a column mapping and a line-by-line check of the totals.</li>
             <li><strong>Import from other budgeting apps</strong> Open a budget from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export, with a line-by-line check against that program's own totals.</li>
+            <li><strong>Bid layouts</strong> Name your own header fields, group accounts into sections by category, account or a range of numbers, and add running subtotals and markups; every account counts once, so the bid always adds up to the budget plus its markups.</li>
           </ul>
         </details>
         <details class="group" id="g-setup">
@@ -445,8 +446,8 @@
         <h3 id="g-soon">On the roadmap</h3>
         <ul class="feats">
           <li><strong>Windows and Linux, tested</strong> Installers for both are built today; printing, keys and file types still need a hands-on check.</li>
-          <li><strong>Accessibility and translations</strong> A full accessibility pass and the app in more languages.</li>
-          <li><strong>Work on a budget together</strong> Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.</li>
+          <li><strong>Accessibility</strong> A full pass with screen readers and the keyboard, building on the grid's screen-reader support.</li>
+          <li><strong>Live sessions</strong> Several people in one budget at once without a shared folder, over an encrypted link between their computers.</li>
           <li><strong>Rate card lookup</strong> Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.</li>
         </ul>
       </section>
@@ -561,21 +562,23 @@
     <div class="wrap">
       <p class="kicker">Status, honestly</p>
       <h2 id="status-title">Where it runs today</h2>
-      <p class="intro">Alpha, ready for testing. The Mac app is built and used every day;
-        Windows and Linux are built from the same code and wait on a hands-on test.</p>
+      <p class="intro">Alpha, ready for testing. The Mac app is built and used every day, and
+        one app runs on Intel and Apple silicon. Windows and Linux are built from the same
+        code and tested automatically on every release, not yet by hand.</p>
       <div class="table-scroll">
       <table class="keys platforms">
         <thead><tr><th>Platform</th><th>Built</th><th>Signed</th><th>Tested by hand</th><th>Updates itself</th></tr></thead>
         <tbody>
           <tr><th>macOS, Apple silicon</th><td>Yes</td><td>Yes, notarized by Apple</td><td>Yes</td><td>Yes</td></tr>
           <tr><th>macOS, Intel</th><td>Yes, from 0.6 (one app for both kinds of Mac)</td><td>Yes</td><td>Not checked</td><td>From 0.6; a copy of 0.2 updates to it</td></tr>
-          <tr><th>Windows (x64)</th><td>Yes</td><td>Not yet</td><td>Not yet</td><td>Not yet</td></tr>
-          <tr><th>Linux (x64, .deb and AppImage)</th><td>Yes</td><td>Not applicable</td><td>Not yet</td><td>Not yet</td></tr>
+          <tr><th>Windows (x64)</th><td>Yes</td><td>No, and none is planned</td><td>Automatically on every release, not yet by hand</td><td>No</td></tr>
+          <tr><th>Linux (x64, .deb and AppImage)</th><td>Yes</td><td>Not applicable</td><td>Automatically on every release, not yet by hand</td><td>No</td></tr>
         </tbody>
       </table>
       </div>
-      <p class="fine">Not there yet: tested Windows and Linux builds, updates in place on those
-        two, and starter templates with charts of accounts. Windows and Linux:
+      <p class="fine">Not there yet: Windows and Linux builds tested by hand, and updates in
+        place on those two. The Windows build is not signed, and no certificate is planned:
+        Windows warns that the publisher is unknown before it opens. Windows and Linux:
         <a href="#help">help us get there</a>.</p>
     </div>
   </section>
@@ -657,7 +660,7 @@
         <details>
           <summary>Is Method Budget affiliated with other budgeting software?</summary>
           <p>No. Method Budget is an independent, clean-room project, not affiliated with
-            Entertainment Partners or Movie Magic Budgeting.</p>
+            Entertainment Partners or Movie Magic Budgeting, a trademark of its owner.</p>
         </details>
         <details>
           <summary>Can it open budgets from other apps?</summary>
@@ -680,8 +683,15 @@
         </details>
         <details>
           <summary>Which computers does it run on?</summary>
-          <p>The Mac comes first: the app is built and used there every day. Windows and Linux
-            installers are built from the same code and are waiting on a hands-on test.</p>
+          <p>Any Mac with macOS 11 or later: one app runs on Intel and Apple silicon, signed
+            and notarized by Apple. Windows and Linux installers are built from the same code
+            and tested automatically, not yet by hand. The Windows build is not signed, and no
+            certificate is planned: Windows warns that the publisher is unknown before it
+            opens. Linux builds are not signed either, which is usual there.</p>
+        </details>
+        <details>
+          <summary>Which languages does it come in?</summary>
+          <p>English, for now.</p>
         </details>
         <details>
           <summary>Can I script it or keep budgets in git?</summary>
@@ -719,7 +729,8 @@
       respective owners.</p>
     <p>Part of the <a href="https://methodproduction.com">Method Production Suite</a>: free,
       open-source tools for film and TV production.</p>
-    <p>This site sets no cookies, runs no scripts and loads nothing from anyone else.</p>
+    <p>This site sets no cookies and loads nothing from anyone else. Its few scripts come
+      from this site and send nothing anywhere.</p>
   </div>
 </footer>
 </body>
