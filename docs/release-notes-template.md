@@ -41,6 +41,9 @@ The reader in the app understands exactly this shape (anything else is refused b
    come to you", not "Updater"), in this order: what's new, then `## Fixed`, then
    `## Good to know` (known gaps, caveats, changed defaults, anything to do after
    updating), then `## Who helped`.
+   When a release mentions Windows signing, it uses these words, with no "yet": "Not
+   signed, and no certificate is planned: Windows warns that the publisher is unknown
+   before it opens."
    **Who helped** names everyone who helped make the release, film-knowledge
    contributors included (people who explained how a department budgets, checked a
    figure or reported a problem), as they asked to be named. Name a person only with

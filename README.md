@@ -138,6 +138,7 @@ this section.
 - **Copy rows with everything on them.** Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change.
 - **Notes.** Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.
 - **Signed and notarized Mac app.** The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.
+- **Work on a budget together.** Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.
 
 ### Versions, compare, diff and merge
 
@@ -163,6 +164,7 @@ this section.
 - **Spreadsheet export.** One spreadsheet (.xlsx) with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.
 - **Spreadsheet import.** Turn any department's spreadsheet (.xlsx), CSV or tab-delimited file into budget lines with a column mapping and a line-by-line check of the totals.
 - **Import from other budgeting apps.** Open a budget from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export, with a line-by-line check against that program's own totals.
+- **Bid layouts.** Name your own header fields, group accounts into sections by category, account or a range of numbers, and add running subtotals and markups; every account counts once, so the bid always adds up to the budget plus its markups.
 
 ### Setup library and templates
 
@@ -185,8 +187,8 @@ this section.
 ### On the roadmap
 
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
-- **Accessibility and translations.** A full accessibility pass and the app in more languages.
-- **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
+- **Accessibility.** A full pass with screen readers and the keyboard, building on the grid's screen-reader support.
+- **Live sessions.** Several people in one budget at once without a shared folder, over an encrypted link between their computers.
 - **Rate card lookup.** Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.
 
 <!-- features:end -->
