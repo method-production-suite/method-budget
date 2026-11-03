@@ -21,7 +21,7 @@ method-format = { path = "../method-format", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 method-session = { path = "../method-session", default-features = false }
-serde_json = "=1.0.151"
+serde_json = "=1.0.154"
 # Both already in Cargo.lock through Tauri: no newer version is taken.
 wasm-bindgen = "=0.2.128"
 js-sys = "=0.3.105"

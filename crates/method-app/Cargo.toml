@@ -21,7 +21,7 @@ path = "src/main.rs"
 tauri-build = { version = "=2.7.1", features = [] }
 # build.rs reads the updater's endpoint and key from tauri.conf.json (already
 # in the build through Tauri; nothing new).
-serde_json = "=1.0.151"
+serde_json = "=1.0.154"
 
 [dependencies]
 method-core = { path = "../method-core" }
@@ -30,7 +30,7 @@ method-format = { path = "../method-format" }
 # views, the command contract); also built for the web.
 method-session = { path = "../method-session", features = ["std-clock"] }
 serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
+serde_json = "=1.0.154"
 tauri = { version = "=2.11.6", default-features = false, features = ["wry", "common-controls-v6", "x11", "dbus"] }
 tauri-plugin-dialog = "=2.7.3"
 # The suite's shared updater (method-production-suite/method-libs), pinned to a
