@@ -17,22 +17,17 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-03. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-03 (after 0.8.1). Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.8.0 is out** (published 2026-10-30, tagged on 5ef4238: the release commit plus the
-  Windows doctest fix; methodbudget.com follows it). It carries signed changes, the owner's
-  key and invite links (3.18), so 0.7.0 and older refuse a shared budget at log format 3
-  or 4; the notes say so. The next release needs the owner's yes as usual. Signing,
-  Remove, Start Again, muted cells, access requests and invite links still need a live
-  check in the app.
-- **A 0.8.1 for the site fixes**: methodbudget.com follows the latest release, so the
-  copy audit's fixes and the hero's ownership line (#110, #111) go live only with the next
-  one. Main also has the high contrast and empty-grid focus fixes (#109) and Explain's
-  message codes (#105), and from 2026-11-03 it ships with no crate-age exceptions.
-  **Recommend: a 0.8.1 soon**, on the owner's yes as usual.
+- **0.8.1 is out** (published 2026-11-03, tagged on f110543; methodbudget.com follows it).
+  It carries the high contrast and empty-grid focus fixes and the site copy fixes, with no
+  crate-age exceptions. 0.8.0 (2026-10-30) brought signed changes, the owner's key and
+  invite links (3.18), so 0.7.0 and older refuse a shared budget at log format 3 or 4. The
+  next release needs the owner's yes as usual. Signing, Remove, Start Again, muted cells,
+  access requests and invite links still need a live check in the app.
 
 ### Open decisions
 
