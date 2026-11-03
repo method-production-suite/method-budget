@@ -17,7 +17,7 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-01. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-03. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
@@ -28,8 +28,11 @@ this page goes ahead without waiting.
   or 4; the notes say so. The next release needs the owner's yes as usual. Signing,
   Remove, Start Again, muted cells, access requests and invite links still need a live
   check in the app.
-- **Crate-age exceptions end**: webpki-roots on 2026-11-02 and rustls-webpki on
-  2026-11-03 reach 14 days; their lines in the age-check exceptions come out then.
+- **A 0.8.1 for the site fixes**: methodbudget.com follows the latest release, so the
+  copy audit's fixes and the hero's ownership line (#110, #111) go live only with the next
+  one. Main also has the high contrast and empty-grid focus fixes (#109) and Explain's
+  message codes (#105), and from 2026-11-03 it ships with no crate-age exceptions.
+  **Recommend: a 0.8.1 soon**, on the owner's yes as usual.
 
 ### Open decisions
 
