@@ -30,6 +30,39 @@ function openBehind() {
   behind = [];
 }
 
+// Where focus goes back when a dialog closes: the element that opened it, or,
+// when that element was drawn again while the dialog was open (a list or row
+// redrawn after an edit), its replacement: the element with the same id, else
+// the one at the same place under the nearest ancestor with an id, else that
+// ancestor. Returns a function that puts focus back.
+export function rememberFocus() {
+  const opener = document.activeElement;
+  if (!opener || opener === document.body) return () => {};
+  const id = opener.id;
+  let anchor = opener.parentElement;
+  const path = [];
+  let node = opener;
+  while (anchor && !anchor.id) {
+    path.unshift([...node.parentElement.children].indexOf(node));
+    node = anchor;
+    anchor = anchor.parentElement;
+  }
+  if (anchor) path.unshift([...anchor.children].indexOf(node));
+  const anchorId = anchor ? anchor.id : '';
+  const tag = opener.tagName;
+  return () => {
+    let target = opener.isConnected ? opener : null;
+    if (!target && id) target = document.getElementById(id);
+    if (!target && anchorId) {
+      const root = document.getElementById(anchorId);
+      let at = root;
+      for (const i of path) at = at && at.children[i];
+      target = at && at.tagName === tag ? at : root;
+    }
+    if (target && target.focus) target.focus({ preventScroll: true });
+  };
+}
+
 /**
  * Shows a form. `fields`: [{ key, label, value, placeholder }].
  * `onSubmit(values)` returns a promise; if it rejects with a message, the
@@ -39,7 +72,7 @@ function openBehind() {
 export function formDialog({ title, message = '', fields = [], submitText = t('modal.ok'), danger = false, onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
-    const previous = document.activeElement;
+    const giveFocusBack = rememberFocus();
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     const inputs = {};
@@ -69,7 +102,7 @@ export function formDialog({ title, message = '', fields = [], submitText = t('m
       open = null;
       backdrop.remove();
       openBehind();
-      if (previous && previous.focus) previous.focus({ preventScroll: true });
+      giveFocusBack();
       resolve(result);
     };
     cancel.addEventListener('click', () => close(false));
@@ -122,7 +155,7 @@ export function confirmDialog({ title, message, confirmText = t('modal.ok'), dan
 export function anchoredDialog({ anchor, title, message = '', label, value = '', placeholder = '', multiline = false, submitText = t('modal.save'), onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
-    const previous = document.activeElement;
+    const giveFocusBack = rememberFocus();
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     const id = 'popover-field';
@@ -148,7 +181,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
       backdrop.remove();
       setRules('popover', '');
       openBehind();
-      if (previous && previous.focus) previous.focus({ preventScroll: true });
+      giveFocusBack();
       resolve(result);
     };
     cancel.addEventListener('click', () => close(false));
@@ -207,7 +240,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
 export function anchoredForm({ anchor, title, message = '', fields = [], submitText = t('modal.save'), danger = false, extra = null, onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
-    const previous = document.activeElement;
+    const giveFocusBack = rememberFocus();
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     const form = el('form', { class: 'modal popover popover-form', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'popover-title', novalidate: true } });
@@ -239,7 +272,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
       backdrop.remove();
       setRules('popover', '');
       openBehind();
-      if (previous && previous.isConnected && previous.focus) previous.focus({ preventScroll: true });
+      giveFocusBack();
       resolve(result);
     };
     cancel.addEventListener('click', () => close(false));
@@ -422,14 +455,14 @@ function placePopover(form, anchor) {
  */
 export function customDialog(build, { onClose = null } = {}) {
   const root = $('modal-root');
-  const previous = document.activeElement;
+  const giveFocusBack = rememberFocus();
   let backdrop = null;
   const close = () => {
     if (!backdrop || open !== backdrop) return;
     open = null;
     backdrop.remove();
     openBehind();
-    if (previous && previous.focus) previous.focus({ preventScroll: true });
+    giveFocusBack();
     if (onClose) onClose();
   };
   const box = build(close);

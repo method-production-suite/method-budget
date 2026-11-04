@@ -1242,7 +1242,8 @@ The keys above are the same with a screen reader on; nothing here changes them (
   sentence. The words come from a hidden live region (`#announce`, `ui/js/announce.js`).
   Messages (the toast) are alerts; banners and the Find count are status.
 - **Dialogs** are labelled modal dialogs: the page behind is inert, Tab stays inside,
-  Escape cancels and focus goes back to what opened it.
+  Escape cancels and focus goes back to what opened it, or to its replacement when it
+  was drawn again while the dialog was open.
 - **Contrast**: text and focus rings follow docs/BRAND.md's rules (4.5:1 for text, 3:1
   for focus rings and borders that carry meaning) in light and dark. Every focused control
   shows a 2-pixel accent ring; a grid with no cursor cell (an account with no lines) rings
