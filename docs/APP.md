@@ -1239,7 +1239,10 @@ The keys above are the same with a screen reader on; nothing here changes them (
   column and row.
 - **Totals after an edit**: when an edit moves the net total, a screen reader hears
   "Net total ..., up ..." (or down) a moment later, politely; a run of quick edits is one
-  sentence. The words come from a hidden live region (`#announce`, `ui/js/announce.js`).
+  sentence. In an account or a category the sentence ends with its total too ("...
+  10-01 Rights, 8,000.00"), and selecting two or more detail rows says how many and
+  their totals ("2 rows selected: lines ..., fringes ..."). The words come from a hidden
+  live region (`#announce`, `ui/js/announce.js`).
   Messages (the toast) are alerts; banners and the Find count are status.
 - **Dialogs** are labelled modal dialogs: the page behind is inert, Tab stays inside,
   Escape cancels and focus goes back to what opened it, or to its replacement when it
@@ -3793,9 +3796,8 @@ on a fresh data folder opening it with its Sample tab and line, a second start n
 it, and Help > Open Sample.
 
 Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and with
-Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the
-dialogs. The footer's other totals aren't announced, and an empty grid shows focus only
-by its border.
+Narrator or NVDA on Windows: the grid's cells, the announcements after an edit and a
+selection, and the dialogs.
 
 The report setup's Bid layout group (decisions.md, entry 92) needs a live check in the app
 (it is checked headless in the browser build): ticking Bid, editing the lines, saving the

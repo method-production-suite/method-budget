@@ -361,7 +361,13 @@ function trackChanges(view, opts) {
     // that moves no money says nothing.
     if (c.last !== 0) {
       const said = { net: totalText(net), change: totalText(Math.abs(c.last)) };
-      announce(c.last > 0 ? t('main.announce_up', said) : t('main.announce_down', said));
+      let sentence = c.last > 0 ? t('main.announce_up', said) : t('main.announce_down', said);
+      // Drilled down, the nearest footer total follows: the account's, or the category's.
+      const near = footerContext()[0];
+      if (near && near.cents !== null) {
+        sentence = t('main.announce_with', { said: sentence, name: near.label, total: totalText(near.cents) });
+      }
+      announce(sentence);
     }
   }
   c.prev = net;
@@ -1109,16 +1115,17 @@ function selectionChanged(keys) {
     broadcastSelection();
   }
   if (state.level !== 'details') return;
-  requestSelectionTotals(keys);
+  requestSelectionTotals(keys, { speak: true });
 }
 
 /**
  * Asks for the selected detail rows' totals (debounced; the newest request
  * wins). The footer shows the row count at once and the totals when they come.
  * Called when the selection changes and after every edit, which can change
- * the totals of rows that stay selected.
+ * the totals of rows that stay selected. `speak` (a new selection of two or
+ * more rows) has a screen reader say the totals too (decision 82).
  */
-function requestSelectionTotals(keys) {
+function requestSelectionTotals(keys, { speak = false } = {}) {
   const ids = keys.filter((k) => k.startsWith('r')).map((k) => Number(k.slice(1)));
   state.selection = { count: ids.length, totals: state.selection ? state.selection.totals : null };
   renderFooterNow();
@@ -1134,6 +1141,15 @@ function requestSelectionTotals(keys) {
         if (seq !== pane.selSeq || state.level !== 'details' || state.doc !== doc) return;
         state.selection = { count: ids.length, totals };
         renderFooterNow();
+        if (speak && ids.length > 1) {
+          announce(
+            t('main.announce_selection', {
+              count: ids.length,
+              lines: totalText(totals.lines.details_total),
+              fringes: totalText(totals.lines.fringe_total),
+            }),
+          );
+        }
       });
     } catch (e) {
       toast(e);
