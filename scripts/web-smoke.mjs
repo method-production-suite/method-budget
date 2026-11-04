@@ -359,6 +359,22 @@ async function main() {
     await until('focus back on Rename budget', `!document.querySelector('#modal-root [role="dialog"]') && document.activeElement.textContent.trim() === 'Rename budget'`, 5_000);
     console.log(`web-smoke: the "${named(dialog)}" dialog is modal, holds focus and gives it back`);
 
+    // 2b'. The opener drawn again while its dialog is open: focus goes to its
+    // replacement, the same button at the same place, not to the page.
+    const redrawnOpener = await evaluate(`(async () => {
+      const { confirmDialog } = await import('./js/modal.js');
+      const old = [...document.querySelectorAll('#actions button')].find((x) => x.textContent.trim() === 'Rename budget');
+      old.focus();
+      const closed = confirmDialog({ title: 'Smoke', message: 'Redraw behind me.' });
+      const fresh = old.cloneNode(true);
+      old.replaceWith(fresh);
+      document.querySelector('#modal-root [role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await closed;
+      return document.activeElement === fresh;
+    })()`);
+    if (!redrawnOpener) fail('focus did not go to the redrawn opener after its dialog closed');
+    console.log('web-smoke: a dialog whose opener was redrawn gives focus to the replacement');
+
     // 2c. A bid layout (decisions.md, entry 92): the engine works the bid
     // out (bid_sheet) and the report draws it into pages, reconciled: the
     // budget's net total plus the bid's own markups.

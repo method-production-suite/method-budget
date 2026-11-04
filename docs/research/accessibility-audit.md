@@ -70,8 +70,11 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
   dialog opened through `customDialog` gets `role="dialog"` and `aria-modal` if its
   builder didn't set them (Compare, What Changed, Merge and the unsaved-changes question
   lacked `aria-modal`).
-- [ ] Left: when the element that opened a dialog was redrawn while it was open, focus
-  goes back to the page rather than to its replacement. In the browser build, Budget Setup
+- [x] Fixed later (2026-11-04): when the element that opened a dialog was redrawn while
+  it was open, focus went back to the page. It now goes to the replacement: the element
+  with the same id, else the one at the same place under the nearest ancestor with an id
+  (`rememberFocus` in `modal.js`; checked in `scripts/web-smoke.mjs`).
+- [ ] Left: in the browser build, Budget Setup
   is a frame over the page without dialog semantics (the app's own window is fine).
 
 ## Visible focus and contrast
