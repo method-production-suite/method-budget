@@ -15,7 +15,8 @@
 // a screen reader does (Chrome's accessibility tree, decision 82): every
 // control has a name, the budget grid is an ARIA grid whose cursor cell says
 // its column and row, cells say whether they are selected, the cursor cell's
-// id stays the same across a redraw, an edit is announced politely, and a
+// id stays the same across a redraw, an edit is announced politely (with the
+// account's total in an account) as is a selection of rows' totals, and a
 // dialog is a named modal dialog that gives focus back when it closes. A bid
 // layout is worked out by the engine and drawn into report pages. The page's
 // words come from the English string table (decision 94): looked up with
@@ -374,6 +375,41 @@ async function main() {
     })()`);
     if (!redrawnOpener) fail('focus did not go to the redrawn opener after its dialog closed');
     console.log('web-smoke: a dialog whose opener was redrawn gives focus to the replacement');
+
+    // 2b''. The footer's other totals are heard too: in an account, selecting
+    // two rows says their totals, and an edit's sentence ends with the
+    // account's total. Escape goes back up to the topsheet.
+    const levelIs = (l) => `document.querySelector('[data-level]')?.dataset.level === '${l}'`;
+    await evaluate(`(document.getElementById('grid-host').focus(), ${key('Enter')})`);
+    await until('the first category open', levelIs('accounts'), 5_000);
+    await evaluate(`(document.getElementById('grid-host').focus(), ${key('Enter')})`);
+    await until('its first account open', levelIs('details'), 5_000);
+    // It has one line; a second, added after it, gives the selection two rows.
+    const lineRows = await evaluate(`document.querySelectorAll('#grid-host tr[role="row"]:not(.static)').length`);
+    await evaluate(`(async () => {
+      const web = window.__METHOD_WEB__;
+      const v = await web.invoke('smoke', 'get_view', {});
+      await web.invoke('smoke', 'add_detail', { accountCode: v.account.code, after: null, kind: 'line' });
+      return true;
+    })()`);
+    await until('the added line', `document.querySelectorAll('#grid-host tr[role="row"]:not(.static)').length > ${lineRows}`, 5_000);
+    await evaluate(`document.getElementById('grid-host').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true, cancelable: true }))`);
+    const heardSelection = await until('the selection announced', `(() => { const a = document.getElementById('announce').textContent; return /^2 rows selected: lines .+, fringes .+$/.test(a) ? a : null; })()`, 10_000);
+    const account = await evaluate(`document.querySelector('#footer .stat.context .stat-label').textContent`);
+    await evaluate(`(async () => {
+      const web = window.__METHOD_WEB__;
+      const f = (await web.invoke('smoke', 'get_view', {})).budget.fringes.FICA;
+      await web.invoke('smoke', 'set_fringe', { name: 'FICA', fringe: { kind: f.kind, description: f.description || '', rate: '20', cutoff: f.cutoff == null ? '' : String(f.cutoff / 100) } });
+      return true;
+    })()`);
+    const heardEdit = await until('the edit announced with the account', `(() => { const a = document.getElementById('announce').textContent; return /^Net total .+, up .+\\. / .test(a) && a.includes(${JSON.stringify(account)}) ? a : null; })()`, 10_000);
+    // The first Escape clears the selection; the next ones go up a level each.
+    for (let i = 0; i < 4 && !(await evaluate(levelIs('topsheet'))); i++) {
+      await evaluate(key('Escape'));
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    await until('back at the topsheet', levelIs('topsheet'), 5_000);
+    console.log(`web-smoke: the footer's totals are heard ("${heardSelection}"; "${heardEdit}")`);
 
     // 2c. A bid layout (decisions.md, entry 92): the engine works the bid
     // out (bid_sheet) and the report draws it into pages, reconciled: the

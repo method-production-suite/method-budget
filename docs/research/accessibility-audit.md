@@ -42,8 +42,11 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
   settle (700 ms; a run of quick edits is one sentence): "Net total 2,437,299.45, up
   26,317.51". A hidden live region outside the app (`#announce`) carries it, so an open
   dialog doesn't silence it. An edit that moves no money says nothing.
-- [ ] Left: the footer's account and category totals and the selection totals are not
-  announced; a screen reader reads them by moving to the footer.
+- [x] Fixed (2026-11-04): in an account or a category, the edit's sentence ends with its
+  total ("Net total ..., up .... 10-01 Rights, 8,000.00"), the footer's nearest total;
+  selecting two or more detail rows says their count and totals ("2 rows selected:
+  lines 8,000.00, fringes 0.00"), through the same live region. A single row (the
+  cursor moving) says nothing extra. Checked headless in the browser build.
 
 ## Toolbar, tabs and panels
 
