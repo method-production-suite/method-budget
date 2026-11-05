@@ -341,6 +341,46 @@ async function main() {
     if (contrast.ring !== 'solid 2px') fail(`under forced colors the cursor cell's ring is "${contrast.ring}"`);
     console.log('web-smoke: focus shows on an empty grid, and under forced colors selection and the cursor stay visible');
 
+    // 2a''. Sharing's colors, light and dark: initials on every person's color
+    // read 4.5:1 or better, the status dots and the conflict ring 3:1 on the surface.
+    for (const scheme of ['light', 'dark']) {
+      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+      const low = await evaluate(`import('./js/share.js').then(({ PERSON_COLORS }) => {
+        const lum = (css) => {
+          const [r, g, b] = css.match(/[\\d.]+/g).map(Number).map((v) => v / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const out = [];
+        const root = getComputedStyle(document.documentElement);
+        const paint = (name) => {
+          const d = document.createElement('div');
+          d.style.background = root.getPropertyValue(name);
+          document.body.append(d);
+          const c = getComputedStyle(d).backgroundColor;
+          d.remove();
+          return c;
+        };
+        for (const color of PERSON_COLORS) {
+          const a = document.createElement('span');
+          a.className = 'share-avatar pc-' + color;
+          document.body.append(a);
+          const s = getComputedStyle(a);
+          const r = ratio(s.backgroundColor, s.color);
+          a.remove();
+          if (r < 4.5) out.push(color + ' ' + r.toFixed(2));
+        }
+        for (const mark of ['--share-ok', '--share-warn-mark']) {
+          const r = ratio(paint(mark), paint('--surface'));
+          if (r < 3) out.push(mark + ' ' + r.toFixed(2));
+        }
+        return out;
+      })`);
+      if (low.length) fail(`sharing's colors in ${scheme} are too faint: ${low.join(', ')}`);
+    }
+    await send('Emulation.setEmulatedMedia', { features: [] });
+    console.log("web-smoke: sharing's colors read in light and dark");
+
     // 2b. A dialog (Rename budget, on the topsheet): a named modal dialog
     // with focus inside and the page behind inert; Escape closes it and
     // focus goes back to the button that opened it.
@@ -600,6 +640,18 @@ async function main() {
     if (JSON.stringify(setupTabs.names) !== JSON.stringify(wantTabs)) fail(`Budget Setup's tabs: ${JSON.stringify(setupTabs.names)}`);
     if (setupTabs.drawn.some((x) => x.endsWith(':false'))) fail(`Budget Setup tabs drew nothing: ${setupTabs.drawn.join(', ')}`);
     console.log(`web-smoke: Budget Setup draws its ${setupTabs.names.length} tabs from the string table`);
+    // It is a named modal dialog over an inert page; Escape closes it and
+    // focus goes back to the grid, as after the app's own window.
+    const setupDialog = (await ax()).find((n) => n.role.value === 'dialog');
+    if (!setupDialog || named(setupDialog) !== 'Budget Setup' || prop(setupDialog, 'modal') !== true) fail(`Budget Setup isn't a named modal dialog: ${setupDialog ? `"${named(setupDialog)}" modal=${prop(setupDialog, 'modal')}` : 'none'}`);
+    if (!(await evaluate(`document.querySelector('.app').inert`))) fail('the page behind Budget Setup is not inert');
+    await evaluate(`(() => {
+      const w = document.querySelector('.mw-setup-frame').contentWindow;
+      w.document.body.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      return true;
+    })()`);
+    await until('Budget Setup closed, focus on the grid', `!document.querySelector('.mw-setup') && !document.querySelector('.app').inert && document.activeElement === document.getElementById('grid-host')`, 5_000);
+    console.log('web-smoke: Budget Setup is a modal dialog and gives focus back');
 
     // 5. Nothing went wrong on the way.
     await new Promise((r) => setTimeout(r, 300));

@@ -77,8 +77,9 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
   it was open, focus went back to the page. It now goes to the replacement: the element
   with the same id, else the one at the same place under the nearest ancestor with an id
   (`rememberFocus` in `modal.js`; checked in `scripts/web-smoke.mjs`).
-- [ ] Left: in the browser build, Budget Setup
-  is a frame over the page without dialog semantics (the app's own window is fine).
+- [x] Fixed later (2026-11-05): in the browser build, Budget Setup, a frame over the page,
+  is a named modal dialog with the page behind it inert; Escape closes it and focus goes
+  to the grid, as after the app's own window (checked in `scripts/web-smoke.mjs`).
 
 ## Visible focus and contrast
 
@@ -96,9 +97,12 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
   against the menu); it now also has the accent ring.
 - [x] Fixed later (2026-11-02): an empty grid (an account with no lines) showed focus only
   by a faint border; with no cursor cell it now shows the 2-pixel accent ring itself.
-- [ ] Left: the sharing palette's green and amber
-  dots are below 3:1 in light but always sit beside a text label. Other per-file colors
-  were not swept one by one.
+- [x] Fixed later (2026-11-05): sharing's status dots and conflict ring are 3:1 or better
+  on the surface in light and dark (they were below it in light). Initials on a person's
+  color are 4.5:1 or better in both: orange and amber were 3.8:1 in light, and every color
+  was about 2:1 in dark, white on a light fill, so dark uses dark initials. Checked in
+  `scripts/web-smoke.mjs`.
+- [ ] Left: other per-file colors were not swept one by one.
 
 ## Not checked in this slice
 

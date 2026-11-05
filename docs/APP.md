@@ -1247,6 +1247,8 @@ The keys above are the same with a screen reader on; nothing here changes them (
 - **Dialogs** are labelled modal dialogs: the page behind is inert, Tab stays inside,
   Escape cancels and focus goes back to what opened it, or to its replacement when it
   was drawn again while the dialog was open.
+- **Sharing's colors**: people's initials read 4.5:1 or better on their color, and the
+  status dots and conflict ring 3:1 or better on the surface, in light and dark.
 - **Contrast**: text and focus rings follow docs/BRAND.md's rules (4.5:1 for text, 3:1
   for focus rings and borders that carry meaning) in light and dark. Every focused control
   shows a 2-pixel accent ring; a grid with no cursor cell (an account with no lines) rings
