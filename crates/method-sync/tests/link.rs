@@ -11,8 +11,8 @@ const WAIT: Duration = Duration::from_secs(15);
 async fn pair() -> (Node, Node) {
     let a = Node::start_loopback([1; 32]).await.unwrap();
     let b = Node::start_loopback([2; 32]).await.unwrap();
-    a.allow(&[b.id()]).unwrap();
-    b.allow(&[a.id()]).unwrap();
+    a.allow(&[b.id()]);
+    b.allow(&[a.id()]);
     (a, b)
 }
 
@@ -63,7 +63,7 @@ async fn frames_cross_both_ways_and_name_the_peer() {
 async fn a_stranger_is_closed_before_any_frame() {
     let (a, b) = pair().await;
     let stranger = Node::start_loopback([3; 32]).await.unwrap();
-    stranger.allow(&[b.id()]).unwrap();
+    stranger.allow(&[b.id()]);
     let address = b.address().unwrap();
 
     let accepted = tokio::spawn({
@@ -95,8 +95,8 @@ async fn a_stranger_is_closed_before_any_frame() {
 async fn a_silent_connection_does_not_keep_a_member_waiting() {
     let (a, b) = pair().await;
     let silent = Node::start_loopback([3; 32]).await.unwrap();
-    silent.allow(&[b.id()]).unwrap();
-    b.allow(&[a.id(), silent.id()]).unwrap();
+    silent.allow(&[b.id()]);
+    b.allow(&[a.id(), silent.id()]);
     let address = b.address().unwrap();
 
     // `connect` opens a stream but writes nothing, so `b` never sees one.
@@ -135,7 +135,7 @@ async fn closing_a_node_ends_its_accept() {
 #[tokio::test]
 async fn connecting_to_a_key_not_on_the_list_is_refused_here() {
     let (a, b) = pair().await;
-    a.allow(&[]).unwrap();
+    a.allow(&[]);
     let err = a.connect(&b.address().unwrap()).await.unwrap_err();
     assert!(err.0.contains("isn't a member"), "{err}");
     a.close().await;

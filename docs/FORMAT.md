@@ -1643,7 +1643,7 @@ Feature.mthd-log/
       000001-000140.chg            a sealed segment: changes 1 to 140 of this actor
       000141-000163.chg
       written.json                 hashes of the .mthd files it wrote from the log
-      presence.json                its heartbeat: who, where, and any access request
+      presence.json                its heartbeat: who, where, any access request, any live address
     <actor>/
       ...
 ```
@@ -1697,6 +1697,15 @@ rename like a segment. It is never part of the log and nothing in it changes the
   heartbeat holding a request and pass over it (tested with the old shape both ways in
   method-format). A request is not signed and gives nothing on its own: a role is given
   only by a signed `grant` from someone allowed to give it.
+- `live` is how to reach this computer's live link, while this person has live mode on
+  (decisions.md, entry 98): a JSON text with its key and IP addresses, which the other
+  members and the folder's hosting service can read. Left out otherwise, and when they turn
+  it off or close the budget. Earlier versions pass over it, as they do a request. It gives
+  nothing on its own: changes that arrive over the link are checked by the log like a
+  segment's, and a removed person's own heartbeat is passed over. The link's trust is the
+  folder's: heartbeats aren't signed, so anyone who can write in the folder can name a key
+  there, and be connected and sent what the folder already holds. Only this computer's own
+  relay is used from an address; a direct address is dialed as it stands.
 
 ### `budget.json`
 

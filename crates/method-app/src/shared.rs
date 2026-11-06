@@ -45,6 +45,8 @@ use method_core::log::{
 use method_core::{Budget, RowId};
 use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
 use method_session::messages::{msg, word};
+use method_sync::mesh::{Event as LiveEvent, Mesh};
+use method_sync::{Frame, Relay};
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_with};
@@ -591,6 +593,31 @@ pub struct SharedDoc {
     declined_dir: Option<PathBuf>,
     /// Requests declined here, by who and when they asked.
     declined: BTreeSet<Declined>,
+    /// The live link, while this person has live mode on (decisions.md,
+    /// entry 98). `None` is the default, and nothing touches the network.
+    live: Option<Live>,
+}
+
+/// The live link and how far it has got.
+#[derive(Debug)]
+struct Live {
+    mesh: Mesh,
+    /// How many of the log's changes have been offered to everyone.
+    offered: usize,
+    /// Who the mesh was last told to connect.
+    peers: BTreeMap<String, String>,
+}
+
+/// The largest run of changes in one frame; [`method_sync::MAX_FRAME`] is
+/// the hard limit, and a line can grow when it is written into a frame.
+const LIVE_FRAME_BYTES: usize = 1024 * 1024;
+
+/// Closing the budget, or the app, ends live mode with it: the link closes
+/// (the mesh's own drop) and the address comes out of the heartbeat file.
+impl Drop for SharedDoc {
+    fn drop(&mut self) {
+        self.live_stop();
+    }
 }
 
 impl std::fmt::Debug for SharedDoc {
@@ -746,6 +773,7 @@ impl SharedDoc {
             request: None,
             declined_dir: None,
             declined: BTreeSet::new(),
+            live: None,
         }
         .with_scan()
     }
@@ -1046,6 +1074,7 @@ impl SharedDoc {
         // The owner started the budget again: nothing more goes into the
         // folder from this log (docs/research/owner-key.md, part 1).
         if flog::replaced(&self.shared) {
+            self.live = None;
             self.replaced = Some(
                 self.shared
                     .log
@@ -1070,7 +1099,9 @@ impl SharedDoc {
         // What others wrote.
         let before = self.shared.log.len();
         let folds = self.shared.log.folds();
-        let report = flog::absorb(&mut self.shared.log, &self.shared.dir, &mut self.scan);
+        let mut report = flog::absorb(&mut self.shared.log, &self.shared.dir, &mut self.scan);
+        report.applied += self.live_receive();
+        report.pending = self.shared.log.pending().len();
         if self.shared.log.folds() != folds {
             // A removal (or the owner's first role or key) left out changes
             // this computer had applied: the budget is made again.
@@ -1135,7 +1166,169 @@ impl SharedDoc {
             self.place_changed = true;
         }
         self.heartbeat(now, false);
+        self.live_send();
         out
+    }
+
+    // The live link (decisions.md, entry 98)
+
+    /// Turns live mode on for this person, on this computer, for this
+    /// budget. The app calls this only after showing what it sends. Nothing
+    /// connects before it, and the first heartbeat with the address follows.
+    pub fn live_start(&mut self, relay: Relay) -> Result<(), String> {
+        if self.live.is_some() {
+            return Ok(());
+        }
+        let mut secret = [0u8; 32];
+        getrandom::fill(&mut secret).map_err(|e| e.to_string())?;
+        let budget = self.live_budget()?;
+        let mesh = Mesh::start(secret, relay, &budget).map_err(|e| e.0)?;
+        self.live_with(mesh);
+        Ok(())
+    }
+
+    /// The budget this log belongs to, which both ends of a link must share.
+    pub fn live_budget(&self) -> Result<String, String> {
+        self.shared.dir.info().map(|i| i.budget_id).map_err(|e| e.0)
+    }
+
+    /// Uses a mesh already started (a test's, on the loopback address).
+    pub fn live_with(&mut self, mesh: Mesh) {
+        self.live = Some(Live {
+            mesh,
+            offered: 0,
+            peers: BTreeMap::new(),
+        });
+        self.heartbeat(Instant::now(), true);
+    }
+
+    /// Turns live mode off: the link closes, and the address comes out of
+    /// the heartbeat file.
+    pub fn live_stop(&mut self) {
+        if self.live.take().is_some() {
+            self.heartbeat(Instant::now(), true);
+        }
+    }
+
+    /// Whether this person has live mode on.
+    pub fn live_on(&self) -> bool {
+        self.live.is_some()
+    }
+
+    /// How many people this computer has a live link to.
+    pub fn live_connected(&self) -> usize {
+        self.live.as_ref().map_or(0, |l| l.mesh.connected())
+    }
+
+    /// Who should be connected: members whose heartbeat is recent and gives
+    /// an address, and never someone removed.
+    fn live_peers(&self) -> BTreeMap<String, String> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let me = self.actor();
+        self.people
+            .iter()
+            .filter(|(a, _)| **a != me && !self.shared.log.removed(**a))
+            .filter(|(_, p)| {
+                iso_secs(&p.at).is_some_and(|at| now.saturating_sub(at) < AWAY_AFTER.as_secs())
+            })
+            .filter_map(|(_, p)| {
+                let address = p.live.clone()?;
+                let id = serde_json::from_str::<serde_json::Value>(&address)
+                    .ok()?
+                    .get("id")?
+                    .as_str()?
+                    .to_string();
+                Some((id, address))
+            })
+            .collect()
+    }
+
+    /// Takes in what arrived on the links, and answers anyone who said what
+    /// they hold. Changes are judged by the log exactly as a segment's are.
+    fn live_receive(&mut self) -> usize {
+        let Some(live) = &self.live else { return 0 };
+        let mut lines = Vec::new();
+        let mut asked = Vec::new();
+        for event in live.mesh.events() {
+            match event {
+                LiveEvent::Up { peer } => {
+                    let frontier = self
+                        .shared
+                        .log
+                        .frontier()
+                        .0
+                        .iter()
+                        .map(|(a, s)| (a.to_string(), *s))
+                        .collect();
+                    live.mesh.send_to(&peer, Frame::Have { frontier });
+                }
+                LiveEvent::Have { peer, frontier } => asked.push((peer, frontier)),
+                LiveEvent::Changes { lines: more, .. } => lines.extend(more),
+                LiveEvent::Down { .. } => {}
+            }
+        }
+        for (peer, frontier) in asked {
+            self.live_answer(&peer, &frontier);
+        }
+        let changes = lines
+            .iter()
+            .filter_map(|l| flog::change_from_json(l).ok())
+            .collect();
+        flog::apply_changes(&mut self.shared.log, changes).applied
+    }
+
+    /// Whether a change may go on the link: this computer's own only once a
+    /// segment holds it. If this computer stopped before writing it, it
+    /// would use the same number again for a different change, and everyone
+    /// who had the first would see a fork.
+    fn live_may_send(&self, c: &method_core::log::Change) -> bool {
+        c.actor != self.actor() || c.seq <= self.written_seq
+    }
+
+    /// Sends a peer the changes it lacks.
+    fn live_answer(&self, peer: &str, frontier: &BTreeMap<String, u64>) {
+        let Some(live) = &self.live else { return };
+        let mut theirs = method_core::log::Frontier::new();
+        for (actor, seq) in frontier {
+            if let Some(a) = ActorId::parse(actor) {
+                theirs.advance(a, *seq);
+            }
+        }
+        let lacking = self.shared.log.since(&theirs);
+        let sendable = lacking.into_iter().filter(|c| self.live_may_send(c));
+        for lines in live_frames(sendable) {
+            live.mesh.send_to(peer, Frame::Changes { lines });
+        }
+    }
+
+    /// Tells the mesh who should be connected, and offers everyone the
+    /// changes it hasn't offered yet.
+    fn live_send(&mut self) {
+        if self.live.is_none() {
+            return;
+        }
+        let peers = self.live_peers();
+        let Some(live) = &self.live else { return };
+        if live.peers != peers {
+            live.mesh.set_peers(peers.clone());
+        }
+        let offered = live.offered.min(self.shared.log.len());
+        let ready: Vec<_> = self
+            .shared
+            .log
+            .changes_from(offered)
+            .take_while(|c| self.live_may_send(c))
+            .collect();
+        let count = ready.len();
+        for lines in live_frames(ready.into_iter()) {
+            live.mesh.broadcast(Frame::Changes { lines });
+        }
+        if let Some(live) = &mut self.live {
+            live.peers = peers;
+            live.offered = offered + count;
+        }
     }
 
     /// Writes this computer's unwritten changes to a segment when typing
@@ -1328,6 +1521,7 @@ impl SharedDoc {
             at: iso_now(),
             frontier: self.shared.log.frontier().digest(),
             request: self.request.clone(),
+            live: self.live.as_ref().and_then(|l| l.mesh.address().ok()),
         };
         if self.shared.dir.write_presence(self.actor(), &p).is_ok() {
             self.heartbeat_at = Some(now);
@@ -2956,6 +3150,32 @@ pub fn refused_why(reason: &str) -> String {
         return tr("shared.refused.not_this_history");
     }
     tr("shared.refused.didnt_fit")
+}
+
+/// Changes as frames' worth of the log's own lines. One too large for any
+/// frame is left to the folder, which carries it as always.
+fn live_frames<'a>(
+    changes: impl Iterator<Item = &'a method_core::log::Change>,
+) -> Vec<Vec<String>> {
+    let mut frames = Vec::new();
+    let mut lines = Vec::new();
+    let mut bytes = 0;
+    for c in changes {
+        let line = flog::change_to_json(c);
+        if line.len() > LIVE_FRAME_BYTES {
+            continue;
+        }
+        if bytes + line.len() > LIVE_FRAME_BYTES {
+            frames.push(std::mem::take(&mut lines));
+            bytes = 0;
+        }
+        bytes += line.len();
+        lines.push(line);
+    }
+    if !lines.is_empty() {
+        frames.push(lines);
+    }
+    frames
 }
 
 #[cfg(test)]
