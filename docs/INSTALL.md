@@ -29,7 +29,7 @@ the Gatekeeper step below; the release's description says when that applies.
 You need Rust (stable, via [rustup](https://rustup.rs)) and the Tauri CLI, pinned:
 
 ```bash
-cargo install tauri-cli --version 2.11.4 --locked
+cargo install tauri-cli --version 2.12.1 --locked
 ```
 
 Then, from the repository root:

@@ -92,6 +92,11 @@ cargo xtask <command> [--root <repository>]
       Check each updater archive in <artifacts> against its .sig the way the
       app does (method-update): the public key in tauri.conf.json and the
       version X.Y.Z. Needs no secret.
+  sign-file --file <path> [--config <tauri.conf.json>]
+      Sign <path> with the same key, writing a plain minisign <path>.minisig.
+      It must be the key tauri.conf.json's public key belongs to.
+  verify-file --file <path> [--config <tauri.conf.json>]
+      Check <path>.minisig against that public key. Needs no secret.
 ";
 
 fn main() -> ExitCode {
@@ -245,6 +250,27 @@ fn run(args: &[String]) -> Result<String, String> {
                 .unwrap_or_else(|| repo::tauri_conf(&root));
             let (pubkey, _) = manifest::updater_config(&config)?;
             sign::verify_command(&path(need("--dir")?), need("--version")?, &pubkey)
+        }
+        "sign-file" => {
+            let file = a.value("--file").ok_or("sign-file needs --file")?;
+            let config = a
+                .value("--config")
+                .map(path)
+                .unwrap_or_else(|| repo::tauri_conf(&root));
+            let (pubkey, _) = manifest::updater_config(&config)?;
+            let key = std::env::var("TAURI_SIGNING_PRIVATE_KEY")
+                .map_err(|_| "sign-file needs TAURI_SIGNING_PRIVATE_KEY".to_string())?;
+            let password = std::env::var("TAURI_SIGNING_PRIVATE_KEY_PASSWORD").unwrap_or_default();
+            sign::sign_file_command(&path(file), &pubkey, &key, &password)
+        }
+        "verify-file" => {
+            let file = a.value("--file").ok_or("verify-file needs --file")?;
+            let config = a
+                .value("--config")
+                .map(path)
+                .unwrap_or_else(|| repo::tauri_conf(&root));
+            let (pubkey, _) = manifest::updater_config(&config)?;
+            sign::verify_file_command(&path(file), &pubkey)
         }
         "notices" => notices::command(&root, a.has("--check")),
         "wasm-check" => wasm::command(&root),
