@@ -10,7 +10,7 @@ Why Tauri: [decisions.md](decisions.md), entry 14.
 
 ## Run and build
 
-You need Rust (stable) and, for bundles, the Tauri CLI (`cargo install tauri-cli --version 2.11.4 --locked`).
+You need Rust (stable) and, for bundles, the Tauri CLI (`cargo install tauri-cli --version 2.12.1 --locked`).
 There is no JavaScript toolchain: no npm, no bundler, no packages.
 
 ```bash

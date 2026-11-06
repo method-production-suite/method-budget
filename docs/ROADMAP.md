@@ -26,6 +26,9 @@ this page goes ahead without waiting.
   D98). Main has it, so hold the release or take the row out of the status panel first.
   (1) The two-computer test below passes. (2) The website repo's `apps/budget/index.html`
   (MOrg's) no longer says the app goes online only for updates or that nothing is uploaded.
+- **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
+  opens to an empty window on current Arch-based systems. Its new packaging tool also packages
+  the macOS and Windows builds, so the rehearsal has to pass first.
 - **0.8.1 is out** (published 2026-11-03, tagged on f110543; methodbudget.com follows it).
   It carries the high contrast and empty-grid focus fixes and the site copy fixes, with no
   crate-age exceptions. 0.8.0 (2026-10-30) brought signed changes, the owner's key and
@@ -244,7 +247,9 @@ the screen-reader check.
 - [ ] **Linux live check** (2.25; **eventually**, the owner 2026-10-20): install from the
       release's `.deb` or AppImage (0.7.0, **ready now**); print the topsheet and detail;
       menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup keys); double-click a `.mthd` to
-      open it.
+      open it. From the next release's AppImage, whose packaging no longer carries `xdg-open`:
+      Help > User Guide and Report a Bug should still open, on a computer with and without
+      its own `xdg-open` (docs/research/linux-appimage-egl.md).
 - [ ] **Rate tables in the app** (3.9; D90; about five minutes): open the Field Station
       sample, Budget Setup > Rate Tables, New Table: type two invented classifications with
       a Per Day figure (Add unit… for Week), Save Table, then Revert after a change. Import
