@@ -40,7 +40,7 @@ use tokio::time::timeout;
 
 /// The protocol's name in the connection handshake. A later, incompatible
 /// protocol takes a new number.
-pub const ALPN: &[u8] = b"method-budget/sync/1";
+pub const ALPN: &[u8] = b"method-budget/sync/2";
 /// The largest frame either side will read or write.
 pub const MAX_FRAME: usize = 4 * 1024 * 1024;
 /// How long the two sides have to say hello.
@@ -118,6 +118,21 @@ pub enum Frame {
     Have { frontier: BTreeMap<String, u64> },
     /// Changes the other side lacks, as the log's own signed lines.
     Changes { lines: Vec<String> },
+    /// The cell this person is on now, if any. Never a value.
+    Cursor { cell: Option<Cell> },
+}
+
+/// A cell of the budget, in the names the change log uses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Cell {
+    /// "row", "account", "category" or "production_total".
+    pub kind: String,
+    /// The row's id, or the account's or category's number, or the item's name.
+    pub key: String,
+    /// A row's account number, an account's category number.
+    pub parent: Option<String>,
+    /// The field, as the file names it ("rate").
+    pub field: Option<String>,
 }
 
 /// This computer's endpoint. [`Node::close`] closes it and every link.

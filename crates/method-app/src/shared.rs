@@ -46,7 +46,7 @@ use method_core::{Budget, RowId};
 use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
 use method_session::messages::{msg, word};
 use method_sync::mesh::{Event as LiveEvent, Mesh};
-use method_sync::{Frame, Relay};
+use method_sync::{Cell, Frame, Relay};
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_with};
@@ -297,6 +297,8 @@ pub struct PersonDto {
     pub account: Option<String>,
     /// How many changes of theirs this computer has.
     pub changes: u64,
+    /// The cell they are on, over a live link (never for this person).
+    pub cell: Option<Cell>,
     /// What they may change: "owner", "co_owner", "admin", "editor", "department",
     /// "actuals", "comment" or "read_only".
     pub role: String,
@@ -570,6 +572,8 @@ pub struct SharedDoc {
     presence_read_at: Option<Instant>,
     place: (Option<String>, Option<String>),
     place_changed: bool,
+    /// The cell this person is on, for those on a live link.
+    cell: Option<Cell>,
     people: BTreeMap<ActorId, Presence>,
     recent: Vec<RemoteChange>,
     /// Changes waiting for ones that haven't arrived, from the last read.
@@ -612,6 +616,8 @@ struct Live {
     peers: BTreeMap<String, String>,
     /// Who has a link open now.
     linked: HashSet<String>,
+    /// The cell each linked person last said they are on.
+    cells: HashMap<String, Cell>,
 }
 
 /// How old a heartbeat may be and still be dialed. Far longer than the time
@@ -781,6 +787,7 @@ impl SharedDoc {
             presence_read_at: None,
             place: (None, None),
             place_changed: false,
+            cell: None,
             people: BTreeMap::new(),
             recent: Vec::new(),
             waiting: 0,
@@ -867,6 +874,19 @@ impl SharedDoc {
         if place != self.place {
             self.place = place;
             self.place_changed = true;
+        }
+    }
+
+    /// The cell this person moved to. It goes only to those on a live link,
+    /// and only while live mode is on.
+    pub fn set_cell(&mut self, cell: Option<Cell>) {
+        let cell = cell.and_then(checked_cell);
+        if cell == self.cell {
+            return;
+        }
+        self.cell = cell.clone();
+        if let Some(live) = &self.live {
+            live.mesh.broadcast(Frame::Cursor { cell });
         }
     }
 
@@ -1210,6 +1230,7 @@ impl SharedDoc {
             offered: 0,
             peers: BTreeMap::new(),
             linked: HashSet::new(),
+            cells: HashMap::new(),
         });
         self.heartbeat(Instant::now(), true);
     }
@@ -1232,6 +1253,17 @@ impl SharedDoc {
         self.live.as_ref().map_or(0, |l| l.mesh.connected())
     }
 
+    /// The cell a person is on, when their heartbeat names a linked computer
+    /// that said so. Someone removed shows none.
+    fn live_cell(&self, actor: ActorId) -> Option<Cell> {
+        let live = self.live.as_ref()?;
+        if self.shared.log.removed(actor) {
+            return None;
+        }
+        let id = live_id(self.people.get(&actor)?.live.as_deref()?)?;
+        live.cells.get(&id).cloned()
+    }
+
     /// Who should be connected: members whose heartbeat gives an address and
     /// is recent, or who have a link open already. Never someone removed.
     fn live_peers(&self) -> BTreeMap<String, String> {
@@ -1244,11 +1276,7 @@ impl SharedDoc {
             .filter(|(a, _)| **a != me && !self.shared.log.removed(**a))
             .filter_map(|(_, p)| {
                 let address = p.live.clone()?;
-                let id = serde_json::from_str::<serde_json::Value>(&address)
-                    .ok()?
-                    .get("id")?
-                    .as_str()?
-                    .to_string();
+                let id = live_id(&address)?;
                 let recent =
                     iso_secs(&p.at).is_some_and(|at| now.saturating_sub(at) < LIVE_STALE.as_secs());
                 let open = self.live.as_ref().is_some_and(|l| l.linked.contains(&id));
@@ -1276,11 +1304,26 @@ impl SharedDoc {
                         .map(|(a, s)| (a.to_string(), *s))
                         .collect();
                     live.mesh.send_to(&peer, Frame::Have { frontier });
+                    live.mesh.send_to(
+                        &peer,
+                        Frame::Cursor {
+                            cell: self.cell.clone(),
+                        },
+                    );
                 }
                 LiveEvent::Have { peer, frontier } => asked.push((peer, frontier)),
                 LiveEvent::Changes { lines: more, .. } => lines.extend(more),
+                LiveEvent::Cursor { peer, cell } => match cell.and_then(checked_cell) {
+                    Some(cell) => {
+                        live.cells.insert(peer, cell);
+                    }
+                    None => {
+                        live.cells.remove(&peer);
+                    }
+                },
                 LiveEvent::Down { peer } => {
                     live.linked.remove(&peer);
+                    live.cells.remove(&peer);
                 }
             }
         }
@@ -3167,6 +3210,28 @@ pub fn refused_why(reason: &str) -> String {
         return tr("shared.refused.not_this_history");
     }
     tr("shared.refused.didnt_fit")
+}
+
+/// The computer's id in a heartbeat's live address.
+fn live_id(address: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(address)
+        .ok()?
+        .get("id")?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// A cell as the page may read it, or none: what arrives on a link comes from
+/// another computer, and only the grid's kinds and short names go further.
+fn checked_cell(cell: Cell) -> Option<Cell> {
+    const LONGEST: usize = 200;
+    let short = |s: &str| s.len() <= LONGEST;
+    let kinds = ["row", "account", "category", "production_total"];
+    (kinds.contains(&cell.kind.as_str())
+        && short(&cell.key)
+        && cell.parent.as_deref().is_none_or(short)
+        && cell.field.as_deref().is_none_or(short))
+    .then_some(cell)
 }
 
 /// Changes as frames' worth of the log's own lines. One too large for any

@@ -1531,6 +1531,7 @@ pub fn run() {
             crate::shared_app::share_live_start,
             crate::shared_app::share_live_stop,
             crate::shared_app::share_place,
+            crate::shared_app::share_cell,
             crate::shared_app::share_review,
             crate::shared_app::share_activity,
             crate::shared_app::share_blame,

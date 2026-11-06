@@ -267,6 +267,7 @@ const COMMANDS: &[&str] = &[
     "share_live_start",
     "share_live_stop",
     "share_place",
+    "share_cell",
     "share_review",
     "share_activity",
     "share_blame",

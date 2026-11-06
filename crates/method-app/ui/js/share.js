@@ -110,7 +110,10 @@ function statusArrived(p) {
     if (locksChanged && typeof ctx.render === 'function') ctx.render();
     renderBar(ctx.view());
     decorateShare(ctx.view());
-    if (st.panel) drawPanel();
+    // Someone moving their cursor doesn't redraw the panel under this person.
+    const panelText = JSON.stringify({ ...p.status, people: p.status.people.map((q) => ({ ...q, cell: null })), me: null });
+    if (st.panel && panelText !== st.panelText) drawPanel();
+    st.panelText = panelText;
   }
 }
 
@@ -423,7 +426,7 @@ export function openLiveDialog() {
       }
     });
     const send = el('ul', { class: 'share-live-sends' });
-    for (const text of [t('share.live.sends_addresses'), t('share.live.sends_relay'), t('share.live.sends_dialing'), t('share.live.sends_nothing_else')]) {
+    for (const text of [t('share.live.sends_addresses'), t('share.live.sends_relay'), t('share.live.sends_dialing'), t('share.live.sends_cell'), t('share.live.sends_nothing_else')]) {
       send.append(el('li', { text }));
     }
     return el(
@@ -713,6 +716,20 @@ export function reportPlace(view) {
   }, 300);
 }
 
+/** The cell this person is on, kept here and sent on only over a live link. */
+export function reportCell(place) {
+  if (!ctx || !ctx.view() || !ctx.view().shared) return;
+  const cell = place ? { kind: place.kind, key: String(place.key), parent: place.parent || null, field: place.field || null } : null;
+  const doc = ctx.doc();
+  const text = JSON.stringify([doc, cell]);
+  if (text === st.cellSent) return;
+  st.cellSent = text;
+  clearTimeout(st.cellTimer);
+  st.cellTimer = setTimeout(() => {
+    ctx.invoke('share_cell', { doc, cell }).catch(() => {});
+  }, CELL_WAIT_MS);
+}
+
 // ---------------------------------------------------------------------------
 // Changes by other people: fetch the view, then flash the cells
 
@@ -766,7 +783,8 @@ export function decorateShare(view) {
   const s = current();
   const grid = ctx.grid();
   if (!s || !grid) return;
-  for (const n of grid.table.querySelectorAll('.share-here, .share-conflict-badge')) n.remove();
+  for (const n of grid.table.querySelectorAll('.share-here, .share-conflict-badge, .share-cell')) n.remove();
+  for (const td of grid.table.querySelectorAll('.share-cell-at')) td.classList.remove('share-cell-at');
   for (const td of grid.table.querySelectorAll('.share-conflict')) td.classList.remove('share-conflict');
   // People in categories and accounts (folder mode: account level only).
   const level = ctx.level();
@@ -779,6 +797,17 @@ export function decorateShare(view) {
     const td = grid.cellFor(at.key, 'name');
     if (!td || td.classList.contains('editing')) continue;
     td.append(el('span', { class: `share-here ${colorClass(p.color)}`, text: p.initials, title: personTitle(p), attrs: { 'aria-label': personTitle(p) } }));
+  }
+  // The cell each person on a live link is on. Not in a cell being typed in:
+  // nothing of theirs ever goes inside what I'm typing.
+  for (const p of s.people) {
+    const at = p.cell ? ctx.rowKeyFor(p.cell) : null;
+    if (!at || !at.col) continue;
+    const td = grid.cellFor(at.key, at.col);
+    if (!td || td.classList.contains('editing')) continue;
+    const label = t('share.cell_here', { name: p.name });
+    td.classList.add('share-cell-at');
+    td.append(el('span', { class: `share-cell ${colorClass(p.color)}`, title: label, attrs: { 'aria-label': label } }, el('span', { class: 'share-cell-tag', text: p.initials })));
   }
   // Values changed by two people.
   for (const c of Array.isArray(s.conflicts) ? s.conflicts : []) {
