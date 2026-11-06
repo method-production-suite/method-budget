@@ -5486,3 +5486,28 @@ docs/research/collaboration.md, section 6.
 - **Public wording.** "Goes online only to check for updates" and "works with no connection"
   change when this ships, in the README, docs/APP.md, site/index.html and the website's
   apps/budget/index.html.
+
+## 99. One read of the folder settles every contested number with one fold (2026-11-06)
+
+Decision 89 settles a number two changes claim by folding the whole log again, and it did
+that once per claim. Someone who can write to the shared folder could plant a forgery at every
+number and make a large shared budget slow to open for everyone. MReview raised it in review.
+
+- **One fold per read.** `Log::apply_all` takes a whole read of the folder, or one frame on a
+  live link, and folds once at the end; `Log::apply` still folds per claim for a change on its
+  own. The fold is the same fold, so the rule for who wins a number doesn't change, and neither
+  does the file format. What each change is reported as comes after that fold.
+- **What it costs now.** Measured on this Mac with a release build and a test key, a budget of
+  500 edits with a forgery at every number took 6.5 seconds to read and takes 25 ms; 2,000
+  edits with 200 forgeries took 5.6 seconds and takes 55 ms. Real signature checks add their
+  own time per change and weren't measured here. The fold itself no longer searches the list
+  of claims for each change.
+- **What it doesn't do.** A folder that keeps gaining forgeries still costs one whole fold per
+  read that finds one, and a change that judges earlier ones (a removal) folds as before. We
+  did not build settling a number without any fold: the judgement of a claim depends on the
+  state where its number falls, and proving it can't win without folding is more rule than
+  this risk needs.
+
+Tests: `opening_a_folder_settles_every_claim_with_one_fold`, `one_read_settles_many_forgeries_with_one_fold`,
+`one_read_reports_what_the_fold_settled`, `one_read_refuses_a_fork_loudly`, and newcomers
+reading all at once in `signed_changes_and_removals_converge_in_any_order`.
