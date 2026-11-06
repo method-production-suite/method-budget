@@ -653,6 +653,36 @@ async function main() {
     await until('Budget Setup closed, focus on the grid', `!document.querySelector('.mw-setup') && !document.querySelector('.app').inert && document.activeElement === document.getElementById('grid-host')`, 5_000);
     console.log('web-smoke: Budget Setup is a modal dialog and gives focus back');
 
+    // 4d. Live changes (decisions.md, entry 98): the notice says what they send
+    // and sends nothing until Turn On. The browser build has no live link, so
+    // pressing it shows the refusal and the dialog stays.
+    const live = await evaluate(`(async () => {
+      const share = await import('./js/share.js');
+      const web = window.__METHOD_WEB__;
+      const calls = [];
+      const invoke = web.invoke;
+      web.invoke = (doc, cmd, args) => { if (String(cmd).startsWith('share_live')) calls.push(cmd); return invoke.call(web, doc, cmd, args); };
+      share.openLiveDialog();
+      const d = document.querySelector('.share-live-dialog');
+      if (!d) return { none: true };
+      const text = d.textContent;
+      const named = document.getElementById(d.getAttribute('aria-labelledby'))?.textContent;
+      const before = calls.length;
+      const radios = d.querySelectorAll('input[type=radio]').length;
+      const checked = d.querySelector('input[type=radio]:checked')?.parentElement.textContent;
+      [...d.querySelectorAll('button')].find((b) => b.textContent === 'Cancel').click();
+      await new Promise((r) => setTimeout(r, 50));
+      web.invoke = invoke;
+      return { text, named, before, radios, checked, closed: !document.querySelector('.share-live-dialog') };
+    })()`);
+    if (live.none) fail('the live changes notice did not open');
+    if (live.before !== 0) fail('the notice called the network before Turn On');
+    if (live.named !== 'Turn on live changes' || live.radios !== 3 || !live.closed) fail(`the live changes notice: ${JSON.stringify(live)}`);
+    for (const want of ['IP addresses', 'hosting service', 'never the budget', 'stays connected', "isn't asked to open a port", 'only for you', 'anyone who can write in the folder']) {
+      if (!live.text.includes(want)) fail(`the live changes notice doesn't say "${want}"`);
+    }
+    console.log('web-smoke: the live changes notice says what they send and sends nothing');
+
     // 5. Nothing went wrong on the way.
     await new Promise((r) => setTimeout(r, 300));
     if (problems.length) fail(`the page reported problems:\n  ${problems.join('\n  ')}`);

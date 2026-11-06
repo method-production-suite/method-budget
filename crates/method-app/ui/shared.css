@@ -861,3 +861,20 @@
 .share-join-next {
   margin-top: 8px;
 }
+
+/* Live changes: the status panel's row, and what the notice lists. */
+.share-live-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.share-live-sends {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+}
+
+.share-live-sends li {
+  margin-bottom: 4px;
+}

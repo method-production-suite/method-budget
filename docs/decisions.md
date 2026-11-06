@@ -5448,7 +5448,8 @@ docs/research/collaboration.md, section 6.
 - **What leaves the computer.** A member's IP addresses go to the other members through the
   shared folder, where the folder's hosting service can read them too. A relay run by
   iroh's makers, free with no uptime promise, sees who talks to whom and their IP addresses,
-  never the budget. A field takes a studio's own relay instead.
+  never the budget, and a computer stays connected to its chosen relay while this is on, even
+  with nobody else online. A field takes a studio's own relay instead.
 - **Nothing published.** The endpoint is built from iroh's `Minimal` preset with the relay
   set on its own, not `N0`, which also publishes the address to its makers' DNS service.
 - **The router is left alone.** `PortmapperConfig::Disabled`, and iroh built without its
@@ -5475,6 +5476,11 @@ docs/research/collaboration.md, section 6.
   not at all. Direct addresses have the same source and stay, since dialing is what they are
   for: anyone who can write in the folder can make the app send connection attempts to any
   IP address, every three seconds, while live mode is on. Accepted; no budget goes with them.
+- **Off each time the budget opens** (2026-11-06). Live mode isn't remembered, so it can't
+  come back on without the person seeing the notice; only the relay they chose is. An old
+  heartbeat (over 15 minutes) isn't dialed, but a link already open stays, since a folder
+  service that lags is when the link matters most. A crash leaves the address in the folder
+  until this person next opens the budget; the notice says so.
 - **One mesh per budget, and a fresh key each time.** The endpoint's key is random each time
   live mode starts and is never stored; its address goes through the heartbeat file.
 - **Public wording.** "Goes online only to check for updates" and "works with no connection"
