@@ -677,9 +677,12 @@ impl Log {
 
     /// Applies many changes at once, as one read of the folder does, and says
     /// what happened to each, in the order given. The result is the one
-    /// [`Log::apply`] reaches change by change, but every number contested
-    /// along the way is settled by one fold at the end, so planting many
-    /// forgeries costs a reader one fold rather than one each.
+    /// [`Log::apply`] reaches change by change, but the numbers contested
+    /// along the way wait and are settled together at the end, so planting
+    /// many forgeries doesn't cost a reader a fold each. That is one fold when
+    /// the read brings every claim's dependencies; a fold that lets a waiting
+    /// change go on can find another claim and fold again, so this is the
+    /// usual cost and not a limit.
     pub fn apply_all(
         &mut self,
         changes: Vec<Change>,
@@ -713,9 +716,11 @@ impl Log {
                     .map(|(_, why)| why.as_str())
             };
             for (change, result) in &mut results {
-                if matches!(result, Ok(Applied::Duplicate | Applied::Applied { .. })) {
+                if matches!(result, Ok(Applied::Duplicate)) {
                     continue;
                 }
+                // Each change counts for itself now: one a change released
+                // earlier is said here too, so it isn't counted twice.
                 if self.changes.get(&change.id()) == Some(&*change) {
                     *result = Ok(Applied::Applied { unblocked: 0 });
                 } else if let Some(why) = claim(change) {

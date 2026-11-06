@@ -5487,15 +5487,17 @@ docs/research/collaboration.md, section 6.
   change when this ships, in the README, docs/APP.md, site/index.html and the website's
   apps/budget/index.html.
 
-## 99. One read of the folder settles every contested number with one fold (2026-11-06)
+## 99. One read of the folder settles its contested numbers together (2026-11-06)
 
 Decision 89 settles a number two changes claim by folding the whole log again, and it did
 that once per claim. Someone who can write to the shared folder could plant a forgery at every
 number and make a large shared budget slow to open for everyone. MReview raised it in review.
 
-- **One fold per read.** `Log::apply_all` takes a whole read of the folder, or one frame on a
-  live link, and folds once at the end; `Log::apply` still folds per claim for a change on its
-  own. The fold is the same fold, so the rule for who wins a number doesn't change, and neither
+- **A fold per read, not per claim.** `Log::apply_all` takes a whole read of the folder, or one
+  frame on a live link, and settles the claims together at the end; `Log::apply` still folds per
+  claim for a change on its own. That is one fold when the read brings every claim's
+  dependencies. A fold that lets a waiting change go on can find another claim and fold again, so
+  this is the usual cost and not a limit the code sets. The fold is the same fold, so the rule for who wins a number doesn't change, and neither
   does the file format. What each change is reported as comes after that fold.
 - **What it costs now.** Measured on this Mac with a release build and a test key, a budget of
   500 edits with a forgery at every number took 6.5 seconds to read and takes 25 ms; 2,000
