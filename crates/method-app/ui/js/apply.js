@@ -154,6 +154,7 @@ const st = {
   gen: 0, // bumped for every new view
   summary: null,
   summarySig: '',
+  fetchError: '',
   summaryScope: null, // the selection the summary describes
   summaryGen: -1,
   timer: null,
@@ -360,7 +361,9 @@ async function fetchSummary() {
   try {
     const s = await invoke('apply_summary', sc);
     if (seq !== st.seq) return;
-    if (sig !== st.summarySig) st.error = ''; // a message is about the old selection
+    // A message is about the old selection, and a failed fetch is over once one works.
+    if (sig !== st.summarySig || st.error === st.fetchError) st.error = '';
+    st.fetchError = '';
     st.summary = s && typeof s === 'object' && Array.isArray(s.rows) ? s : null;
     st.summarySig = sig;
     st.summaryScope = sc;
@@ -368,6 +371,7 @@ async function fetchSummary() {
   } catch (e) {
     if (seq !== st.seq) return;
     st.error = errText(e);
+    st.fetchError = st.error;
   }
   draw();
 }
