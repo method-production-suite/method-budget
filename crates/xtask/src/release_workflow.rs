@@ -150,6 +150,23 @@ mod tests {
         assert!(release_age_check(&no_step).is_err());
     }
 
+    /// The checksums are signed and that signature is checked, in a release
+    /// and, with a probe, in a rehearsal, which never reaches the release job.
+    #[test]
+    fn the_release_signs_its_checksums() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.github/workflows/release.yml");
+        let workflow = std::fs::read_to_string(&path).expect("release.yml");
+        for needed in [
+            "sign-file --file dist/SHA256SUMS",
+            "verify-file --file dist/SHA256SUMS",
+            "sign-file --file \"$RUNNER_TEMP/minisig-probe\"",
+            "SHA256SUMS SHA256SUMS.minisig; do",
+        ] {
+            assert!(workflow.contains(needed), "release.yml lost: {needed}");
+        }
+    }
+
     #[test]
     fn the_check_catches_cargo_after_a_secret() {
         let bad = "jobs:\n  build:\n    steps:\n      - name: Build\n        run: cargo build\n      - name: Key\n        env:\n          K: ${{ secrets.KEY }}\n        run: echo\n      - name: Package\n        run: |\n          # cargo is fine in a comment\n          cargo tauri bundle\n";
