@@ -22,6 +22,10 @@ this page goes ahead without waiting.
 
 ### Release go-aheads
 
+- **The next release must not carry the Live changes switch until these are done** (3.18;
+  D98). Main has it, so hold the release or take the row out of the status panel first.
+  (1) The two-computer test below passes. (2) The website repo's `apps/budget/index.html`
+  (MOrg's) no longer says the app goes online only for updates or that nothing is uploaded.
 - **0.8.1 is out** (published 2026-11-03, tagged on f110543; methodbudget.com follows it).
   It carries the high contrast and empty-grid focus fixes and the site copy fixes, with no
   crate-age exceptions. 0.8.0 (2026-10-30) brought signed changes, the owner's key and
@@ -260,7 +264,8 @@ the screen-reader check.
       the notice. Edit on one (the other should show it within seconds, before the folder
       syncs). Try: both on one network; on different networks with the public relay; with **No
       relay**; pausing the folder's sync; turning it off on one; Remove on the owner's (that
-      person's link should end). Note anything that doesn't connect, and any firewall prompt.
+      person's link should end); quitting one (the others' link should end, and that computer's
+      `presence.json` in the folder should have no `live` in it). Note anything that doesn't connect, and any firewall prompt.
 - [ ] **A screen reader in the app** (3.14; D82): with VoiceOver on (Cmd+F5), open the
       Field Station sample (`method-budget sample` writes it); click into the topsheet
       grid and arrow through it (each move should be spoken, with the cell's value, column

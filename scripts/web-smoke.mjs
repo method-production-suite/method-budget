@@ -678,7 +678,7 @@ async function main() {
     if (live.none) fail('the live changes notice did not open');
     if (live.before !== 0) fail('the notice called the network before Turn On');
     if (live.named !== 'Turn on live changes' || live.radios !== 3 || !live.closed) fail(`the live changes notice: ${JSON.stringify(live)}`);
-    for (const want of ['IP addresses', 'hosting service', 'never the budget', "isn't asked to open a port", 'only for you', 'anyone who can write in the folder']) {
+    for (const want of ['IP addresses', 'hosting service', 'never the budget', 'stays connected', "isn't asked to open a port", 'only for you', 'anyone who can write in the folder']) {
       if (!live.text.includes(want)) fail(`the live changes notice doesn't say "${want}"`);
     }
     console.log('web-smoke: the live changes notice says what they send and sends nothing');

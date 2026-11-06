@@ -2097,10 +2097,11 @@ it, and that is their own signed change.
 (**Live changes**, **Turn On…**). The notice says what it sends before anything does: their
 IP addresses go in the shared folder, where the others and the folder's hosting service can
 read them; a relay can carry the link and sees who talks to whom and their IP addresses,
-never the budget; the computer connects to the addresses in the others' files. They choose
-the free public relay, the production's own, or none. Changes then reach the others who
+never the budget, and the computer stays connected to a chosen relay while this is on, even
+with nobody else online; the computer connects to the addresses in the others' files. They
+choose the free public relay, the production's own, or none. Changes then reach the others who
 have it on within seconds of typing pausing, checked like a segment's, and still go through
-the folder as always. It stays on until they turn it off or close the budget, and is off
+the folder as always. It stays on until they turn it off, close the budget or quit, and is off
 again the next time the budget opens. Needs a live check on two computers: on real networks
 and through a relay, which the tests can't cover. Cursors aren't built.
 
@@ -3631,8 +3632,10 @@ waits for the next frame, so one layout serves a whole redraw.
 The app opens files the user picks and nothing else, and the web view is treated as
 untrusted (a budget file is data from anywhere).
 
-- **No network unless checking for updates.** No telemetry, no remote content, no
-  accounts. The only network access is the updater, in Rust (src/updater.rs): an HTTPS
+- **No network but update checks, and live changes if a person turns them on.** No
+  telemetry, no remote content, no accounts. Live changes are `crates/method-sync`, off
+  until this person turns them on for a budget (decisions.md, entry 98). The only other
+  network access is the updater, in Rust (src/updater.rs): an HTTPS
   request for the update manifest at the endpoint in `tauri.conf.json` and, when there is a
   newer version, its archive. The updater's HTTP client is https-only and follows redirects
   only to the endpoint's host (plus GitHub's two download hosts, `objects.githubusercontent.com`

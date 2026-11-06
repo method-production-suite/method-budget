@@ -5448,7 +5448,8 @@ docs/research/collaboration.md, section 6.
 - **What leaves the computer.** A member's IP addresses go to the other members through the
   shared folder, where the folder's hosting service can read them too. A relay run by
   iroh's makers, free with no uptime promise, sees who talks to whom and their IP addresses,
-  never the budget. A field takes a studio's own relay instead.
+  never the budget, and a computer stays connected to its chosen relay while this is on, even
+  with nobody else online. A field takes a studio's own relay instead.
 - **Nothing published.** The endpoint is built from iroh's `Minimal` preset with the relay
   set on its own, not `N0`, which also publishes the address to its makers' DNS service.
 - **The router is left alone.** `PortmapperConfig::Disabled`, and iroh built without its

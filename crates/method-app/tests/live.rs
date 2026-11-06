@@ -413,3 +413,33 @@ fn a_budget_started_again_ends_it() {
         std::thread::sleep(Duration::from_millis(50));
     }
 }
+
+/// Quitting doesn't drop the budgets, so it stops live changes itself.
+#[test]
+fn quitting_takes_the_address_out() {
+    let mut t = apart();
+    t.linked();
+    assert!(address_in(&t.alex_log, ALEX));
+    let Two {
+        alex,
+        mut jordan,
+        alex_log,
+        ..
+    } = t;
+    let state = method_app::app::AppState::default();
+    let kept = state.docs().add(alex);
+    method_app::safety_app::stop_live_everywhere(&state);
+    assert!(!address_in(&alex_log, ALEX));
+    assert!(!state
+        .docs()
+        .get_mut(kept)
+        .unwrap()
+        .shared_mut()
+        .unwrap()
+        .live_on());
+    let start = Instant::now();
+    while Two::doc(&mut jordan).live_connected() != 0 {
+        assert!(start.elapsed() < WAIT, "Jordan never heard");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
