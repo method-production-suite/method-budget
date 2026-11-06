@@ -160,12 +160,13 @@ one means changing the workflow, this table and the site's links together.
 | `Method-Budget_<version>_universal.app.tar.gz` and `.sig` | the Mac updater archive and its signature (versioned: `latest.json` lists it for both `darwin-aarch64` and `darwin-x86_64`) |
 | `latest.json` | the update manifest installed apps read |
 | `SHA256SUMS` | the SHA-256 of every file above, one per line (`sha256sum -c --ignore-missing SHA256SUMS` checks a download); Method Launcher checks Windows and Linux downloads against it |
+| `SHA256SUMS.minisig` | `SHA256SUMS` signed with the update key: `minisign -Vm SHA256SUMS -P <key>`, where the key is the second line of `plugins.updater.pubkey` in `tauri.conf.json` after base64-decoding. The release fails if it can't sign |
 
 The owner's one yes covers the tag and the publish (the suite CLAUDE.md, "Faster
 releases"): after the tag, the session that made it checks the draft and publishes it,
 unless the owner has said stop; any failed check stops it there. The checks: every file in
 the table is attached at a sensible size; `sha256sum -c SHA256SUMS` passes on the
-downloaded files; `cargo xtask verify-update` passes on the updater archive and its `.sig`
+downloaded files; `cargo xtask verify-file --file SHA256SUMS` passes; `cargo xtask verify-update` passes on the updater archive and its `.sig`
 (and `latest.json` names this version for both Mac keys); the `.dmg`'s app is notarized and
 stapled, `scripts/check-macos-bundle.sh` on it shows a `TeamIdentifier`, `x86_64 arm64` and
 Gatekeeper `accepted` (source: Notarized Developer ID); and the build log's bundle step

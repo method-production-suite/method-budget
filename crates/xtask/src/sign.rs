@@ -160,6 +160,66 @@ pub fn verify_command(dir: &Path, version: &str, pubkey: &str) -> Result<String,
     }
 }
 
+/// `cargo xtask sign-file --file <path>`: writes `<path>.minisig`, a plain
+/// minisign signature anyone can check with `minisign -Vm <path> -P <key>`,
+/// with the update key (SUITE-STANDARDS.md, section 3). Checked against the
+/// public key the app trusts before it is written: a key the app doesn't
+/// trust writes nothing.
+pub fn sign_file_command(
+    file: &Path,
+    pubkey: &str,
+    key: &str,
+    password: &str,
+) -> Result<String, String> {
+    let pk = load_public_key(pubkey)?;
+    let sk = load_secret_key(key, password)?;
+    let name = file
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| format!("{}: not a file", file.display()))?;
+    let data = std::fs::read(file).map_err(|e| format!("can't read {name}: {e}"))?;
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs();
+    let sig = minisign::sign(
+        Some(&pk),
+        &sk,
+        std::io::Cursor::new(&data),
+        Some(&format!("timestamp:{timestamp}\tfile:{name}")),
+        Some("signature from the Method Budget update key"),
+    )
+    .map_err(|e| format!("{name}: {e} (is this the key the app trusts?)"))?;
+    let out = minisig_path(file);
+    std::fs::write(&out, sig.to_string())
+        .map_err(|e| format!("can't write {}: {e}", out.display()))?;
+    Ok(format!("signed {name}\n"))
+}
+
+/// `cargo xtask verify-file --file <path>`: `<path>.minisig` must be a
+/// signature of the file by the key the app trusts.
+pub fn verify_file_command(file: &Path, pubkey: &str) -> Result<String, String> {
+    let pk = load_public_key(pubkey)?;
+    let data = std::fs::read(file).map_err(|e| format!("can't read {}: {e}", file.display()))?;
+    let at = minisig_path(file);
+    let text =
+        std::fs::read_to_string(&at).map_err(|e| format!("can't read {}: {e}", at.display()))?;
+    let sig =
+        minisign::SignatureBox::from_string(&text).map_err(|e| format!("{}: {e}", at.display()))?;
+    minisign::verify(&pk, &sig, std::io::Cursor::new(&data), true, false, false)
+        .map_err(|e| format!("{}: {e}", at.display()))?;
+    Ok(format!(
+        "{}: signed by the key the app trusts\n",
+        file.display()
+    ))
+}
+
+fn minisig_path(file: &Path) -> std::path::PathBuf {
+    let mut name = file.as_os_str().to_os_string();
+    name.push(".minisig");
+    name.into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,5 +365,38 @@ mod tests {
         let path = r.root().join("updater.key");
         assert!(load_secret_key(path.to_str().unwrap(), "").is_ok());
         assert!(load_secret_key("not a key", "").is_err());
+    }
+
+    #[test]
+    fn a_signed_file_checks_and_an_altered_one_or_another_key_doesnt() {
+        let (sk, pk) = keygen("pass");
+        let r = TempRepo::new("sign-file");
+        r.write("dist/SHA256SUMS", "abc  a-file\n");
+        let file = r.root().join("dist/SHA256SUMS");
+        assert_eq!(
+            sign_file_command(&file, &pk, &sk, "pass").unwrap(),
+            "signed SHA256SUMS\n"
+        );
+        // A plain minisign signature, not the base64 an updater `.sig` is.
+        let text = r.read("dist/SHA256SUMS.minisig");
+        assert!(text.starts_with("untrusted comment: "), "{text}");
+        verify_file_command(&file, &pk).unwrap();
+
+        let (_, other) = keygen("pass");
+        assert!(verify_file_command(&file, &other).is_err());
+
+        r.write("dist/SHA256SUMS", "abc  another-file\n");
+        assert!(verify_file_command(&file, &pk).is_err());
+    }
+
+    #[test]
+    fn a_key_the_app_doesnt_trust_signs_no_file() {
+        let (sk, _) = keygen("pass");
+        let (_, trusted) = keygen("pass");
+        let r = TempRepo::new("sign-file-untrusted");
+        r.write("dist/SHA256SUMS", "abc  a-file\n");
+        let file = r.root().join("dist/SHA256SUMS");
+        assert!(sign_file_command(&file, &trusted, &sk, "pass").is_err());
+        assert!(!r.root().join("dist/SHA256SUMS.minisig").exists());
     }
 }
