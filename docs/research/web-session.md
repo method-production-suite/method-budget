@@ -415,7 +415,7 @@ uses:
   `view-changed`, as the desktop's `tools::changed` does. The page's title follows the
   budget in front, and leaving the page asks first while a budget has unsaved changes.
 - **Budget Setup** (`setup_window`) shows the same page with `?panel=setup` in a frame over
-  the page; it shares the main page's Host and bus, and `close_setup_window` removes it
+  the page, a named modal dialog with the page behind it inert; it shares the main page's Host and bus, and `close_setup_window` removes it
   and tells the page (`setup-closed`). The tools panel has no window of its own in a
   browser: it docks at the right or the bottom.
 

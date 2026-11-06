@@ -9,13 +9,18 @@
   --pc-teal: #0e7468;
   --pc-blue: #2a63c9;
   --pc-purple: #7246c4;
-  --pc-orange: #c96a12;
+  --pc-orange: #b35c0e;
   --pc-rose: #c42f63;
   --pc-green: #35862f;
-  --pc-amber: #a67c00;
+  --pc-amber: #8f6a00;
   --pc-slate: #5b6b7c;
-  --share-ok: #3a9d3a;
+  /* Initials on a person's color: 4.5:1 or better on all eight. */
+  --pc-on: #fff;
+  /* The status dots and the conflict ring: 3:1 or better on the surface.
+     --share-warn itself is a badge's fill, under dark text. */
+  --share-ok: #2f8a2f;
   --share-warn: #d29a12;
+  --share-warn-mark: #a67c00;
   --share-bad: var(--danger);
   /* A department editor's cells outside their scope: muted, still 4.5:1 or
      better on the grid's surface (the lock says it too). */
@@ -32,7 +37,9 @@
     --pc-green: #7fcf72;
     --pc-amber: #e3b341;
     --pc-slate: #a4b1be;
+    --pc-on: #12181f;
     --share-ok: #6fcf6f;
+    --share-warn-mark: #d29a12;
     --share-locked-text: #868f99;
   }
 }
@@ -73,7 +80,7 @@
   border: 2px solid var(--surface);
   border-radius: 50%;
   background: var(--pc, var(--pc-slate));
-  color: #fff;
+  color: var(--pc-on);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -159,7 +166,7 @@
 }
 
 .share-status[data-tone="warn"] .share-dot {
-  background: var(--share-warn);
+  background: var(--share-warn-mark);
 }
 
 .share-status[data-tone="bad"] .share-dot {
@@ -554,7 +561,7 @@
   padding: 0 4px;
   border-radius: 8px;
   background: var(--pc, var(--pc-slate));
-  color: #fff;
+  color: var(--pc-on);
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
@@ -602,7 +609,7 @@
 
 .grid td.share-conflict {
   position: relative;
-  box-shadow: inset 0 0 0 1px var(--share-warn);
+  box-shadow: inset 0 0 0 1px var(--share-warn-mark);
 }
 
 .share-conflict-badge {

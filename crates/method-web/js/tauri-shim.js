@@ -375,7 +375,7 @@
     // -----------------------------------------------------------------
     // The Budget Setup window: a frame over the page
 
-    let setup = null; // { box, frame }
+    let setup = null; // { box, frame, behind }
 
     function showSetup() {
       if (setup) {
@@ -386,6 +386,12 @@
       style();
       const box = doc.createElement('div');
       box.className = 'mw-setup';
+      // A modal dialog, as the page's own are (modal.js): named, the page
+      // behind inert. When it closes the page puts focus back on the grid
+      // (main.js, setup-closed), as it does after the app's own window.
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-label', 'Budget Setup');
       const frame = doc.createElement('iframe');
       frame.className = 'mw-setup-frame';
       frame.title = 'Budget Setup';
@@ -395,17 +401,20 @@
       frame.src = url.href;
       box.append(frame);
       doc.body.append(box);
-      setup = { box, frame };
+      const behind = [...doc.body.children].filter((n) => n !== box && n.id !== 'toast' && n.id !== 'announce' && !n.inert);
+      for (const n of behind) n.inert = true;
+      setup = { box, frame, behind };
       frame.addEventListener('load', () => frame.focus());
       return false;
     }
 
     function closeSetup() {
       if (!setup) return null;
-      const { box, frame } = setup;
+      const { box, frame, behind } = setup;
       setup = null;
       if (frame.contentWindow) forgetWindow(frame.contentWindow);
       box.remove();
+      for (const n of behind) n.inert = false;
       emit('main', 'setup-closed', null);
       return null;
     }
