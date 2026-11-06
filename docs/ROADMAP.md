@@ -17,7 +17,7 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-05. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-06. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
@@ -26,6 +26,9 @@ this page goes ahead without waiting.
   D98). Main has it, so hold the release or take the row out of the status panel first.
   (1) The two-computer test below passes. (2) The website repo's `apps/budget/index.html`
   (MOrg's) no longer says the app goes online only for updates or that nothing is uploaded.
+- **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
+  opens to an empty window on current Arch-based systems. Its new packaging tool also packages
+  the macOS and Windows builds, so the rehearsal has to pass first.
 - **0.8.1 is out** (published 2026-11-03, tagged on f110543; methodbudget.com follows it).
   It carries the high contrast and empty-grid focus fixes and the site copy fixes, with no
   crate-age exceptions. 0.8.0 (2026-10-30) brought signed changes, the owner's key and

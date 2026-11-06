@@ -423,6 +423,16 @@ jobs:
               appimage="$(one "AppImage" "$root"/appimage/*.AppImage)"
               cp "$deb" dist/Method-Budget-linux-amd64.deb
               cp "$appimage" dist/Method-Budget-linux-x86_64.AppImage
+              # A bundled libwayland-client stops current Mesa loading, and the app can't
+              # draw on rolling distributions (docs/research/linux-appimage-egl.md).
+              chmod +x dist/Method-Budget-linux-x86_64.AppImage
+              inside="$(mktemp -d)"
+              (cd "$inside" && "$GITHUB_WORKSPACE/dist/Method-Budget-linux-x86_64.AppImage" --appimage-extract >/dev/null)
+              if find "$inside/squashfs-root" -name 'libwayland-client*.so*' | grep -q .; then
+                echo "::error::The AppImage bundles libwayland-client."
+                exit 1
+              fi
+              rm -rf "$inside"
               ;;
           esac
           ls -l dist updater meta

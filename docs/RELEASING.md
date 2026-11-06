@@ -275,7 +275,7 @@ a build with it never checks for updates, and the release workflow writes no
 public key, so make the key before the first public release.
 
 Make it once, on a trusted Mac, with the pinned Tauri CLI
-(`cargo install tauri-cli --version 2.11.4 --locked`):
+(`cargo install tauri-cli --version 2.12.1 --locked`):
 
 ```bash
 cargo tauri signer generate -w "$HOME/.tauri/method-budget-updater.key"

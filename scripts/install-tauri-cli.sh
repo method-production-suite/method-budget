@@ -12,15 +12,15 @@
 # The Linux build needs glibc 2.35 (Ubuntu 22.04, the release's Linux runner).
 set -euo pipefail
 
-VERSION=2.11.4
+VERSION=2.12.1
 
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) asset=cargo-tauri-aarch64-apple-darwin.zip
-    sha=82bdcb9ae7f407882321680ae50750f11623fae22445f8b00b096e10f815d604 ;;
+    sha=ee35ee364a0c626df7852d9a5bc0c5394b6440772e9864cfb9b11dcb8d33f527 ;;
   Linux-x86_64) asset=cargo-tauri-x86_64-unknown-linux-gnu.tgz
-    sha=6864602a34292aa6f2ad40ae019eebe5c1064d6c623fe20696a8a8974067e60b ;;
+    sha=04ef3a9a2ed7b7dc479bef08ab40deee80065c99fc778f79ebce775eb72bbeff ;;
   MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) asset=cargo-tauri-x86_64-pc-windows-msvc.zip
-    sha=0743e30a661a35d63339b24cf63828f97ba5389a1d7f13b368a542794dd0a3f3 ;;
+    sha=d3919ebe0bf7013dd98293862784dd37b8f76db2d650e13a3ec11c5dd799c519 ;;
   *) echo "install-tauri-cli: no pinned build for $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
