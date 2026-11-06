@@ -364,7 +364,11 @@ fn an_old_heartbeat_with_no_link_is_not_dialed() {
     t.both_live();
     // The addresses cross already old, so nobody has dialed them yet.
     std::fs::copy(presence(&t.alex_log, ALEX), presence(&t.jordan_log, ALEX)).unwrap();
-    std::fs::copy(presence(&t.jordan_log, JORDAN), presence(&t.alex_log, JORDAN)).unwrap();
+    std::fs::copy(
+        presence(&t.jordan_log, JORDAN),
+        presence(&t.alex_log, JORDAN),
+    )
+    .unwrap();
     set_field(&presence(&t.alex_log, JORDAN), "at", LONG_AGO);
     set_field(&presence(&t.jordan_log, ALEX), "at", LONG_AGO);
     let now = Instant::now() + Duration::from_secs(500);

@@ -400,7 +400,7 @@ export function openLiveDialog() {
     let choice = known ? saved : 'own';
     const own = el('input', {
       class: 'modal-input',
-      attrs: { type: 'url', id: 'share-live-relay', placeholder: 'https://', 'aria-label': t('share.live.relay_own_address') },
+      attrs: { type: 'url', id: 'share-live-relay', placeholder: t('share.live.relay_placeholder'), 'aria-label': t('share.live.relay_own_address') },
     });
     own.value = known ? '' : saved;
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
@@ -423,8 +423,8 @@ export function openLiveDialog() {
       }
     });
     const send = el('ul', { class: 'share-live-sends' });
-    for (const key of ['share.live.sends_addresses', 'share.live.sends_relay', 'share.live.sends_dialing', 'share.live.sends_nothing_else']) {
-      send.append(el('li', { text: t(key) }));
+    for (const text of [t('share.live.sends_addresses'), t('share.live.sends_relay'), t('share.live.sends_dialing'), t('share.live.sends_nothing_else')]) {
+      send.append(el('li', { text }));
     }
     return el(
       'div',

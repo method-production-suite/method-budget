@@ -3707,6 +3707,7 @@ export default {
   "share.live.relay_none": "No relay: direct connections only. Some networks will then not connect.",
   "share.live.relay_own": "My production's own relay:",
   "share.live.relay_own_address": "Your production's relay address",
+  "share.live.relay_placeholder": "https://relay.example.com",
   "share.live.relay_public": "The free public relay, run by the makers of the connection software. It has no uptime promise.",
   "share.live.relay_title": "When two computers can't connect directly",
   "share.live.sends_addresses": "Your computer's IP addresses go in the shared folder, where the others in this budget and the folder's hosting service can read them. They come out when you turn this off or close the budget. If the app stops unexpectedly they stay there until you next open this budget.",
