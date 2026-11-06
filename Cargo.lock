@@ -2603,10 +2603,12 @@ dependencies = [
 name = "method-app"
 version = "0.8.1"
 dependencies = [
+ "getrandom 0.3.4",
  "method-core",
  "method-format",
  "method-release",
  "method-session",
+ "method-sync",
  "method-update",
  "serde",
  "serde_json",

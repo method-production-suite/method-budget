@@ -5458,6 +5458,17 @@ docs/research/collaboration.md, section 6.
 - **The new dependency.** iroh 1.4.1 and about 92 to 100 crates, in a new crate,
   `method-sync`, never in `method-core`, with its license and advisory reasons listed in
   `deny.toml`. Its pull request goes to MReview before merge.
+- **Only a written change goes on the link** (2026-11-06, while wiring it). A computer sends
+  its own change once a segment holds it, not before. If it stopped with a change only in
+  memory, it would use the same number again for a different one, and everyone who had the
+  first would see a fork. The cost is the wait for typing to pause, 1.5 to 6 seconds.
+- **The link adds nothing to the log's trust.** A change that arrives is put through the
+  same checks as a segment's (`method_format::log::apply_changes`). The receiver keeps it in
+  memory and its author's segment arrives through the folder as always, recognized by
+  (actor, seq). A removed person is dropped from the mesh the next second, and anyone holding
+  the folder can still read what it holds, as before.
+- **One mesh per budget, and a fresh key each time.** The endpoint's key is random each time
+  live mode starts and is never stored; its address goes through the heartbeat file.
 - **Public wording.** "Goes online only to check for updates" and "works with no connection"
   change when this ships, in the README, docs/APP.md, site/index.html and the website's
   apps/budget/index.html.

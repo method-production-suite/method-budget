@@ -19,6 +19,8 @@
 //! - a connection from a key not on the allow list is closed before any
 //!   frame is read.
 
+pub mod mesh;
+
 use std::collections::{BTreeMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::str::FromStr;
@@ -45,6 +47,8 @@ const HELLO_WAIT: Duration = Duration::from_secs(10);
 const CLOSE_NOT_ALLOWED: u32 = 1;
 /// The close code for a connection that opened no stream in time.
 const CLOSE_TOO_SLOW: u32 = 2;
+/// The close code for a link this side has finished with.
+const CLOSE_DONE: u32 = 3;
 /// How long a connection has for its handshake, and then to open its stream.
 const ADMIT_WAIT: Duration = Duration::from_secs(10);
 /// How many connections may be on their way in at once, and wait to be taken.
@@ -303,6 +307,73 @@ pub struct Link {
     recv: RecvStream,
 }
 
+/// A link's sending half ([`Link::split`]).
+#[derive(Debug)]
+pub struct LinkSender {
+    conn: Connection,
+    send: SendStream,
+}
+
+/// A link's receiving half ([`Link::split`]).
+#[derive(Debug)]
+pub struct LinkReceiver {
+    conn: Connection,
+    recv: RecvStream,
+}
+
+async fn write_frame(send: &mut SendStream, frame: &Frame) -> Result<(), SyncError> {
+    let bytes = serde_json::to_vec(frame).map_err(|e| fail("couldn't write a frame", e))?;
+    if bytes.len() > MAX_FRAME {
+        return Err(SyncError::new("that frame is too large to send"));
+    }
+    send.write_all(&(bytes.len() as u32).to_be_bytes())
+        .await
+        .map_err(|e| fail("couldn't send", e))?;
+    send.write_all(&bytes)
+        .await
+        .map_err(|e| fail("couldn't send", e))
+}
+
+async fn read_frame(conn: &Connection, recv: &mut RecvStream) -> Result<Frame, SyncError> {
+    let mut len = [0u8; 4];
+    recv.read_exact(&mut len)
+        .await
+        .map_err(|e| fail("the link ended", e))?;
+    let len = u32::from_be_bytes(len) as usize;
+    if len > MAX_FRAME {
+        conn.close(VarInt::from_u32(0), b"frame too large");
+        return Err(SyncError::new(
+            "the other computer sent a frame too large to read",
+        ));
+    }
+    let mut bytes = vec![0u8; len];
+    recv.read_exact(&mut bytes)
+        .await
+        .map_err(|e| fail("the link ended", e))?;
+    serde_json::from_slice(&bytes).map_err(|e| fail("couldn't read a frame", e))
+}
+
+impl LinkSender {
+    /// Sends one frame.
+    pub async fn send(&mut self, frame: &Frame) -> Result<(), SyncError> {
+        write_frame(&mut self.send, frame).await
+    }
+}
+
+impl Drop for LinkSender {
+    /// Ends the connection, so the other side hears at once.
+    fn drop(&mut self) {
+        self.conn.close(VarInt::from_u32(CLOSE_DONE), b"done");
+    }
+}
+
+impl LinkReceiver {
+    /// Waits for the next frame.
+    pub async fn recv(&mut self) -> Result<Frame, SyncError> {
+        read_frame(&self.conn, &mut self.recv).await
+    }
+}
+
 impl Link {
     /// The other computer's key, proved by the connection's handshake.
     pub fn peer(&self) -> String {
@@ -330,41 +401,26 @@ impl Link {
 
     /// Sends one frame.
     pub async fn send(&mut self, frame: &Frame) -> Result<(), SyncError> {
-        let bytes = serde_json::to_vec(frame).map_err(|e| fail("couldn't write a frame", e))?;
-        if bytes.len() > MAX_FRAME {
-            return Err(SyncError::new("that frame is too large to send"));
-        }
-        self.send
-            .write_all(&(bytes.len() as u32).to_be_bytes())
-            .await
-            .map_err(|e| fail("couldn't send", e))?;
-        self.send
-            .write_all(&bytes)
-            .await
-            .map_err(|e| fail("couldn't send", e))
+        write_frame(&mut self.send, frame).await
     }
 
     /// Waits for the next frame. One larger than [`MAX_FRAME`] is refused
     /// before it is read, and ends the link.
     pub async fn recv(&mut self) -> Result<Frame, SyncError> {
-        let mut len = [0u8; 4];
-        self.recv
-            .read_exact(&mut len)
-            .await
-            .map_err(|e| fail("the link ended", e))?;
-        let len = u32::from_be_bytes(len) as usize;
-        if len > MAX_FRAME {
-            self.conn.close(VarInt::from_u32(0), b"frame too large");
-            return Err(SyncError::new(
-                "the other computer sent a frame too large to read",
-            ));
-        }
-        let mut bytes = vec![0u8; len];
-        self.recv
-            .read_exact(&mut bytes)
-            .await
-            .map_err(|e| fail("the link ended", e))?;
-        serde_json::from_slice(&bytes).map_err(|e| fail("couldn't read a frame", e))
+        read_frame(&self.conn, &mut self.recv).await
+    }
+
+    /// Separates the two directions, so a task can wait on one and another
+    /// write on the other.
+    pub fn split(self) -> (LinkSender, LinkReceiver) {
+        let Link { conn, send, recv } = self;
+        (
+            LinkSender {
+                conn: conn.clone(),
+                send,
+            },
+            LinkReceiver { conn, recv },
+        )
     }
 
     /// Sends raw bytes as if they were a frame's length, for tests of what a
