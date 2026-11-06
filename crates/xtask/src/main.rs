@@ -170,6 +170,7 @@ fn run(args: &[String]) -> Result<String, String> {
         "--out",
         "--base-url",
         "--pub-date",
+        "--file",
     ];
     let a = Args::parse(rest, &values, &["--check", "--json", "--require", "--demo"])?;
     let root = match a.value("--root") {
