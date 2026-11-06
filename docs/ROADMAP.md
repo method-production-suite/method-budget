@@ -247,7 +247,9 @@ the screen-reader check.
 - [ ] **Linux live check** (2.25; **eventually**, the owner 2026-10-20): install from the
       release's `.deb` or AppImage (0.7.0, **ready now**); print the topsheet and detail;
       menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup keys); double-click a `.mthd` to
-      open it.
+      open it. From the next release's AppImage, whose packaging no longer carries `xdg-open`:
+      Help > User Guide and Report a Bug should still open, on a computer with and without
+      its own `xdg-open` (docs/research/linux-appimage-egl.md).
 - [ ] **Rate tables in the app** (3.9; D90; about five minutes): open the Field Station
       sample, Budget Setup > Rate Tables, New Table: type two invented classifications with
       a Per Day figure (Add unit… for Week), Save Table, then Revert after a change. Import
