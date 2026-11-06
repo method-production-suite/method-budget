@@ -2888,6 +2888,52 @@ fn one_read_reports_what_the_fold_settled() {
     assert_eq!(reader.folds(), folds);
 }
 
+/// A claim that needs a later number of the same person can't be weighed
+/// when its own number comes up. It still costs a fold per read, not per claim.
+#[test]
+fn one_read_with_claims_waiting_on_later_numbers_stays_cheap() {
+    let (real, forgeries) = forged_at_every_number(40);
+    let waiting: Vec<Change> = forgeries
+        .iter()
+        .map(|f| {
+            let mut c = f.clone();
+            // Depends on the number after its own, so only a later change frees it.
+            c.deps.advance(c.actor, c.seq + 1);
+            c
+        })
+        .collect();
+    let mut one_by_one = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver_all(&mut one_by_one, &[real.clone(), waiting.clone()].concat());
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    reader.apply_all([real, waiting.clone()].concat());
+    assert!(reader.folds() <= 2, "{} folds", reader.folds());
+    assert_eq!(reader.project().budget.title, "Real 39");
+    assert_eq!(
+        reader.project().budget.title,
+        one_by_one.project().budget.title
+    );
+    assert_eq!(reader.frontier(), one_by_one.frontier());
+    assert!(waiting.iter().all(|w| reader.change(w.id()) != Some(w)));
+}
+
+/// A change released by a fold is counted once.
+#[test]
+fn one_read_counts_each_change_once() {
+    let (real, forgeries) = forged_at_every_number(5);
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    let mut changes = forgeries;
+    changes.extend(real.iter().rev().cloned());
+    let results = reader.apply_all(changes);
+    let applied: usize = results
+        .iter()
+        .map(|(_, r)| match r {
+            Ok(Applied::Applied { unblocked }) => 1 + unblocked,
+            _ => 0,
+        })
+        .sum();
+    assert_eq!(applied, reader.changes().count());
+}
+
 /// Two valid changes at one number are still refused loudly when one read
 /// brings them both.
 #[test]
