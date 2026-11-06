@@ -1331,3 +1331,51 @@ fn an_invite_raises_the_log_format_to_4_and_a_newcomer_joins_with_it() {
     assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_INVITES);
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// Opening a folder with many claims on numbers folds once, not once a claim
+/// (decisions.md, entry 99), and refuses them as a fork as before.
+#[test]
+fn opening_a_folder_settles_every_claim_with_one_fold() {
+    use method_core::log::Change;
+
+    let root = temp_dir("many-claims");
+    let path = root.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    for n in 0..3 {
+        let p = alex.log.project();
+        let mut after = p.budget.clone();
+        row_rate(&mut after, 0, 100 + n);
+        alex.log.record(&p, &after, &[], "Alex edits", T).unwrap();
+    }
+    log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+
+    // Another program writes a different change at each of those numbers.
+    let real: Vec<Change> = alex
+        .log
+        .changes()
+        .filter(|c| c.actor == actor(1) && c.seq >= 2)
+        .cloned()
+        .collect();
+    assert_eq!(real.len(), 3);
+    for c in &real {
+        let claim = Change {
+            label: "Planted".into(),
+            ..c.clone()
+        };
+        alex.dir.write_segment(&[claim]).unwrap();
+    }
+
+    let (reader, report) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
+    assert_eq!(reader.log.folds(), 1);
+    // The first of the numbers is a fork; the rest depend on it, and every
+    // claim is listed rather than applied.
+    let listed = reader.log.forks().len() + reader.log.rejected().len();
+    assert_eq!(listed, 6, "{report:?}");
+    assert_eq!(report.pending, 0);
+    assert!(reader
+        .log
+        .changes()
+        .all(|c| c.actor != actor(1) || c.seq < 2));
+    fs::remove_dir_all(&root).unwrap();
+}

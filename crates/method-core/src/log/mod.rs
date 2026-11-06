@@ -34,7 +34,7 @@ pub mod sign;
 pub mod state;
 pub mod undo;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -195,6 +195,11 @@ pub struct Log {
     /// included: what this actor's next change must be above (a claim is
     /// checked against every change in its `deps`, decisions.md entry 97).
     seen_lamport: u64,
+    /// While [`Log::apply_all`] runs: a contest waits for one fold at the end
+    /// instead of folding everything for each claim.
+    holding_folds: bool,
+    /// A contest is waiting for that fold.
+    fold_due: bool,
 }
 
 impl fmt::Debug for Log {
@@ -230,6 +235,8 @@ impl Log {
             forks: Vec::new(),
             owner_key_pin: None,
             seen_lamport: 0,
+            holding_folds: false,
+            fold_due: false,
         }
     }
 
@@ -668,6 +675,69 @@ impl Log {
         result.map(|()| Applied::Applied { unblocked })
     }
 
+    /// Applies many changes at once, as one read of the folder does, and says
+    /// what happened to each, in the order given. The result is the one
+    /// [`Log::apply`] reaches change by change, but the numbers contested
+    /// along the way wait and are settled together at the end, so planting
+    /// many forgeries doesn't cost a reader a fold each. That is one fold when
+    /// the read brings every claim's dependencies; a fold that lets a waiting
+    /// change go on can find another claim and fold again, so this is the
+    /// usual cost and not a limit.
+    pub fn apply_all(
+        &mut self,
+        changes: Vec<Change>,
+    ) -> Vec<(ChangeId, Result<Applied, LogError>)> {
+        let folds = self.folds;
+        self.holding_folds = true;
+        let mut results: Vec<(Change, Result<Applied, LogError>)> = changes
+            .into_iter()
+            .map(|change| {
+                let result = self.apply(change.clone());
+                (change, result)
+            })
+            .collect();
+        while std::mem::take(&mut self.fold_due) {
+            self.refold();
+            self.drain_pending();
+            self.settle_waiting_claims();
+        }
+        self.holding_folds = false;
+        // What a fold settled replaces what was said before it.
+        if self.folds != folds {
+            let claims: BTreeMap<ChangeId, Vec<&(Change, String)>> =
+                self.forks.iter().fold(BTreeMap::new(), |mut all, fork| {
+                    all.entry(fork.0.id()).or_insert_with(Vec::new).push(fork);
+                    all
+                });
+            let claim = |c: &Change| {
+                claims
+                    .get(&c.id())
+                    .and_then(|forks| forks.iter().find(|(f, _)| f == c))
+                    .map(|(_, why)| why.as_str())
+            };
+            for (change, result) in &mut results {
+                if matches!(result, Ok(Applied::Duplicate)) {
+                    continue;
+                }
+                // Each change counts for itself now: one a change released
+                // earlier is said here too, so it isn't counted twice.
+                if self.changes.get(&change.id()) == Some(&*change) {
+                    *result = Ok(Applied::Applied { unblocked: 0 });
+                } else if let Some(why) = claim(change) {
+                    *result = if why == FORK_SECOND {
+                        Err(LogError::Fork { id: change.id() })
+                    } else {
+                        Ok(Applied::Duplicate)
+                    };
+                }
+            }
+        }
+        results
+            .into_iter()
+            .map(|(change, result)| (change.id(), result))
+            .collect()
+    }
+
     /// A change whose number this log has already taken. The same change is
     /// a duplicate. A different one is kept with the other changes that
     /// claim that number and everything is folded again, where the fold
@@ -685,6 +755,10 @@ impl Log {
             return Ok(Applied::Duplicate);
         }
         self.forks.push((change.clone(), String::new()));
+        if self.holding_folds {
+            self.fold_due = true;
+            return Ok(Applied::Pending);
+        }
         self.refold();
         if self.changes.get(&id) == Some(&change) {
             Ok(Applied::Applied { unblocked: 0 })
@@ -746,7 +820,9 @@ impl Log {
             .forks
             .iter()
             .any(|(c, why)| why == FORK_WAITING && self.frontier.covers(&c.deps));
-        if due {
+        if due && self.holding_folds {
+            self.fold_due = true;
+        } else if due {
             self.refold();
         }
     }
@@ -801,6 +877,7 @@ impl Log {
     /// that judges changes applied before it.
     fn refold(&mut self) {
         self.folds += 1;
+        self.fold_due = false;
         for _ in 0..16 {
             let mut taken: BTreeMap<ChangeId, Change> = std::mem::take(&mut self.changes);
             for (c, _) in std::mem::take(&mut self.rejected) {
@@ -827,6 +904,7 @@ impl Log {
                 .into_iter()
                 .map(|(c, _)| c)
                 .collect();
+            let mut claimed: BTreeSet<ChangeId> = others.iter().map(Change::id).collect();
             // Claims not ready when their number was settled.
             let mut unplaced: Vec<Change> = Vec::new();
             loop {
@@ -834,8 +912,7 @@ impl Log {
                 let mut progress = false;
                 let mut rest = Vec::new();
                 for c in waiting {
-                    let contested = others.iter().any(|o| o.id() == c.id());
-                    if !contested && self.ready(&c) {
+                    if !claimed.contains(&c.id()) && self.ready(&c) {
                         let id = c.id();
                         if self.take(c, false).is_ok() {
                             let c = self.changes.get(&id).expect("just applied");
@@ -856,12 +933,13 @@ impl Log {
                 let Some(id) = waiting
                     .iter()
                     .chain(others.iter())
-                    .filter(|c| others.iter().any(|o| o.id() == c.id()) && self.ready(c))
+                    .filter(|c| claimed.contains(&c.id()) && self.ready(c))
                     .map(Change::id)
                     .min()
                 else {
                     break;
                 };
+                claimed.remove(&id);
                 let mut claims: Vec<Change> = Vec::new();
                 let (mine, rest): (Vec<Change>, Vec<Change>) =
                     waiting.into_iter().partition(|c| c.id() == id);
