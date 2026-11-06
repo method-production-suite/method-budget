@@ -5537,5 +5537,6 @@ Design 9.3 has an outline with initials in the other person's cell, in live mode
   so it is as quick as that timer, not instant.
 
 Tests: `a_cursor_crosses_the_link_and_stops_with_it`, `a_bad_cursor_from_a_link_is_dropped`,
-`with_live_mode_off_a_cell_goes_nowhere`. Loopback only, in the session: the outline hasn't been seen in a
-real window, and the check on what arrives is tested through the sender, which uses the same function.
+`with_live_mode_off_a_cell_goes_nowhere`, `a_removed_person_shows_no_cursor`, and
+`a_cell_from_a_link_is_checked` on the check itself. Loopback only, in the session: the outline
+hasn't been seen in a real window, and no test has a hostile computer on the other end.

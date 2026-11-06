@@ -516,3 +516,27 @@ fn with_live_mode_off_a_cell_goes_nowhere() {
     assert_eq!(cell_seen(&t.jordan, ALEX), None);
     assert!(!Two::doc(&mut t.alex).live_on());
 }
+
+/// The moment someone is removed their cell is gone, before the link ends.
+#[test]
+fn a_removed_person_shows_no_cursor() {
+    let mut t = apart();
+    let key = |seed: u8| -> std::sync::Arc<dyn method_core::log::Signer> {
+        std::sync::Arc::new(method_format::log::sign::KeyPair::from_seed([seed; 32]))
+    };
+    Two::doc(&mut t.alex).use_key(key(1)).unwrap();
+    Two::doc(&mut t.jordan).use_key(key(2)).unwrap();
+    t.linked();
+    Two::doc(&mut t.alex)
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    t.until("Jordan's role at Jordan", |t| {
+        Two::doc(&mut t.jordan).log().roles_started()
+    });
+    Two::doc(&mut t.jordan).set_cell(Some(cell("7")));
+    t.until("Jordan's cell at Alex", |t| {
+        cell_seen(&t.alex, JORDAN) == Some(cell("7"))
+    });
+    Two::doc(&mut t.alex).remove_person(&JORDAN.hex()).unwrap();
+    assert_eq!(cell_seen(&t.alex, JORDAN), None);
+}

@@ -3270,6 +3270,40 @@ fn live_frames<'a>(
 mod tests {
     use super::*;
 
+    fn a_cell(kind: &str, key: &str) -> Cell {
+        Cell {
+            kind: kind.into(),
+            key: key.into(),
+            parent: Some("50-01".into()),
+            field: Some("rate".into()),
+        }
+    }
+
+    /// What a link brings is refused unless it is one of the grid's kinds with
+    /// short names, whichever computer sent it.
+    #[test]
+    fn a_cell_from_a_link_is_checked() {
+        for kind in ["row", "account", "category", "production_total"] {
+            assert!(checked_cell(a_cell(kind, "7")).is_some(), "{kind}");
+        }
+        for kind in ["", "script", "Row", "fringe"] {
+            assert_eq!(checked_cell(a_cell(kind, "7")), None, "{kind}");
+        }
+        let long = "x".repeat(201);
+        assert!(checked_cell(a_cell("row", &"x".repeat(200))).is_some());
+        assert_eq!(checked_cell(a_cell("row", &long)), None);
+        let mut c = a_cell("row", "7");
+        c.parent = Some(long.clone());
+        assert_eq!(checked_cell(c), None);
+        let mut c = a_cell("row", "7");
+        c.field = Some(long);
+        assert_eq!(checked_cell(c), None);
+        let mut c = a_cell("row", "7");
+        c.parent = None;
+        c.field = None;
+        assert!(checked_cell(c).is_some());
+    }
+
     #[test]
     fn reasons_for_leaving_a_change_out_are_plain() {
         use method_core::log::{refused, sign::why};

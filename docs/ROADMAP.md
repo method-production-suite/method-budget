@@ -265,7 +265,9 @@ the screen-reader check.
       syncs). Try: both on one network; on different networks with the public relay; with **No
       relay**; pausing the folder's sync; turning it off on one; Remove on the owner's (that
       person's link should end); quitting one (the others' link should end, and that computer's
-      `presence.json` in the folder should have no `live` in it). Note anything that doesn't connect, and any firewall prompt.
+      `presence.json` in the folder should have no `live` in it). Move the cursor on one and
+      open the same account on the other: that cell should have an outline in the person's
+      color with their initials, moving as they do, and not while you type in it. Note anything that doesn't connect, and any firewall prompt.
 - [ ] **A screen reader in the app** (3.14; D82): with VoiceOver on (Cmd+F5), open the
       Field Station sample (`method-budget sample` writes it); click into the topsheet
       grid and arrow through it (each move should be spoken, with the cell's value, column
