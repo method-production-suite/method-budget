@@ -33,14 +33,19 @@ this page goes ahead without waiting.
 
 - **Live sessions: decided by the owner (2026-11-05)** (3.18; decision 98;
   docs/research/collaboration.md, sections 6 and 12, questions 5 and 14): "Yes, opt-in as
-  proposed". Live mode is off until a person turns it on for a shared budget, and the app
-  says what it sends before it starts: their address goes to the other members through the
-  shared folder, and a relay run by iroh's makers, free with no uptime promise, sees who
-  talks to whom and their IP addresses, never the budget. No publishing to the outside DNS
-  service. A field takes a studio's own relay instead. Folder members only at first; no
-  link-only joining yet. Accepted cost, measured 2026-11-05: about 100 new crates and up to
-  10.8 MB per architecture uncompressed (about 21.5 MB in the universal Mac app). Being
-  built; the README's "goes online only to check for updates" line changes when it ships.
+  proposed", then, relayed by MReview, "Yes, add both" (port mapping off, each member opts
+  in). Each person turns live mode on for themselves, on their own computer, and sees there
+  what it sends. One person turning it on doesn't take other members' apps online. Their
+  IP addresses go to the other members through the shared folder, where the folder's hosting
+  service can read them too, and a relay run by iroh's makers, free with no uptime promise,
+  sees who talks to whom and their IP addresses, never the budget. No publishing to the
+  outside DNS service, and the app doesn't ask the router to open a port. A field takes a
+  studio's own relay instead. Folder members only at first; no link-only joining yet.
+  Accepted cost, measured 2026-11-05: about 100 new crates (about 92 without port mapping)
+  and up to 10.8 MB per architecture uncompressed (about 21.5 MB in the universal Mac app).
+  Being built; its dependency PR goes to MReview before merge. "Goes online only to check
+  for updates" changes when it ships, in the README, docs/APP.md, site/index.html and the
+  website's apps/budget/index.html.
 
 - **A key put in the owner's name before the owner's app does: decided by the owner
   (2026-10-20)** (3.18; D89, D95): "build 3.18 options 1 and 3". Built (decision 95; design

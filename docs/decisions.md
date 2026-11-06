@@ -5431,23 +5431,33 @@ this records the choices.
   not yet synced says try again and then works, a link for another budget refused. Links:
   round trip, inside a message, broken and newer links refused in words, base64url vectors.
 
-## 98. Live sessions: opt-in, nothing published, folder members first (2026-11-05, the owner's decision)
+## 98. Live sessions: each person opts in, nothing published, folder members first (2026-11-05, the owner's decision)
 
 Roadmap 3.18's next item and the app's first network use beyond update checks, which
 SUITE-STANDARDS section 5 allows only for things the user turns on, each saying what it
-sends. The owner, in this session's chat, 2026-11-05, answering the recommendation in the
-roadmap's "Waiting on the owner": "Yes, opt-in as proposed". The measurements are in
+sends. The owner, in the MBudget session's chat, 2026-11-05, answering "Should Budget build
+live sessions, off until someone turns them on?": "Yes, opt-in as proposed". MReview's
+review then found port mapping and per-member opt-in missing from the proposal. MReview
+asked the owner in its own chat, "Add router port mapping off and per-member opt-in to
+decision 98?", and relayed the answer: "Yes, add both". The measurements are in
 docs/research/collaboration.md, section 6.
 
-- **Off until a person turns it on, for one shared budget.** Before it starts, the app says
-  what it sends. Nothing connects before that.
-- **What leaves the computer.** A member's address goes to the other members through the
-  shared folder. A relay run by iroh's makers, free with no uptime promise, sees who talks
-  to whom and their IP addresses, never the budget. A field takes a studio's own relay instead.
+- **Each person turns it on, for themselves.** On their own computer, for one shared budget,
+  and the app says there what it sends before it starts. Nothing connects before that, and
+  one person turning it on doesn't take other members' apps online.
+- **What leaves the computer.** A member's IP addresses go to the other members through the
+  shared folder, where the folder's hosting service can read them too. A relay run by
+  iroh's makers, free with no uptime promise, sees who talks to whom and their IP addresses,
+  never the budget. A field takes a studio's own relay instead.
 - **Nothing published.** The endpoint is built from iroh's `Minimal` preset with the relay
   set on its own, not `N0`, which also publishes the address to its makers' DNS service.
+- **The router is left alone.** `PortmapperConfig::Disabled`, and iroh built without its
+  `portmapper` feature if that works, so the app doesn't ask the router to open a port. A
+  connection that would have needed it uses the relay.
 - **Folder members only at first.** No link-only joining and no LAN discovery yet.
-- **The new dependency.** iroh 1.4.1 and about 100 crates, in a new crate, `method-sync`,
-  never in `method-core`, with its license and advisory reasons listed in `deny.toml`.
-- **Public wording.** The README's line that the app goes online only for updates changes
-  when this ships.
+- **The new dependency.** iroh 1.4.1 and about 92 to 100 crates, in a new crate,
+  `method-sync`, never in `method-core`, with its license and advisory reasons listed in
+  `deny.toml`. Its pull request goes to MReview before merge.
+- **Public wording.** "Goes online only to check for updates" and "works with no connection"
+  change when this ships, in the README, docs/APP.md, site/index.html and the website's
+  apps/budget/index.html.
