@@ -1234,9 +1234,8 @@ fn apply_segments(log: &mut Log, dir: &LogDir, segments: &[Segment]) -> LoadRepo
         }
     }
     changes.sort_by_key(|c| (c.actor, c.seq));
-    for c in changes {
-        let id = c.id();
-        match log.apply(c) {
+    for (id, result) in log.apply_all(changes) {
+        match result {
             Ok(method_core::log::Applied::Applied { unblocked }) => report.applied += 1 + unblocked,
             Ok(method_core::log::Applied::Duplicate) => report.duplicates += 1,
             Ok(method_core::log::Applied::Pending) => {}

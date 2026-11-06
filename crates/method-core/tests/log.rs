@@ -2669,6 +2669,14 @@ fn signed_changes_and_removals_converge_in_any_order() {
             all.iter().cloned().partition(|c| is_collision(c));
         deliver_all(&mut forged_first, &[fakes.clone(), reals.clone()].concat());
         deliver_all(&mut real_first, &[reals, fakes].concat());
+        // And one read of the folder, as a budget opening does.
+        let mut at_once = keyed(Log::new(actor(33), Ids::seeded(seed)), None);
+        let mut sorted = all.clone();
+        sorted.sort_by_key(|c| (c.actor, c.seq));
+        at_once.apply_all(sorted);
+        assert!(at_once.folds() <= 3, "seed {seed}: {}", at_once.folds());
+        let mut at_once_shuffled = keyed(Log::new(actor(34), Ids::seeded(seed)), None);
+        at_once_shuffled.apply_all(all.clone());
         for log in logs.iter_mut() {
             let mut mine = all.clone();
             rng.shuffle(&mut mine);
@@ -2682,7 +2690,13 @@ fn signed_changes_and_removals_converge_in_any_order() {
         let first = &logs[0];
         // No forgery at a member's number is ever applied.
         for f in &collisions {
-            for log in logs.iter().chain([&newcomer, &forged_first, &real_first]) {
+            for log in logs.iter().chain([
+                &newcomer,
+                &forged_first,
+                &real_first,
+                &at_once,
+                &at_once_shuffled,
+            ]) {
                 assert_ne!(
                     log.change(f.id()),
                     Some(f),
@@ -2691,11 +2705,13 @@ fn signed_changes_and_removals_converge_in_any_order() {
                 );
             }
         }
-        for log in logs
-            .iter()
-            .skip(1)
-            .chain([&newcomer, &forged_first, &real_first])
-        {
+        for log in logs.iter().skip(1).chain([
+            &newcomer,
+            &forged_first,
+            &real_first,
+            &at_once,
+            &at_once_shuffled,
+        ]) {
             assert!(log.pending().is_empty(), "seed {seed}");
             assert_eq!(log.frontier(), first.frontier(), "seed {seed}");
             assert_eq!(
@@ -2788,6 +2804,119 @@ fn a_real_change_takes_the_place_of_a_forgery_at_its_number_in_either_order() {
         // The same reason in either order: it doesn't pass, the real one does.
         assert_eq!(reader.forks()[0].1, method_core::log::FORK_REPLACED);
     }
+}
+
+/// A member's history with a forgery planted at every number: what someone
+/// with write access to the shared folder could leave there.
+fn forged_at_every_number(edits: usize) -> (Vec<Change>, Vec<Change>) {
+    let owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    let mut forgeries = Vec::new();
+    for n in 0..edits {
+        forgeries.push(forged(
+            actor(2),
+            jordan.own_seq() + 1,
+            &jordan,
+            vec![title_op(&format!("Forged {n}"))],
+        ));
+        try_edit(&mut jordan, |b| b.title = format!("Real {n}"))
+            .unwrap()
+            .unwrap();
+    }
+    (written(&[&owner, &jordan]), forgeries)
+}
+
+/// One read of the folder settles every contested number with one fold, so
+/// many forgeries can't make a shared budget slow to open: the same result
+/// as taking them one at a time, whichever came first.
+#[test]
+fn one_read_settles_many_forgeries_with_one_fold() {
+    let (real, forgeries) = forged_at_every_number(40);
+    let mut one_by_one = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver_all(&mut one_by_one, &[real.clone(), forgeries.clone()].concat());
+    assert_eq!(one_by_one.folds(), 40);
+
+    let orders = [
+        [real.clone(), forgeries.clone()].concat(),
+        [forgeries.clone(), real.clone()].concat(),
+    ];
+    for changes in orders {
+        let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+        reader.apply_all(changes);
+        assert_eq!(reader.folds(), 1);
+        assert_eq!(reader.project().budget.title, "Real 39");
+        assert_eq!(reader.frontier(), one_by_one.frontier());
+        assert!(reader.pending().is_empty());
+        assert!(reader.rejected().is_empty(), "{:?}", reader.rejected());
+        assert_eq!(reader.forks().len(), forgeries.len());
+        assert!(forgeries
+            .iter()
+            .all(|f| reader.forks().iter().any(|(c, _)| c == f)));
+        assert!(reader
+            .forks()
+            .iter()
+            .all(|(_, why)| why == method_core::log::FORK_REPLACED));
+    }
+}
+
+/// What a read reports comes after the fold: a change that was refused only
+/// because a forgery held its parent's number is applied, and a forgery that
+/// lost its place isn't said to be new.
+#[test]
+fn one_read_reports_what_the_fold_settled() {
+    let (real, forgeries) = forged_at_every_number(3);
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    let mut changes = forgeries.clone();
+    changes.extend(real.clone());
+    let results = reader.apply_all(changes.clone());
+    assert_eq!(results.len(), changes.len());
+    for (c, (id, result)) in changes.iter().zip(&results) {
+        assert_eq!(c.id(), *id);
+        if forgeries.contains(c) {
+            assert!(matches!(result, Ok(Applied::Duplicate)), "{result:?}");
+        } else {
+            assert!(matches!(result, Ok(Applied::Applied { .. })), "{result:?}");
+        }
+    }
+
+    // Taken again, nothing new, and no further fold.
+    let folds = reader.folds();
+    let again = reader.apply_all(changes);
+    assert!(again
+        .iter()
+        .all(|(_, r)| matches!(r, Ok(Applied::Duplicate))));
+    assert_eq!(reader.folds(), folds);
+}
+
+/// Two valid changes at one number are still refused loudly when one read
+/// brings them both.
+#[test]
+fn one_read_refuses_a_fork_loudly() {
+    let a = adopt(1, &sample());
+    let mut one = follower(2, &a);
+    let mut two = one.clone();
+    try_edit(&mut one, |b| b.title = "One".into())
+        .unwrap()
+        .unwrap();
+    try_edit(&mut two, |b| b.title = "Two".into())
+        .unwrap()
+        .unwrap();
+    let first = one.changes().last().unwrap().clone();
+    let second = two.changes().last().unwrap().clone();
+    assert_eq!(first.id(), second.id());
+    let mut reader = Log::new(actor(9), Ids::seeded(9));
+    let mut changes = written(&[&a]);
+    changes.extend([first.clone(), second.clone()]);
+    let results = reader.apply_all(changes);
+    assert!(results
+        .iter()
+        .any(|(id, r)| *id == second.id() && matches!(r, Err(LogError::Fork { .. }))));
+    assert_ne!(reader.project().budget.title, "One");
+    assert_ne!(reader.project().budget.title, "Two");
+    assert!(reader
+        .forks()
+        .iter()
+        .any(|(_, why)| why == method_core::log::FORK_SECOND));
 }
 
 /// Two different changes at one number that both pass can only come from
