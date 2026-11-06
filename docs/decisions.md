@@ -5475,6 +5475,11 @@ docs/research/collaboration.md, section 6.
   not at all. Direct addresses have the same source and stay, since dialing is what they are
   for: anyone who can write in the folder can make the app send connection attempts to any
   IP address, every three seconds, while live mode is on. Accepted; no budget goes with them.
+- **Off each time the budget opens** (2026-11-06). Live mode isn't remembered, so it can't
+  come back on without the person seeing the notice; only the relay they chose is. An old
+  heartbeat (over 15 minutes) isn't dialed, but a link already open stays, since a folder
+  service that lags is when the link matters most. A crash leaves the address in the folder
+  until this person next opens the budget; the notice says so.
 - **One mesh per budget, and a fresh key each time.** The endpoint's key is random each time
   live mode starts and is never stored; its address goes through the heartbeat file.
 - **Public wording.** "Goes online only to check for updates" and "works with no connection"

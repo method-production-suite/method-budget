@@ -166,14 +166,16 @@ impl Drop for Mesh {
             return;
         };
         let node = self.node.clone();
-        // On a thread of its own for the same reason as starting.
-        let closing = std::thread::spawn(move || {
+        // On a thread of its own, for the same reason as starting, and not
+        // waited for: the caller may be the window's, and telling the others
+        // can take a moment. If the app exits first the system closes the
+        // sockets and the others notice a little later.
+        std::thread::spawn(move || {
             runtime.block_on(async {
                 let _ = timeout(CLOSE_WAIT, node.close()).await;
             });
             runtime.shutdown_background();
         });
-        let _ = closing.join();
     }
 }
 

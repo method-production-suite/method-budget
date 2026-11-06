@@ -333,3 +333,79 @@ fn someone_removed_from_the_budget_loses_their_link() {
         Two::doc(&mut t.alex).live_connected() == 0 && Two::doc(&mut t.jordan).live_connected() == 0
     });
 }
+
+fn set_field(path: &Path, field: &str, value: &str) {
+    let mut p: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    p[field] = serde_json::Value::String(value.to_string());
+    std::fs::write(path, serde_json::to_vec(&p).unwrap()).unwrap();
+}
+
+const LONG_AGO: &str = "2020-01-01T00:00:00Z";
+
+/// A folder service that lags doesn't close a link that works.
+#[test]
+fn an_old_heartbeat_leaves_an_open_link_open() {
+    let mut t = apart();
+    t.linked();
+    set_field(&presence(&t.alex_log, JORDAN), "at", LONG_AGO);
+    set_field(&presence(&t.jordan_log, ALEX), "at", LONG_AGO);
+    let now = Instant::now() + Duration::from_secs(500);
+    t.alex.share_tick(now);
+    t.jordan.share_tick(now);
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(Two::doc(&mut t.alex).live_connected(), 1);
+    assert_eq!(Two::doc(&mut t.jordan).live_connected(), 1);
+}
+
+/// An address left by a computer gone quiet long ago isn't dialed.
+#[test]
+fn an_old_heartbeat_with_no_link_is_not_dialed() {
+    let mut t = apart();
+    t.both_live();
+    // The addresses cross already old, so nobody has dialed them yet.
+    std::fs::copy(presence(&t.alex_log, ALEX), presence(&t.jordan_log, ALEX)).unwrap();
+    std::fs::copy(presence(&t.jordan_log, JORDAN), presence(&t.alex_log, JORDAN)).unwrap();
+    set_field(&presence(&t.alex_log, JORDAN), "at", LONG_AGO);
+    set_field(&presence(&t.jordan_log, ALEX), "at", LONG_AGO);
+    let now = Instant::now() + Duration::from_secs(500);
+    t.alex.share_tick(now);
+    t.jordan.share_tick(now);
+    std::thread::sleep(Duration::from_millis(800));
+    assert_eq!(Two::doc(&mut t.alex).live_connected(), 0);
+}
+
+/// An address a crash left behind comes out the next time the budget opens.
+#[test]
+fn the_next_start_clears_an_address_left_by_a_crash() {
+    let mut t = apart();
+    t.round(10);
+    set_field(
+        &presence(&t.jordan_log, JORDAN),
+        "live",
+        "{\"id\":\"left over\"}",
+    );
+    assert!(address_in(&t.jordan_log, JORDAN));
+    t.round(40);
+    assert!(!address_in(&t.jordan_log, JORDAN));
+}
+
+/// The owner starting the budget again ends live mode here.
+#[test]
+fn a_budget_started_again_ends_it() {
+    let mut t = apart();
+    t.linked();
+    set_field(
+        &t.jordan_log.join("budget.json"),
+        "budget_id",
+        "another budget",
+    );
+    t.jordan
+        .share_tick(Instant::now() + Duration::from_secs(10));
+    assert!(!Two::doc(&mut t.jordan).live_on());
+    assert!(!address_in(&t.jordan_log, JORDAN));
+    let start = Instant::now();
+    while Two::doc(&mut t.alex).live_connected() != 0 {
+        assert!(start.elapsed() < WAIT, "Alex never heard");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}

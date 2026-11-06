@@ -327,6 +327,10 @@ pub struct ShareStatus {
     pub unshared: usize,
     /// Changes waiting for ones that haven't arrived.
     pub waiting: usize,
+    /// Whether this person has live mode on, on this computer.
+    pub live_on: bool,
+    /// How many people this computer has a live link to.
+    pub live_connected: usize,
     pub review_count: usize,
     /// The problem reaching or writing the folder, if any.
     pub error: Option<String>,
@@ -606,6 +610,22 @@ struct Live {
     offered: usize,
     /// Who the mesh was last told to connect.
     peers: BTreeMap<String, String>,
+    /// Who has a link open now.
+    linked: HashSet<String>,
+}
+
+/// How old a heartbeat may be and still be dialed. Far longer than the time
+/// a heartbeat takes to go round, because a folder service that lags is when
+/// the link matters most, and a computer's clock may be some way off. A link
+/// already open stays, however old the heartbeat.
+const LIVE_STALE: Duration = Duration::from_secs(15 * 60);
+
+/// Starts a mesh for `budget`, using `relay`. This is the first thing that
+/// touches the network. It can take a moment, so not on the window's thread.
+pub fn live_mesh(relay: Relay, budget: &str) -> Result<Mesh, String> {
+    let mut secret = [0u8; 32];
+    getrandom::fill(&mut secret).map_err(|e| e.to_string())?;
+    Mesh::start(secret, relay, budget).map_err(|e| e.0)
 }
 
 /// The largest run of changes in one frame; [`method_sync::MAX_FRAME`] is
@@ -1074,7 +1094,7 @@ impl SharedDoc {
         // The owner started the budget again: nothing more goes into the
         // folder from this log (docs/research/owner-key.md, part 1).
         if flog::replaced(&self.shared) {
-            self.live = None;
+            self.live_stop();
             self.replaced = Some(
                 self.shared
                     .log
@@ -1172,32 +1192,24 @@ impl SharedDoc {
 
     // The live link (decisions.md, entry 98)
 
-    /// Turns live mode on for this person, on this computer, for this
-    /// budget. The app calls this only after showing what it sends. Nothing
-    /// connects before it, and the first heartbeat with the address follows.
-    pub fn live_start(&mut self, relay: Relay) -> Result<(), String> {
-        if self.live.is_some() {
-            return Ok(());
-        }
-        let mut secret = [0u8; 32];
-        getrandom::fill(&mut secret).map_err(|e| e.to_string())?;
-        let budget = self.live_budget()?;
-        let mesh = Mesh::start(secret, relay, &budget).map_err(|e| e.0)?;
-        self.live_with(mesh);
-        Ok(())
-    }
-
     /// The budget this log belongs to, which both ends of a link must share.
     pub fn live_budget(&self) -> Result<String, String> {
         self.shared.dir.info().map(|i| i.budget_id).map_err(|e| e.0)
     }
 
-    /// Uses a mesh already started (a test's, on the loopback address).
+    /// Turns live mode on for this person, on this computer, for this budget,
+    /// with a mesh from [`live_mesh`]. The app comes here only after showing
+    /// what it sends. Nothing connects before it, and the heartbeat with the
+    /// address is written now.
     pub fn live_with(&mut self, mesh: Mesh) {
+        if self.live.is_some() || self.replaced.is_some() {
+            return;
+        }
         self.live = Some(Live {
             mesh,
             offered: 0,
             peers: BTreeMap::new(),
+            linked: HashSet::new(),
         });
         self.heartbeat(Instant::now(), true);
     }
@@ -1220,8 +1232,8 @@ impl SharedDoc {
         self.live.as_ref().map_or(0, |l| l.mesh.connected())
     }
 
-    /// Who should be connected: members whose heartbeat is recent and gives
-    /// an address, and never someone removed.
+    /// Who should be connected: members whose heartbeat gives an address and
+    /// is recent, or who have a link open already. Never someone removed.
     fn live_peers(&self) -> BTreeMap<String, String> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1230,9 +1242,6 @@ impl SharedDoc {
         self.people
             .iter()
             .filter(|(a, _)| **a != me && !self.shared.log.removed(**a))
-            .filter(|(_, p)| {
-                iso_secs(&p.at).is_some_and(|at| now.saturating_sub(at) < AWAY_AFTER.as_secs())
-            })
             .filter_map(|(_, p)| {
                 let address = p.live.clone()?;
                 let id = serde_json::from_str::<serde_json::Value>(&address)
@@ -1240,7 +1249,10 @@ impl SharedDoc {
                     .get("id")?
                     .as_str()?
                     .to_string();
-                Some((id, address))
+                let recent =
+                    iso_secs(&p.at).is_some_and(|at| now.saturating_sub(at) < LIVE_STALE.as_secs());
+                let open = self.live.as_ref().is_some_and(|l| l.linked.contains(&id));
+                (recent || open).then_some((id, address))
             })
             .collect()
     }
@@ -1248,12 +1260,13 @@ impl SharedDoc {
     /// Takes in what arrived on the links, and answers anyone who said what
     /// they hold. Changes are judged by the log exactly as a segment's are.
     fn live_receive(&mut self) -> usize {
-        let Some(live) = &self.live else { return 0 };
+        let Some(live) = &mut self.live else { return 0 };
         let mut lines = Vec::new();
         let mut asked = Vec::new();
         for event in live.mesh.events() {
             match event {
                 LiveEvent::Up { peer } => {
+                    live.linked.insert(peer.clone());
                     let frontier = self
                         .shared
                         .log
@@ -1266,7 +1279,9 @@ impl SharedDoc {
                 }
                 LiveEvent::Have { peer, frontier } => asked.push((peer, frontier)),
                 LiveEvent::Changes { lines: more, .. } => lines.extend(more),
-                LiveEvent::Down { .. } => {}
+                LiveEvent::Down { peer } => {
+                    live.linked.remove(&peer);
+                }
             }
         }
         for (peer, frontier) in asked {
@@ -1687,6 +1702,8 @@ impl SharedDoc {
         let review = self.review();
         let (locked_categories, locked_accounts) = self.locked();
         ShareStatus {
+            live_on: self.live_on(),
+            live_connected: self.live_connected(),
             mode: "folder".into(),
             folder: self
                 .shared

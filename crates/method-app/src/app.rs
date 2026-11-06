@@ -1528,6 +1528,8 @@ pub fn run() {
             crate::shared_app::share_pick_folder,
             crate::shared_app::share_start,
             crate::shared_app::share_set_me,
+            crate::shared_app::share_live_start,
+            crate::shared_app::share_live_stop,
             crate::shared_app::share_place,
             crate::shared_app::share_review,
             crate::shared_app::share_activity,
