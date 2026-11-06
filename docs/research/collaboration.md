@@ -1104,8 +1104,8 @@ months in. Live mode about 1 to 1.5 months later.
 4. **Codes**: links and QR only over the internet, short codes on the same network only? A
    short code over the internet needs someone's lookup server (n0's or a third party's).
 5. **Relays**: n0's free public relays as the default (they see who talks to whom and IP
-   addresses, never content)? Or ask the user the first time? (Put to the owner with the
-   measurements of section 6, 2026-11-05; see docs/ROADMAP.md, "Waiting on the owner".)
+   addresses, never content)? Or ask the user the first time? (Answered 2026-11-05: ask, off until
+   a person turns it on; decisions.md, entry 98.)
 6. **Encryption at rest** in the shared folder: wanted in the first release, later, or
    never?
 7. **Names in history**: signed history keeps whatever name each person typed, forever, in

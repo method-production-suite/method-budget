@@ -5430,3 +5430,24 @@ this records the choices.
   shows it used by Riley, the same link refused for Morgan, a cancelled link refused, a link
   not yet synced says try again and then works, a link for another budget refused. Links:
   round trip, inside a message, broken and newer links refused in words, base64url vectors.
+
+## 98. Live sessions: opt-in, nothing published, folder members first (2026-11-05, the owner's decision)
+
+Roadmap 3.18's next item and the app's first network use beyond update checks, which
+SUITE-STANDARDS section 5 allows only for things the user turns on, each saying what it
+sends. The owner, in this session's chat, 2026-11-05, answering the recommendation in the
+roadmap's "Waiting on the owner": "Yes, opt-in as proposed". The measurements are in
+docs/research/collaboration.md, section 6.
+
+- **Off until a person turns it on, for one shared budget.** Before it starts, the app says
+  what it sends. Nothing connects before that.
+- **What leaves the computer.** A member's address goes to the other members through the
+  shared folder. A relay run by iroh's makers, free with no uptime promise, sees who talks
+  to whom and their IP addresses, never the budget. A field takes a studio's own relay instead.
+- **Nothing published.** The endpoint is built from iroh's `Minimal` preset with the relay
+  set on its own, not `N0`, which also publishes the address to its makers' DNS service.
+- **Folder members only at first.** No link-only joining and no LAN discovery yet.
+- **The new dependency.** iroh 1.4.1 and about 100 crates, in a new crate, `method-sync`,
+  never in `method-core`, with its license and advisory reasons listed in `deny.toml`.
+- **Public wording.** The README's line that the app goes online only for updates changes
+  when this ships.
