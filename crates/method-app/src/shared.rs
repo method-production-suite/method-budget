@@ -877,6 +877,11 @@ impl SharedDoc {
         }
     }
 
+    /// The cell this person is on, as checked.
+    pub fn cell(&self) -> Option<&Cell> {
+        self.cell.as_ref()
+    }
+
     /// The cell this person moved to. It goes only to those on a live link,
     /// and only while live mode is on.
     pub fn set_cell(&mut self, cell: Option<Cell>) {
@@ -1714,6 +1719,7 @@ impl SharedDoc {
                 presence.and_then(|p| p.account.clone())
             },
             changes: self.shared.log.frontier().get(&actor),
+            cell: if me { None } else { self.live_cell(actor) },
             role: role.key().to_string(),
             role_text: if removed {
                 crate::i18n::phrase(&word("engine.role.removed"))

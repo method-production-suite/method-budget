@@ -2103,7 +2103,12 @@ choose the free public relay, the production's own, or none. Changes then reach 
 have it on within seconds of typing pausing, checked like a segment's, and still go through
 the folder as always. It stays on until they turn it off, close the budget or quit, and is off
 again the next time the budget opens. Needs a live check on two computers: on real networks
-and through a relay, which the tests can't cover. Cursors aren't built.
+and through a relay, which the tests can't cover.
+
+While linked, each person's cell in the budget grid has an outline in their color with their
+initials, for those looking at the same level of the budget. It says which cell, never a value; it
+goes over the link and never into the folder or the log. Nothing of theirs goes inside a cell
+being typed in, and my cursor, selection and scroll don't move. Follow isn't built.
 
 **Inviting someone** (decision 97; design 9.1). In the Share dialog, whoever may give roles
 sees **Invite someone**: what the person can do (the same roles as the People list, with

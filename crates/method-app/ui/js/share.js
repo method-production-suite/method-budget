@@ -70,6 +70,8 @@ const st = {
 
 /** How long a changed cell keeps the editor's color (design 9.4). */
 const FLASH_MS = 1600;
+// How long the cursor rests on a cell before the others are told.
+const CELL_WAIT_MS = 120;
 
 export function initShare(context) {
   ctx = context;
