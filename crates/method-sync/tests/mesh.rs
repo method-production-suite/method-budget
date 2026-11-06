@@ -98,6 +98,23 @@ fn a_peer_taken_off_the_list_loses_its_link() {
         .any(|e| matches!(e, Event::Changes { .. })));
 }
 
+/// One damaged heartbeat beside a removal doesn't stop the removal.
+#[test]
+fn a_bad_key_in_the_list_doesnt_stop_the_rest() {
+    let (a, b) = linked();
+    a.set_peers(BTreeMap::from([(
+        "x".to_string(),
+        "{\"id\":\"x\"}".to_string(),
+    )]));
+    until("the link gone on a", || a.connected() == 0);
+    until("the link gone on b", || b.connected() == 0);
+    // And a good key beside a bad one still links.
+    let mut peers = BTreeMap::from([("x".to_string(), "not an address".to_string())]);
+    peers.insert(b.id(), b.address().unwrap());
+    a.set_peers(peers);
+    until("the link back", || a.connected() == 1 && b.connected() == 1);
+}
+
 /// Dropping the mesh is the only way out, and it leaves nothing online.
 #[test]
 fn dropping_a_mesh_ends_its_links_and_takes_it_offline() {

@@ -1702,7 +1702,10 @@ rename like a segment. It is never part of the log and nothing in it changes the
   members and the folder's hosting service can read. Left out otherwise, and when they turn
   it off or close the budget. Earlier versions pass over it, as they do a request. It gives
   nothing on its own: changes that arrive over the link are checked by the log like a
-  segment's, and a person removed from the budget is never connected.
+  segment's, and a removed person's own heartbeat is passed over. The link's trust is the
+  folder's: heartbeats aren't signed, so anyone who can write in the folder can name a key
+  there, and be connected and sent what the folder already holds. Only this computer's own
+  relay is used from an address; a direct address is dialed as it stands.
 
 ### `budget.json`
 

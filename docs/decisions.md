@@ -5465,8 +5465,16 @@ docs/research/collaboration.md, section 6.
 - **The link adds nothing to the log's trust.** A change that arrives is put through the
   same checks as a segment's (`method_format::log::apply_changes`). The receiver keeps it in
   memory and its author's segment arrives through the folder as always, recognized by
-  (actor, seq). A removed person is dropped from the mesh the next second, and anyone holding
-  the folder can still read what it holds, as before.
+  (actor, seq). A removed person's own heartbeat is passed over from the next second, closing
+  their link. The link's trust is the folder's: heartbeats aren't signed, so anyone who can
+  write in the folder can name a key under a member's folder and be connected, and sent what
+  the folder already holds.
+- **Addresses come from a file anyone with the folder can write.** So a relay named in one is
+  dropped unless it is this computer's own, since iroh would contact it and that host would
+  learn this computer's IP address. Two members on different relays link only directly, or
+  not at all. Direct addresses have the same source and stay, since dialing is what they are
+  for: anyone who can write in the folder can make the app send connection attempts to any
+  IP address, every three seconds, while live mode is on. Accepted; no budget goes with them.
 - **One mesh per budget, and a fresh key each time.** The endpoint's key is random each time
   live mode starts and is never stored; its address goes through the heartbeat file.
 - **Public wording.** "Goes online only to check for updates" and "works with no connection"

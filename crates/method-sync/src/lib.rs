@@ -31,7 +31,9 @@ use iroh::dns::DnsResolver;
 use iroh::endpoint::{
     presets, Builder, Connection, Incoming, PortmapperConfig, RecvStream, SendStream, VarInt,
 };
-use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, SecretKey};
+use iroh::{
+    Endpoint, EndpointAddr, EndpointId, RelayMap, RelayMode, RelayUrl, SecretKey, TransportAddr,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Semaphore};
 use tokio::time::timeout;
@@ -122,6 +124,8 @@ pub enum Frame {
 #[derive(Debug, Clone)]
 pub struct Node {
     endpoint: Endpoint,
+    /// The only relays this node will use: the one it was started with.
+    relays: RelayMap,
     allowed: Arc<Mutex<HashSet<EndpointId>>>,
     arrived: Arc<tokio::sync::Mutex<mpsc::Receiver<Link>>>,
 }
@@ -151,7 +155,7 @@ impl Node {
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node::around(endpoint))
+        Ok(Node::around(endpoint, &relay))
     }
 
     /// Starts an endpoint on this computer's loopback address, with no relay:
@@ -164,15 +168,16 @@ impl Node {
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node::around(endpoint))
+        Ok(Node::around(endpoint, &Relay::None))
     }
 
-    fn around(endpoint: Endpoint) -> Node {
+    fn around(endpoint: Endpoint, relay: &Relay) -> Node {
         let allowed = Arc::new(Mutex::new(HashSet::new()));
         let (arrive, arrived) = mpsc::channel(PENDING_MAX);
         tokio::spawn(accept_loop(endpoint.clone(), allowed.clone(), arrive));
         Node {
             endpoint,
+            relays: relay.mode().relay_map(),
             allowed,
             arrived: Arc::new(tokio::sync::Mutex::new(arrived)),
         }
@@ -200,14 +205,15 @@ impl Node {
     }
 
     /// Replaces the keys allowed to connect (the budget's members, from the
-    /// shared folder). A link already open is not closed by this.
-    pub fn allow(&self, ids: &[String]) -> Result<(), SyncError> {
-        let mut set = HashSet::with_capacity(ids.len());
-        for id in ids {
-            set.insert(EndpointId::from_str(id).map_err(|e| fail("not a member's key", e))?);
-        }
+    /// shared folder). One that doesn't read as a key is passed over, so one
+    /// damaged file can't stop the rest from taking effect. A link already
+    /// open is not closed by this.
+    pub fn allow(&self, ids: &[String]) {
+        let set = ids
+            .iter()
+            .filter_map(|id| EndpointId::from_str(id).ok())
+            .collect();
         *self.allowed.lock().unwrap_or_else(|p| p.into_inner()) = set;
-        Ok(())
     }
 
     fn is_allowed(&self, id: &EndpointId) -> bool {
@@ -220,8 +226,7 @@ impl Node {
     /// Connects to a member from the text of their [`Node::address`]. Their
     /// key must be on the allow list too.
     pub async fn connect(&self, address: &str) -> Result<Link, SyncError> {
-        let addr: EndpointAddr =
-            serde_json::from_str(address).map_err(|e| fail("not an address", e))?;
+        let addr = dial_address(address, &self.relays)?;
         if !self.is_allowed(&addr.id) {
             return Err(SyncError::new(
                 "that computer isn't a member of this budget",
@@ -250,6 +255,22 @@ impl Node {
     pub async fn close(&self) {
         self.endpoint.close().await;
     }
+}
+
+/// What may be dialed from another member's address text. It comes from a
+/// file anyone with the folder can write, and iroh would contact any relay it
+/// names, telling that host this computer's IP address, so only this node's
+/// own relay stays. Direct addresses have the same source and stay: dialing is
+/// what they are for (decisions.md, entry 98).
+fn dial_address(address: &str, relays: &RelayMap) -> Result<EndpointAddr, SyncError> {
+    let mut addr: EndpointAddr =
+        serde_json::from_str(address).map_err(|e| fail("not an address", e))?;
+    addr.addrs.retain(|a| match a {
+        TransportAddr::Relay(url) => relays.contains(url),
+        TransportAddr::Ip(_) => true,
+        _ => false,
+    });
+    Ok(addr)
 }
 
 /// Takes connections as they come. Each is worked through on its own task,
@@ -431,5 +452,54 @@ impl Link {
             .write_all(bytes)
             .await
             .map_err(|e| fail("couldn't send", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn address_with(relay: &str) -> String {
+        let id = SecretKey::from_bytes(&[9; 32]).public();
+        let addr = EndpointAddr::new(id)
+            .with_relay_url(RelayUrl::from_str(relay).unwrap())
+            .with_ip_addr(SocketAddr::from((Ipv4Addr::new(192, 0, 2, 1), 7000)));
+        serde_json::to_string(&addr).unwrap()
+    }
+
+    fn relays_in(addr: &EndpointAddr) -> Vec<String> {
+        addr.addrs
+            .iter()
+            .filter_map(|a| match a {
+                TransportAddr::Relay(url) => Some(url.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A relay named in someone's heartbeat is never contacted.
+    #[test]
+    fn a_relay_that_isnt_ours_is_dropped_from_an_address() {
+        let theirs = address_with("https://their-relay.example.org");
+        for mine in [
+            Relay::None,
+            Relay::Public,
+            Relay::own("https://my-relay.example.com").unwrap(),
+        ] {
+            let addr = dial_address(&theirs, &mine.mode().relay_map()).unwrap();
+            assert!(relays_in(&addr).is_empty(), "{mine:?}: {addr:?}");
+            assert_eq!(addr.addrs.len(), 1, "the direct address stays");
+        }
+    }
+
+    #[test]
+    fn our_own_relay_stays_in_an_address() {
+        let mine = Relay::own("https://my-relay.example.com").unwrap();
+        let addr = dial_address(
+            &address_with("https://my-relay.example.com"),
+            &mine.mode().relay_map(),
+        )
+        .unwrap();
+        assert_eq!(relays_in(&addr).len(), 1);
     }
 }

@@ -219,9 +219,7 @@ async fn run(
                     None => break,
                     Some(Cmd::Peers(peers)) => {
                         let ids: Vec<String> = peers.keys().cloned().collect();
-                        if node.allow(&ids).is_err() {
-                            continue;
-                        }
+                        node.allow(&ids);
                         wanted = peers;
                         let gone: Vec<String> =
                             links.keys().filter(|id| !wanted.contains_key(*id)).cloned().collect();

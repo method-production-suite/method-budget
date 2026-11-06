@@ -317,6 +317,17 @@ fn someone_removed_from_the_budget_loses_their_link() {
     t.until("Jordan's role at Jordan", |t| {
         Two::doc(&mut t.jordan).log().roles_started()
     });
+    // A damaged heartbeat from someone else doesn't stop the removal.
+    let third = ActorId([3; 32]);
+    let at = presence(&t.alex_log, ALEX);
+    let mine: serde_json::Value = serde_json::from_slice(&std::fs::read(&at).unwrap()).unwrap();
+    let mut bad = mine.clone();
+    bad["live"] = serde_json::Value::String("{\"id\":\"x\"}".to_string());
+    let bad_path = presence(&t.alex_log, third);
+    std::fs::create_dir_all(bad_path.parent().unwrap()).unwrap();
+    std::fs::write(&bad_path, serde_json::to_vec(&bad).unwrap()).unwrap();
+    t.round(100);
+
     Two::doc(&mut t.alex).remove_person(&JORDAN.hex()).unwrap();
     t.until("the link gone", |t| {
         Two::doc(&mut t.alex).live_connected() == 0 && Two::doc(&mut t.jordan).live_connected() == 0
