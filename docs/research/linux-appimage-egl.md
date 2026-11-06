@@ -24,6 +24,7 @@ screenshot of each run:
 |---|---|---|
 | 0.8.1 | yes | `EGL_BAD_PARAMETER`, web process gone, menu bar over an empty window |
 | 0.8.1 with `LD_PRELOAD` of the system's copy | yes, overridden | No error, the whole app draws |
+| Built from this branch with CLI 2.12.1, on Ubuntu 22.04 in a container | no | No error, the whole app draws |
 
 Not checked on real hardware, where the error differs, or by running the `.AppImage` file itself
 under FUSE.
