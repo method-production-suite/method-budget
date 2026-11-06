@@ -590,6 +590,39 @@ relayed or forwarded change can't be altered.
   of pulling `iroh-base` in early. To decide in phase 3.
 - All networking lives in a new crate (`method-sync`), never in `method-core`.
 
+**Measured 2026-11-05** (iroh 1.4.1, 15 days old, resolved against our lockfile in a
+scratch project; nothing added to the repo):
+
+| Check | Result |
+|---|---|
+| Size | A release binary that links an endpoint is 10.8 MB larger than one with tokio alone (macOS, Apple silicon, stripped, uncompressed). An upper bound: the app already carries part of it. The universal Mac app holds two copies, so about 21.5 MB there. For scale, 0.8.1's `.dmg` is 24.1 MB and its `.msi` 11.8 MB. Not measured inside the app. |
+| Build | 39 seconds for a clean release build of the scratch project, on this Mac. |
+| New crates | About 100 of the 242 in its normal dependency graph are not in our lockfile. It shares our `ed25519-dalek` 3.0.0, so the two-copies worry above is gone. |
+| Age | Seven crates were under 14 days; all moved back and the check passes. |
+| Advisories | Three, all needing work. tokio 1.53.1 meets RUSTSEC-2026-0386 (unsound): 1.53.3 fixes it and is old enough. Our lockfile already has 1.53.1 and our deny check passes anyway, because cargo-deny by default reports an unsound advisory only for a direct dependency: in a small test the same lockfile gave no report through a transitive dependency, a report once tokio was direct, and a report for the transitive case with `unsound = "all"`. So a `method-sync` crate that depends on tokio directly trips it, and `deny.toml`'s comment that every unsound advisory fails isn't what it does. ctutils needs 0.4.4 or later for RUSTSEC-2026-0385, and 0.4.4 reaches 14 days on 2026-11-06. `paste` (RUSTSEC-2024-0436, unmaintained, no fix) comes through the Linux network crates and would need a listed reason in `deny.toml`. |
+| Licenses | Four crates fail `deny.toml`: `spez` (BSD-2-Clause), and `async_io_stream`, `pharos` and `ws_stream_wasm` (Unlicense), the last three not built on our desktop targets. Each needs the license allowed or the crate excluded, with a reason. |
+
+**The preset decides what leaves the computer.** iroh's `N0` preset does more than use
+n0's relays: it also publishes the endpoint's address to n0's DNS service and looks others
+up there. `N0DisableRelay` still publishes to that DNS service, with IP addresses instead
+of relay addresses. `Minimal` sets only the crypto provider, so an endpoint built from it
+publishes nothing unless we add it, and a relay can be set on its own. Members
+of a shared folder don't need the DNS service, since `presence.json` can carry the address,
+so the folder case can leave it out. That puts each member's IP addresses into the shared
+folder, where the other members and the folder's hosting service can read them.
+
+**The router.** iroh's default features include `portmapper`, and its builder defaults to
+`PortmapperConfig::Enabled` (UPnP, PCP and NAT-PMP, asking the router to open a port).
+`Minimal` doesn't change that. Decision 98 turns it off: the endpoint uses
+`PortmapperConfig::Disabled`, and iroh is built without the feature if that works. Without
+the feature its graph resolves to about 92 new crates instead of about 100 (built and
+measured when the crate is added). A connection that would have needed it uses the relay.
+
+**Public wording to change if this ships**: "goes online only to check for updates" and
+"works with no connection" in the README, docs/APP.md and site/index.html, and the website
+repo's apps/budget/index.html (MOrg's). SUITE-STANDARDS section 5 allows other network use
+only for things the user turns on, each saying what it sends.
+
 ---
 
 ## 7. Security and permissions without a server
@@ -1080,7 +1113,8 @@ months in. Live mode about 1 to 1.5 months later.
 4. **Codes**: links and QR only over the internet, short codes on the same network only? A
    short code over the internet needs someone's lookup server (n0's or a third party's).
 5. **Relays**: n0's free public relays as the default (they see who talks to whom and IP
-   addresses, never content)? Or ask the user the first time?
+   addresses, never content)? Or ask the user the first time? (Answered 2026-11-05: each person
+   turns it on for themselves, told what it sends; decisions.md, entry 98.)
 6. **Encryption at rest** in the shared folder: wanted in the first release, later, or
    never?
 7. **Names in history**: signed history keeps whatever name each person typed, forever, in
@@ -1100,7 +1134,8 @@ months in. Live mode about 1 to 1.5 months later.
     single-instance on Windows and Linux) for `methodbudget://` links, `ed25519-dalek` or
     iroh's key crate in phase 3, iroh in phase 4. Each would pass the cooldown and a size
     check first. (`ed25519-dalek` 3.0.0 added for phase 3, built on the recommendation,
-    2026-10-20; decisions.md, entry 89.)
+    2026-10-20; decisions.md, entry 89. iroh in phase 4: yes, 2026-11-05; decisions.md,
+    entry 98. It would still pass the checks above in its own pull request.)
 
 ---
 
