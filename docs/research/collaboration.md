@@ -602,6 +602,10 @@ scratch project; nothing added to the repo):
 | Advisories | Three, all needing work. tokio 1.53.1 meets RUSTSEC-2026-0386 (unsound): 1.53.3 fixes it and is old enough. Our lockfile already has 1.53.1 and our deny check passes anyway, because cargo-deny by default reports an unsound advisory only for a direct dependency: in a small test the same lockfile gave no report through a transitive dependency, a report once tokio was direct, and a report for the transitive case with `unsound = "all"`. So a `method-sync` crate that depends on tokio directly trips it, and `deny.toml`'s comment that every unsound advisory fails isn't what it does. ctutils needs 0.4.4 or later for RUSTSEC-2026-0385, and 0.4.4 reaches 14 days on 2026-11-06. `paste` (RUSTSEC-2024-0436, unmaintained, no fix) comes through the Linux network crates and would need a listed reason in `deny.toml`. |
 | Licenses | Four crates fail `deny.toml`: `spez` (BSD-2-Clause), and `async_io_stream`, `pharos` and `ws_stream_wasm` (Unlicense), the last three not built on our desktop targets. Each needs the license allowed or the crate excluded, with a reason. |
 
+**Measured in the app, 2026-11-06:** the stripped release binary (macOS, Apple silicon) went
+from 32.4 MB to 40.3 MB once it called the link, 7.9 MB more. The universal Mac app holds two
+copies, so about 15.7 MB there, uncompressed.
+
 **The preset decides what leaves the computer.** iroh's `N0` preset does more than use
 n0's relays: it also publishes the endpoint's address to n0's DNS service and looks others
 up there. `N0DisableRelay` still publishes to that DNS service, with IP addresses instead

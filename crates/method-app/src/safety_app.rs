@@ -813,11 +813,26 @@ pub fn discard_all(state: &AppState, safety: &Safety) {
     }
 }
 
+/// Turns live changes off in every open budget (decisions.md, entry 98): the
+/// links close and each address comes out of its heartbeat file.
+pub fn stop_live_everywhere(state: &AppState) {
+    let mut docs = state.docs();
+    for id in docs.ids() {
+        if let Some(sh) = docs.get_mut(id).and_then(Session::shared_mut) {
+            sh.live_stop();
+        }
+    }
+}
+
 /// The app is exiting. Changes the user didn't throw away are kept (into
 /// the file with Autosave on, else a recovery copy): an exit the guard
 /// didn't see (logging out, the system quitting the app) loses nothing. A
 /// budget with nothing unsaved leaves no recovery copy.
 pub fn on_exit<R: Runtime>(app: &AppHandle<R>) {
+    // Before anything else: exiting doesn't drop the budgets, and the notice
+    // promises the address comes out of the heartbeat file on quitting,
+    // whatever became of the changes.
+    stop_live_everywhere(&app.state::<AppState>());
     let Some(safety) = app.try_state::<Safety>() else {
         return;
     };

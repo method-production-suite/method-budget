@@ -264,6 +264,8 @@ const COMMANDS: &[&str] = &[
     "share_pick_folder",
     "share_start",
     "share_set_me",
+    "share_live_start",
+    "share_live_stop",
     "share_place",
     "share_review",
     "share_activity",

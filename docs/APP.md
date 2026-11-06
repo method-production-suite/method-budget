@@ -4,7 +4,8 @@ Method Budget's editor is a local desktop app built with [Tauri 2](https://tauri
 the Rust engine runs natively inside the app, and the interface is plain HTML, CSS and
 JavaScript drawn in the operating system's own web view. Budgets are `.mthd` files on your
 disk ([FORMAT.md](FORMAT.md)). There is no server and no account, and the app
-goes online only to check for updates of itself, which can be turned off ("Updates" below).
+goes online only to check for updates of itself, which can be turned off ("Updates" below),
+and for live changes in a shared budget, if the person turns those on ("Live changes").
 Why Tauri: [decisions.md](decisions.md), entry 14.
 
 ## Run and build
@@ -2092,6 +2093,18 @@ never see it. A request isn't signed, so someone with write access to the folder
 one in another person's name; it gives nothing until someone allowed to give roles allows
 it, and that is their own signed change.
 
+**Live changes** (decision 98). A person turns these on for themselves in the status panel
+(**Live changes**, **Turn On…**). The notice says what it sends before anything does: their
+IP addresses go in the shared folder, where the others and the folder's hosting service can
+read them; a relay can carry the link and sees who talks to whom and their IP addresses,
+never the budget, and the computer stays connected to a chosen relay while this is on, even
+with nobody else online; the computer connects to the addresses in the others' files. They
+choose the free public relay, the production's own, or none. Changes then reach the others who
+have it on within seconds of typing pausing, checked like a segment's, and still go through
+the folder as always. It stays on until they turn it off, close the budget or quit, and is off
+again the next time the budget opens. Needs a live check on two computers: on real networks
+and through a relay, which the tests can't cover. Cursors aren't built.
+
 **Inviting someone** (decision 97; design 9.1). In the Share dialog, whoever may give roles
 sees **Invite someone**: what the person can do (the same roles as the People list, with
 the category checklist for Edits some categories; admins and co-owners only for those who
@@ -2140,7 +2153,7 @@ computer's id; a co-owner can do everything else), clickable `methodbudget://` l
 Join from Link… takes the pasted text), invites from the command line, a new key for a person
 (a lost or stolen computer is removed, and comes back with a new sharing id), picking
 single accounts (not only whole categories) in the dialog, a notification for a new
-access request beyond the badge, live sessions with cursors,
+access request beyond the badge, cursors in live changes,
 proposals, checkpoints for very long logs, and the service-by-service checks (iCloud,
 Google Drive, LucidLink) the design calls for.
 
@@ -2151,6 +2164,8 @@ Google Drive, LucidLink) the design calls for.
 | `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
 | `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
 | `share_set_me` | `name`, `color` | The person as kept, for every shared budget |
+| `share_live_start` | `relay` (`public`, `none` or a relay's address) | The status with live changes on (decision 98); the page shows the notice first. Starts the endpoint away from the window's thread |
+| `share_live_stop` | none | The status with live changes off: the link closes and the address comes out of the heartbeat file |
 | `share_place` | `category`, `account` (where this person is) | nothing |
 | `share_review` | none | The review list: `index`, `key`, `sentence`, `place` (`{kind, key, parent, field, text}`), `values` |
 | `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place`, `signed` |
@@ -3328,7 +3343,7 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
                      the read-only switch
   src/host/*.rs      each moved module's commands as the host dispatches them
 
-crates/method-sync/      the live link between members (decisions.md, entry 98): no app uses it yet
+crates/method-sync/      the live link between members (decisions.md, entry 98); off until a person turns it on
 crates/method-web/       the page in a browser: Host as WebAssembly (wasm32 only)
   src/web.rs         the JS API (wasm-bindgen): new Host(), dispatch, openMthd, saveMthd,
                      setReadOnly, hostInfo, commands(); the browser's clock
@@ -3617,8 +3632,10 @@ waits for the next frame, so one layout serves a whole redraw.
 The app opens files the user picks and nothing else, and the web view is treated as
 untrusted (a budget file is data from anywhere).
 
-- **No network unless checking for updates.** No telemetry, no remote content, no
-  accounts. The only network access is the updater, in Rust (src/updater.rs): an HTTPS
+- **No network but update checks, and live changes if a person turns them on.** No
+  telemetry, no remote content, no accounts. Live changes are `crates/method-sync`, off
+  until this person turns them on for a budget (decisions.md, entry 98). The only other
+  network access is the updater, in Rust (src/updater.rs): an HTTPS
   request for the update manifest at the endpoint in `tauri.conf.json` and, when there is a
   newer version, its archive. The updater's HTTP client is https-only and follows redirects
   only to the endpoint's host (plus GitHub's two download hosts, `objects.githubusercontent.com`

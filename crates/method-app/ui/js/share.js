@@ -347,6 +347,7 @@ function drawPanel() {
   if (s.waiting) rows.push(line(t('share.panel.waiting'), String(s.waiting), 'is-warn'));
   if (typeof s.synced_secs === 'number') rows.push(line(t('share.panel.folder_read'), ago(s.synced_secs + extra)));
   rows.push(line(t('share.panel.changes'), String(s.changes)));
+  rows.push(liveRow(s));
   const people = el('div', { class: 'share-people-list' });
   people.append(personRow(s.me, s));
   for (const p of s.people) people.append(personRow(p, s));
@@ -363,6 +364,84 @@ function drawPanel() {
   actions.append(el('button', { class: 'btn', text: t('share.panel.settings'), attrs: { type: 'button' }, on: { click: () => { closeStatusPanel(); openShareDialog(); } } }));
   rows.push(actions);
   panel.replaceChildren(...rows);
+}
+
+/** Live changes: whether they are on here, with the switch. */
+function liveRow(s) {
+  const state = !s.live_on ? t('share.live.off') : t('share.live.on', { count: s.live_connected });
+  const button = el('button', {
+    class: 'btn',
+    text: s.live_on ? t('share.live.turn_off') : t('share.live.turn_on_ellipsis'),
+    attrs: { type: 'button' },
+    on: { click: () => (s.live_on ? stopLive() : openLiveDialog()) },
+  });
+  return el('div', { class: 'share-live-row' }, line(t('share.live.label'), state), button);
+}
+
+async function stopLive() {
+  try {
+    await ctx.invoke('share_live_stop', { doc: ctx.doc() });
+  } catch (e) {
+    ctx.toast(e);
+  }
+  fetchStatus();
+}
+
+/**
+ * What live changes send, before anything does (decisions.md, entry 98): each
+ * person turns them on for themselves, here. Nothing touches the network until
+ * Turn On is pressed. The relay last chosen is offered again.
+ */
+export function openLiveDialog() {
+  if (!ctx || isModalOpen()) return;
+  customDialog((close) => {
+    const saved = readPref('share.live.relay', 'public');
+    const known = saved === 'public' || saved === 'none';
+    let choice = known ? saved : 'own';
+    const own = el('input', {
+      class: 'modal-input',
+      attrs: { type: 'url', id: 'share-live-relay', placeholder: t('share.live.relay_placeholder'), 'aria-label': t('share.live.relay_own_address') },
+    });
+    own.value = known ? '' : saved;
+    const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
+    error.hidden = true;
+    const cancel = el('button', { class: 'btn', text: t('share.cancel'), attrs: { type: 'button' } });
+    const go = el('button', { class: 'btn btn-primary', text: t('share.live.turn_on'), attrs: { type: 'button' } });
+    cancel.addEventListener('click', () => close());
+    go.addEventListener('click', async () => {
+      const relay = choice === 'own' ? own.value.trim() : choice;
+      go.disabled = true;
+      try {
+        await ctx.invoke('share_live_start', { doc: ctx.doc(), relay });
+        writePref('share.live.relay', relay);
+        close();
+        fetchStatus();
+      } catch (e) {
+        error.textContent = String(e);
+        error.hidden = false;
+        go.disabled = false;
+      }
+    });
+    const send = el('ul', { class: 'share-live-sends' });
+    for (const text of [t('share.live.sends_addresses'), t('share.live.sends_relay'), t('share.live.sends_dialing'), t('share.live.sends_nothing_else')]) {
+      send.append(el('li', { text }));
+    }
+    return el(
+      'div',
+      { class: 'modal share-live-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'share-live-title' } },
+      el('h2', { class: 'modal-title', text: t('share.live.title'), attrs: { id: 'share-live-title' } }),
+      el('p', { text: t('share.live.intro') }),
+      el('h3', { class: 'share-panel-sub', text: t('share.live.sends_title') }),
+      send,
+      el('h3', { class: 'share-panel-sub', text: t('share.live.relay_title') }),
+      radio('share-live-relay-choice', t('share.live.relay_public'), choice === 'public', () => { choice = 'public'; }),
+      radio('share-live-relay-choice', t('share.live.relay_own'), choice === 'own', () => { choice = 'own'; }),
+      own,
+      radio('share-live-relay-choice', t('share.live.relay_none'), choice === 'none', () => { choice = 'none'; }),
+      error,
+      el('div', { class: 'modal-actions' }, cancel, go),
+    );
+  });
 }
 
 /**

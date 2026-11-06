@@ -223,6 +223,8 @@
     "allow-share-pick-folder",
     "allow-share-start",
     "allow-share-set-me",
+    "allow-share-live-start",
+    "allow-share-live-stop",
     "allow-share-place",
     "allow-share-review",
     "allow-share-activity",

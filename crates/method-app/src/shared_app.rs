@@ -320,6 +320,56 @@ pub fn share_start<R: Runtime>(
     Ok(finish(&window, &mut s, None))
 }
 
+/// Turns live mode on for this person, on this computer, for budget `doc`
+/// (decisions.md, entry 98), once the page has shown what it sends. `relay` is
+/// "public", "none" or a production's own relay's address. Starting the
+/// endpoint can take a moment, so it happens away from the window's thread
+/// and with no budget locked.
+#[tauri::command]
+pub async fn share_live_start(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    relay: String,
+) -> Result<Option<ShareStatus>, String> {
+    let relay = match relay.trim() {
+        "public" => method_sync::Relay::Public,
+        "none" => method_sync::Relay::None,
+        own => method_sync::Relay::own(own)
+            .map_err(|_| crate::i18n::tr("sharing.live_relay_address"))?,
+    };
+    let budget = {
+        let s = state.lock_doc(doc)?;
+        match s.shared() {
+            Some(sh) => sh.live_budget()?,
+            None => return Ok(None),
+        }
+    };
+    let mesh = tauri::async_runtime::spawn_blocking(move || shared::live_mesh(relay, &budget))
+        .await
+        .map_err(|e| e.to_string())??;
+    let mut s = state.lock_doc(doc)?;
+    let Some(sh) = s.shared_mut() else {
+        return Ok(None);
+    };
+    sh.live_with(mesh);
+    Ok(Some(sh.status(Instant::now())))
+}
+
+/// Turns live mode off: the link closes and the address comes out of the
+/// heartbeat file.
+#[tauri::command]
+pub fn share_live_stop(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> Result<Option<ShareStatus>, String> {
+    let mut s = state.lock_doc(doc)?;
+    let Some(sh) = s.shared_mut() else {
+        return Ok(None);
+    };
+    sh.live_stop();
+    Ok(Some(sh.status(Instant::now())))
+}
+
 /// Sets this person's name and color, for every shared budget.
 #[tauri::command]
 pub fn share_set_me(
@@ -801,6 +851,8 @@ mod tests {
             "share_pick_folder",
             "share_start",
             "share_set_me",
+            "share_live_start",
+            "share_live_stop",
             "share_place",
             "share_review",
             "share_activity",

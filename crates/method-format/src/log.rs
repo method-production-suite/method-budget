@@ -1233,6 +1233,19 @@ fn apply_segments(log: &mut Log, dir: &LogDir, segments: &[Segment]) -> LoadRepo
             Err(e) => report.skipped.push((s.path.clone(), e.0)),
         }
     }
+    apply_into(log, changes, &mut report);
+    report
+}
+
+/// Puts changes through the same checks as a segment's, whatever carried
+/// them here: signatures, roles and duplicates are the log's to judge.
+pub fn apply_changes(log: &mut Log, changes: Vec<Change>) -> LoadReport {
+    let mut report = LoadReport::default();
+    apply_into(log, changes, &mut report);
+    report
+}
+
+fn apply_into(log: &mut Log, mut changes: Vec<Change>, report: &mut LoadReport) {
     changes.sort_by_key(|c| (c.actor, c.seq));
     for (id, result) in log.apply_all(changes) {
         match result {
@@ -1243,7 +1256,6 @@ fn apply_segments(log: &mut Log, dir: &LogDir, segments: &[Segment]) -> LoadRepo
         }
     }
     report.pending = log.pending().len();
-    report
 }
 
 /// Reads every whole segment in the folder into `log`.
@@ -1463,6 +1475,12 @@ pub struct Presence {
     /// never refuses a field it doesn't know).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request: Option<AccessRequest>,
+    /// How to reach this computer's live link, while this person has live
+    /// mode turned on (decisions.md, entry 98): its key and IP addresses,
+    /// which the other members and the folder's hosting service can read.
+    /// Left out otherwise, and an older app ignores it, as `request`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub live: Option<String>,
 }
 
 /// An access request in a heartbeat: what role a person would like, with
@@ -2717,6 +2735,7 @@ mod tests {
             at: "2026-10-21T10:00:00Z".into(),
             frontier: "abc".into(),
             request: None,
+            live: None,
         };
         log.write_presence(actor(2), &plain).unwrap();
         let text = fs::read_to_string(log.actor_dir(actor(2)).join(PRESENCE_FILE)).unwrap();

@@ -19,6 +19,8 @@
 //! - a connection from a key not on the allow list is closed before any
 //!   frame is read.
 
+pub mod mesh;
+
 use std::collections::{BTreeMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::str::FromStr;
@@ -29,7 +31,9 @@ use iroh::dns::DnsResolver;
 use iroh::endpoint::{
     presets, Builder, Connection, Incoming, PortmapperConfig, RecvStream, SendStream, VarInt,
 };
-use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, SecretKey};
+use iroh::{
+    Endpoint, EndpointAddr, EndpointId, RelayMap, RelayMode, RelayUrl, SecretKey, TransportAddr,
+};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Semaphore};
 use tokio::time::timeout;
@@ -45,6 +49,8 @@ const HELLO_WAIT: Duration = Duration::from_secs(10);
 const CLOSE_NOT_ALLOWED: u32 = 1;
 /// The close code for a connection that opened no stream in time.
 const CLOSE_TOO_SLOW: u32 = 2;
+/// The close code for a link this side has finished with.
+const CLOSE_DONE: u32 = 3;
 /// How long a connection has for its handshake, and then to open its stream.
 const ADMIT_WAIT: Duration = Duration::from_secs(10);
 /// How many connections may be on their way in at once, and wait to be taken.
@@ -118,6 +124,8 @@ pub enum Frame {
 #[derive(Debug, Clone)]
 pub struct Node {
     endpoint: Endpoint,
+    /// The only relays this node will use: the one it was started with.
+    relays: RelayMap,
     allowed: Arc<Mutex<HashSet<EndpointId>>>,
     arrived: Arc<tokio::sync::Mutex<mpsc::Receiver<Link>>>,
 }
@@ -147,7 +155,7 @@ impl Node {
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node::around(endpoint))
+        Ok(Node::around(endpoint, &relay))
     }
 
     /// Starts an endpoint on this computer's loopback address, with no relay:
@@ -160,15 +168,16 @@ impl Node {
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node::around(endpoint))
+        Ok(Node::around(endpoint, &Relay::None))
     }
 
-    fn around(endpoint: Endpoint) -> Node {
+    fn around(endpoint: Endpoint, relay: &Relay) -> Node {
         let allowed = Arc::new(Mutex::new(HashSet::new()));
         let (arrive, arrived) = mpsc::channel(PENDING_MAX);
         tokio::spawn(accept_loop(endpoint.clone(), allowed.clone(), arrive));
         Node {
             endpoint,
+            relays: relay.mode().relay_map(),
             allowed,
             arrived: Arc::new(tokio::sync::Mutex::new(arrived)),
         }
@@ -196,14 +205,15 @@ impl Node {
     }
 
     /// Replaces the keys allowed to connect (the budget's members, from the
-    /// shared folder). A link already open is not closed by this.
-    pub fn allow(&self, ids: &[String]) -> Result<(), SyncError> {
-        let mut set = HashSet::with_capacity(ids.len());
-        for id in ids {
-            set.insert(EndpointId::from_str(id).map_err(|e| fail("not a member's key", e))?);
-        }
+    /// shared folder). One that doesn't read as a key is passed over, so one
+    /// damaged file can't stop the rest from taking effect. A link already
+    /// open is not closed by this.
+    pub fn allow(&self, ids: &[String]) {
+        let set = ids
+            .iter()
+            .filter_map(|id| EndpointId::from_str(id).ok())
+            .collect();
         *self.allowed.lock().unwrap_or_else(|p| p.into_inner()) = set;
-        Ok(())
     }
 
     fn is_allowed(&self, id: &EndpointId) -> bool {
@@ -216,8 +226,7 @@ impl Node {
     /// Connects to a member from the text of their [`Node::address`]. Their
     /// key must be on the allow list too.
     pub async fn connect(&self, address: &str) -> Result<Link, SyncError> {
-        let addr: EndpointAddr =
-            serde_json::from_str(address).map_err(|e| fail("not an address", e))?;
+        let addr = dial_address(address, &self.relays)?;
         if !self.is_allowed(&addr.id) {
             return Err(SyncError::new(
                 "that computer isn't a member of this budget",
@@ -246,6 +255,22 @@ impl Node {
     pub async fn close(&self) {
         self.endpoint.close().await;
     }
+}
+
+/// What may be dialed from another member's address text. It comes from a
+/// file anyone with the folder can write, and iroh would contact any relay it
+/// names, telling that host this computer's IP address, so only this node's
+/// own relay stays. Direct addresses have the same source and stay: dialing is
+/// what they are for (decisions.md, entry 98).
+fn dial_address(address: &str, relays: &RelayMap) -> Result<EndpointAddr, SyncError> {
+    let mut addr: EndpointAddr =
+        serde_json::from_str(address).map_err(|e| fail("not an address", e))?;
+    addr.addrs.retain(|a| match a {
+        TransportAddr::Relay(url) => relays.contains(url),
+        TransportAddr::Ip(_) => true,
+        _ => false,
+    });
+    Ok(addr)
 }
 
 /// Takes connections as they come. Each is worked through on its own task,
@@ -303,6 +328,73 @@ pub struct Link {
     recv: RecvStream,
 }
 
+/// A link's sending half ([`Link::split`]).
+#[derive(Debug)]
+pub struct LinkSender {
+    conn: Connection,
+    send: SendStream,
+}
+
+/// A link's receiving half ([`Link::split`]).
+#[derive(Debug)]
+pub struct LinkReceiver {
+    conn: Connection,
+    recv: RecvStream,
+}
+
+async fn write_frame(send: &mut SendStream, frame: &Frame) -> Result<(), SyncError> {
+    let bytes = serde_json::to_vec(frame).map_err(|e| fail("couldn't write a frame", e))?;
+    if bytes.len() > MAX_FRAME {
+        return Err(SyncError::new("that frame is too large to send"));
+    }
+    send.write_all(&(bytes.len() as u32).to_be_bytes())
+        .await
+        .map_err(|e| fail("couldn't send", e))?;
+    send.write_all(&bytes)
+        .await
+        .map_err(|e| fail("couldn't send", e))
+}
+
+async fn read_frame(conn: &Connection, recv: &mut RecvStream) -> Result<Frame, SyncError> {
+    let mut len = [0u8; 4];
+    recv.read_exact(&mut len)
+        .await
+        .map_err(|e| fail("the link ended", e))?;
+    let len = u32::from_be_bytes(len) as usize;
+    if len > MAX_FRAME {
+        conn.close(VarInt::from_u32(0), b"frame too large");
+        return Err(SyncError::new(
+            "the other computer sent a frame too large to read",
+        ));
+    }
+    let mut bytes = vec![0u8; len];
+    recv.read_exact(&mut bytes)
+        .await
+        .map_err(|e| fail("the link ended", e))?;
+    serde_json::from_slice(&bytes).map_err(|e| fail("couldn't read a frame", e))
+}
+
+impl LinkSender {
+    /// Sends one frame.
+    pub async fn send(&mut self, frame: &Frame) -> Result<(), SyncError> {
+        write_frame(&mut self.send, frame).await
+    }
+}
+
+impl Drop for LinkSender {
+    /// Ends the connection, so the other side hears at once.
+    fn drop(&mut self) {
+        self.conn.close(VarInt::from_u32(CLOSE_DONE), b"done");
+    }
+}
+
+impl LinkReceiver {
+    /// Waits for the next frame.
+    pub async fn recv(&mut self) -> Result<Frame, SyncError> {
+        read_frame(&self.conn, &mut self.recv).await
+    }
+}
+
 impl Link {
     /// The other computer's key, proved by the connection's handshake.
     pub fn peer(&self) -> String {
@@ -330,41 +422,26 @@ impl Link {
 
     /// Sends one frame.
     pub async fn send(&mut self, frame: &Frame) -> Result<(), SyncError> {
-        let bytes = serde_json::to_vec(frame).map_err(|e| fail("couldn't write a frame", e))?;
-        if bytes.len() > MAX_FRAME {
-            return Err(SyncError::new("that frame is too large to send"));
-        }
-        self.send
-            .write_all(&(bytes.len() as u32).to_be_bytes())
-            .await
-            .map_err(|e| fail("couldn't send", e))?;
-        self.send
-            .write_all(&bytes)
-            .await
-            .map_err(|e| fail("couldn't send", e))
+        write_frame(&mut self.send, frame).await
     }
 
     /// Waits for the next frame. One larger than [`MAX_FRAME`] is refused
     /// before it is read, and ends the link.
     pub async fn recv(&mut self) -> Result<Frame, SyncError> {
-        let mut len = [0u8; 4];
-        self.recv
-            .read_exact(&mut len)
-            .await
-            .map_err(|e| fail("the link ended", e))?;
-        let len = u32::from_be_bytes(len) as usize;
-        if len > MAX_FRAME {
-            self.conn.close(VarInt::from_u32(0), b"frame too large");
-            return Err(SyncError::new(
-                "the other computer sent a frame too large to read",
-            ));
-        }
-        let mut bytes = vec![0u8; len];
-        self.recv
-            .read_exact(&mut bytes)
-            .await
-            .map_err(|e| fail("the link ended", e))?;
-        serde_json::from_slice(&bytes).map_err(|e| fail("couldn't read a frame", e))
+        read_frame(&self.conn, &mut self.recv).await
+    }
+
+    /// Separates the two directions, so a task can wait on one and another
+    /// write on the other.
+    pub fn split(self) -> (LinkSender, LinkReceiver) {
+        let Link { conn, send, recv } = self;
+        (
+            LinkSender {
+                conn: conn.clone(),
+                send,
+            },
+            LinkReceiver { conn, recv },
+        )
     }
 
     /// Sends raw bytes as if they were a frame's length, for tests of what a
@@ -375,5 +452,54 @@ impl Link {
             .write_all(bytes)
             .await
             .map_err(|e| fail("couldn't send", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn address_with(relay: &str) -> String {
+        let id = SecretKey::from_bytes(&[9; 32]).public();
+        let addr = EndpointAddr::new(id)
+            .with_relay_url(RelayUrl::from_str(relay).unwrap())
+            .with_ip_addr(SocketAddr::from((Ipv4Addr::new(192, 0, 2, 1), 7000)));
+        serde_json::to_string(&addr).unwrap()
+    }
+
+    fn relays_in(addr: &EndpointAddr) -> Vec<String> {
+        addr.addrs
+            .iter()
+            .filter_map(|a| match a {
+                TransportAddr::Relay(url) => Some(url.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A relay named in someone's heartbeat is never contacted.
+    #[test]
+    fn a_relay_that_isnt_ours_is_dropped_from_an_address() {
+        let theirs = address_with("https://their-relay.example.org");
+        for mine in [
+            Relay::None,
+            Relay::Public,
+            Relay::own("https://my-relay.example.com").unwrap(),
+        ] {
+            let addr = dial_address(&theirs, &mine.mode().relay_map()).unwrap();
+            assert!(relays_in(&addr).is_empty(), "{mine:?}: {addr:?}");
+            assert_eq!(addr.addrs.len(), 1, "the direct address stays");
+        }
+    }
+
+    #[test]
+    fn our_own_relay_stays_in_an_address() {
+        let mine = Relay::own("https://my-relay.example.com").unwrap();
+        let addr = dial_address(
+            &address_with("https://my-relay.example.com"),
+            &mine.mode().relay_map(),
+        )
+        .unwrap();
+        assert_eq!(relays_in(&addr).len(), 1);
     }
 }
