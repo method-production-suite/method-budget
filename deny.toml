@@ -7,9 +7,10 @@
 # by default cargo-deny reports those only for a direct dependency.
 unsound = "all"
 ignore = [
-    # Unsound in one iterator we don't call; glib through Tauri's gtk on Linux.
-    # Surfaced when `unsound` went to "all". Drop it when Tauri moves off it.
-    { id = "RUSTSEC-2024-0429", reason = "glib VariantStrIter: via Tauri's gtk crates, not called" },
+    # Unsound in one iterator; glib through Tauri's gtk on Linux. Our crates
+    # don't use it directly; calls inside Tauri and gtk weren't traced. Surfaced
+    # when `unsound` went to "all". Drop it when Tauri moves off it.
+    { id = "RUSTSEC-2024-0429", reason = "glib VariantStrIter: via Tauri's gtk crates, no direct use in ours, calls inside them not traced" },
     # Unmaintained, no fix upstream; through iroh's network crates on Linux
     # (netlink-packet-core). A build-time macro. Drop it when they move off it.
     { id = "RUSTSEC-2024-0436", reason = "paste: build-time macro under iroh's Linux network crates" },

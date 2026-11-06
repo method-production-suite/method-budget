@@ -89,6 +89,49 @@ async fn a_stranger_is_closed_before_any_frame() {
     }
 }
 
+/// A member who connects and then says nothing holds up nobody else. The
+/// wait is far shorter than the time a silent connection is given.
+#[tokio::test]
+async fn a_silent_connection_does_not_keep_a_member_waiting() {
+    let (a, b) = pair().await;
+    let silent = Node::start_loopback([3; 32]).await.unwrap();
+    silent.allow(&[b.id()]).unwrap();
+    b.allow(&[a.id(), silent.id()]).unwrap();
+    let address = b.address().unwrap();
+
+    // `connect` opens a stream but writes nothing, so `b` never sees one.
+    let _quiet = silent.connect(&address).await.unwrap();
+    let (mine, theirs) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(
+            async {
+                let mut l = a.connect(&address).await.unwrap();
+                l.hello("budget-1").await.unwrap();
+                l
+            },
+            async {
+                let mut l = b.accept().await.unwrap();
+                l.hello("budget-1").await.unwrap();
+                l
+            }
+        )
+    })
+    .await
+    .expect("a silent connection kept a member waiting");
+    assert_eq!(theirs.peer(), a.id());
+    drop((mine, theirs));
+    for n in [&a, &b, &silent] {
+        n.close().await;
+    }
+}
+
+#[tokio::test]
+async fn closing_a_node_ends_its_accept() {
+    let node = Node::start_loopback([5; 32]).await.unwrap();
+    node.close().await;
+    let ended = tokio::time::timeout(WAIT, node.accept()).await.unwrap();
+    assert!(ended.is_none());
+}
+
 #[tokio::test]
 async fn connecting_to_a_key_not_on_the_list_is_refused_here() {
     let (a, b) = pair().await;

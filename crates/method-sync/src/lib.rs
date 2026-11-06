@@ -14,7 +14,8 @@
 //! - the router is left alone: no UPnP, PCP or NAT-PMP, and the crate that
 //!   speaks them isn't built;
 //! - the only outside machine it may talk to is the relay named in
-//!   [`Relay`], which forwards encrypted packets;
+//!   [`Relay`], which forwards encrypted packets, and a relay's name is looked
+//!   up through this computer's own DNS servers, never public ones;
 //! - a connection from a key not on the allow list is closed before any
 //!   frame is read.
 
@@ -24,9 +25,14 @@ use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use iroh::endpoint::{presets, Connection, PortmapperConfig, RecvStream, SendStream, VarInt};
+use iroh::dns::DnsResolver;
+use iroh::endpoint::{
+    presets, Builder, Connection, Incoming, PortmapperConfig, RecvStream, SendStream, VarInt,
+};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayMode, RelayUrl, SecretKey};
 use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, Semaphore};
+use tokio::time::timeout;
 
 /// The protocol's name in the connection handshake. A later, incompatible
 /// protocol takes a new number.
@@ -37,6 +43,12 @@ pub const MAX_FRAME: usize = 4 * 1024 * 1024;
 const HELLO_WAIT: Duration = Duration::from_secs(10);
 /// The close code for a key that isn't on the allow list.
 const CLOSE_NOT_ALLOWED: u32 = 1;
+/// The close code for a connection that opened no stream in time.
+const CLOSE_TOO_SLOW: u32 = 2;
+/// How long a connection has for its handshake, and then to open its stream.
+const ADMIT_WAIT: Duration = Duration::from_secs(10);
+/// How many connections may be on their way in at once, and wait to be taken.
+const PENDING_MAX: usize = 32;
 
 /// Which relay carries a connection two computers can't make directly.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,49 +114,64 @@ pub enum Frame {
     Changes { lines: Vec<String> },
 }
 
-/// This computer's endpoint. Dropping it closes every link.
+/// This computer's endpoint. [`Node::close`] closes it and every link.
 #[derive(Debug, Clone)]
 pub struct Node {
     endpoint: Endpoint,
     allowed: Arc<Mutex<HashSet<EndpointId>>>,
+    arrived: Arc<tokio::sync::Mutex<mpsc::Receiver<Link>>>,
+}
+
+/// The settings every endpoint shares, whatever its relay. iroh's default
+/// resolver falls back to public DNS servers when the system's fail, which
+/// would tell them a relay's name, so it is told not to.
+fn builder(secret: [u8; 32], relay: &Relay) -> Builder {
+    Endpoint::builder(presets::Minimal)
+        .secret_key(SecretKey::from_bytes(&secret))
+        .alpns(vec![ALPN.to_vec()])
+        .relay_mode(relay.mode())
+        .portmapper_config(PortmapperConfig::Disabled)
+        .dns_resolver(
+            DnsResolver::builder()
+                .with_system_defaults()
+                .disable_fallback()
+                .build(),
+        )
 }
 
 impl Node {
     /// Starts the endpoint with its 32-byte secret key. This is the first
     /// thing that touches the network.
     pub async fn start(secret: [u8; 32], relay: Relay) -> Result<Node, SyncError> {
-        let endpoint = Endpoint::builder(presets::Minimal)
-            .secret_key(SecretKey::from_bytes(&secret))
-            .alpns(vec![ALPN.to_vec()])
-            .relay_mode(relay.mode())
-            .portmapper_config(PortmapperConfig::Disabled)
+        let endpoint = builder(secret, &relay)
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node {
-            endpoint,
-            allowed: Arc::new(Mutex::new(HashSet::new())),
-        })
+        Ok(Node::around(endpoint))
     }
 
     /// Starts an endpoint on this computer's loopback address, with no relay:
     /// nothing leaves the computer. For tests.
     pub async fn start_loopback(secret: [u8; 32]) -> Result<Node, SyncError> {
-        let endpoint = Endpoint::builder(presets::Minimal)
-            .secret_key(SecretKey::from_bytes(&secret))
-            .alpns(vec![ALPN.to_vec()])
-            .relay_mode(RelayMode::Disabled)
-            .portmapper_config(PortmapperConfig::Disabled)
+        let endpoint = builder(secret, &Relay::None)
             .clear_ip_transports()
             .bind_addr(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
             .map_err(|e| fail("couldn't use the loopback address", e))?
             .bind()
             .await
             .map_err(|e| fail("couldn't start the live link", e))?;
-        Ok(Node {
+        Ok(Node::around(endpoint))
+    }
+
+    fn around(endpoint: Endpoint) -> Node {
+        let allowed = Arc::new(Mutex::new(HashSet::new()));
+        let (arrive, arrived) = mpsc::channel(PENDING_MAX);
+        tokio::spawn(accept_loop(endpoint.clone(), allowed.clone(), arrive));
+        Node {
             endpoint,
-            allowed: Arc::new(Mutex::new(HashSet::new())),
-        })
+            allowed,
+            arrived: Arc::new(tokio::sync::Mutex::new(arrived)),
+        }
     }
 
     /// This computer's key, as members' files name it.
@@ -208,30 +235,63 @@ impl Node {
         Ok(Link { conn, send, recv })
     }
 
-    /// Waits for the next member to connect. A key not on the allow list is
-    /// closed here and waiting goes on. `None` once the node is closed.
+    /// Waits for the next member to connect. Strangers never get here (see
+    /// [`accept_loop`]). `None` once the node is closed.
     pub async fn accept(&self) -> Option<Link> {
-        loop {
-            let incoming = self.endpoint.accept().await?;
-            let Ok(accepting) = incoming.accept() else {
-                continue;
-            };
-            let Ok(conn) = accepting.await else { continue };
-            if !self.is_allowed(&conn.remote_id()) {
-                conn.close(VarInt::from_u32(CLOSE_NOT_ALLOWED), b"not a member");
-                continue;
-            }
-            let Ok((send, recv)) = conn.accept_bi().await else {
-                continue;
-            };
-            return Some(Link { conn, send, recv });
-        }
+        self.arrived.lock().await.recv().await
     }
 
     /// Closes every link and the endpoint: this person turned live mode off,
     /// or the budget closed.
     pub async fn close(&self) {
         self.endpoint.close().await;
+    }
+}
+
+/// Takes connections as they come. Each is worked through on its own task,
+/// with a time limit, so a slow handshake or a silent member never keeps
+/// another member waiting; past [`PENDING_MAX`] at once, new ones are refused.
+async fn accept_loop(
+    endpoint: Endpoint,
+    allowed: Arc<Mutex<HashSet<EndpointId>>>,
+    arrive: mpsc::Sender<Link>,
+) {
+    let pending = Arc::new(Semaphore::new(PENDING_MAX));
+    while let Some(incoming) = endpoint.accept().await {
+        let Ok(permit) = pending.clone().try_acquire_owned() else {
+            incoming.refuse();
+            continue;
+        };
+        let allowed = allowed.clone();
+        let arrive = arrive.clone();
+        tokio::spawn(async move {
+            let _permit = permit;
+            if let Some(link) = admit(incoming, &allowed).await {
+                let _ = arrive.send(link).await;
+            }
+        });
+    }
+}
+
+/// A connection, once its handshake is done, its key is on the list and it
+/// has opened its stream, each in [`ADMIT_WAIT`].
+async fn admit(incoming: Incoming, allowed: &Mutex<HashSet<EndpointId>>) -> Option<Link> {
+    let accepting = incoming.accept().ok()?;
+    let conn = timeout(ADMIT_WAIT, accepting).await.ok()?.ok()?;
+    let on_list = allowed
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .contains(&conn.remote_id());
+    if !on_list {
+        conn.close(VarInt::from_u32(CLOSE_NOT_ALLOWED), b"not a member");
+        return None;
+    }
+    match timeout(ADMIT_WAIT, conn.accept_bi()).await {
+        Ok(Ok((send, recv))) => Some(Link { conn, send, recv }),
+        _ => {
+            conn.close(VarInt::from_u32(CLOSE_TOO_SLOW), b"too slow");
+            None
+        }
     }
 }
 
@@ -256,7 +316,7 @@ impl Link {
             budget: budget.to_string(),
         })
         .await?;
-        let theirs = tokio::time::timeout(HELLO_WAIT, self.recv())
+        let theirs = timeout(HELLO_WAIT, self.recv())
             .await
             .map_err(|_| SyncError::new("the other computer didn't answer"))??;
         match theirs {
