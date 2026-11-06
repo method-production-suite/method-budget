@@ -590,6 +590,30 @@ relayed or forwarded change can't be altered.
   of pulling `iroh-base` in early. To decide in phase 3.
 - All networking lives in a new crate (`method-sync`), never in `method-core`.
 
+**Measured 2026-11-05** (iroh 1.4.1, 15 days old, resolved against our lockfile in a
+scratch project; nothing added to the repo):
+
+| Check | Result |
+|---|---|
+| Size | A release binary that links an endpoint is 10.8 MB larger than one with tokio alone (macOS, Apple silicon, stripped, uncompressed). An upper bound: the app already carries part of it. The universal Mac app holds two copies, so about 21.5 MB there. For scale, 0.8.1's `.dmg` is 24.1 MB and its `.msi` 11.8 MB. Not measured inside the app. |
+| Build | 39 seconds for a clean release build of the scratch project, on this Mac. |
+| New crates | About 100 of the 242 in its normal dependency graph are not in our lockfile. It shares our `ed25519-dalek` 3.0.0, so the two-copies worry above is gone. |
+| Age | Seven crates were under 14 days; all moved back and the check passes. |
+| Advisories | Three, all needing work. tokio 1.53.1 fails RUSTSEC-2026-0386 once iroh turns on its `net` feature (our tokio doesn't enable `net`, and our own check passes today): 1.53.3 fixes it and is old enough. ctutils needs 0.4.4 or later for RUSTSEC-2026-0385, and 0.4.4 reaches 14 days on 2026-11-06. `paste` (RUSTSEC-2024-0436, unmaintained, no fix) comes through the Linux network crates and would need a listed reason in `deny.toml`. |
+| Licenses | Four crates fail `deny.toml`: `spez` (BSD-2-Clause), and `async_io_stream`, `pharos` and `ws_stream_wasm` (Unlicense), the last three not built on our desktop targets. Each needs the license allowed or the crate excluded, with a reason. |
+
+**The preset decides what leaves the computer.** iroh's `N0` preset does more than use
+n0's relays: it also publishes the endpoint's address to n0's DNS service and looks others
+up there. `N0DisableRelay` still publishes to that DNS service, with IP addresses instead
+of relay addresses. `Minimal` sets only the crypto provider, so an endpoint built from it
+publishes nothing unless we add it, and a relay can be set on its own. Members of a shared folder don't need the DNS service, since
+`presence.json` can carry the address, so the folder case can leave it out. That also
+puts each member's address into the shared folder, for the other members to read.
+
+**Public wording to change if this ships**: the README says the app goes online only to
+check for its own updates, and SUITE-STANDARDS section 5 allows other network use only for
+things the user turns on, each saying what it sends.
+
 ---
 
 ## 7. Security and permissions without a server
@@ -1080,7 +1104,8 @@ months in. Live mode about 1 to 1.5 months later.
 4. **Codes**: links and QR only over the internet, short codes on the same network only? A
    short code over the internet needs someone's lookup server (n0's or a third party's).
 5. **Relays**: n0's free public relays as the default (they see who talks to whom and IP
-   addresses, never content)? Or ask the user the first time?
+   addresses, never content)? Or ask the user the first time? (Put to the owner with the
+   measurements of section 6, 2026-11-05; see docs/ROADMAP.md, "Waiting on the owner".)
 6. **Encryption at rest** in the shared folder: wanted in the first release, later, or
    never?
 7. **Names in history**: signed history keeps whatever name each person typed, forever, in
