@@ -3,8 +3,17 @@
 
 [advisories]
 # Every advisory fails, unmaintained and unsound ones included, unless it is
-# listed here with the reason it does not apply.
+# listed here with the reason it does not apply. `unsound` says so out loud:
+# by default cargo-deny reports those only for a direct dependency.
+unsound = "all"
 ignore = [
+    # Unsound in one iterator; glib through Tauri's gtk on Linux. Our crates
+    # don't use it directly; calls inside Tauri and gtk weren't traced. Surfaced
+    # when `unsound` went to "all". Drop it when Tauri moves off it.
+    { id = "RUSTSEC-2024-0429", reason = "glib VariantStrIter: via Tauri's gtk crates, no direct use in ours, calls inside them not traced" },
+    # Unmaintained, no fix upstream; through iroh's network crates on Linux
+    # (netlink-packet-core). A build-time macro. Drop it when they move off it.
+    { id = "RUSTSEC-2024-0436", reason = "paste: build-time macro under iroh's Linux network crates" },
     # Unmaintained, no fix upstream; reached only through Tauri (gtk's macros on
     # Linux; urlpattern in tauri-utils). Drop each when Tauri moves off it.
     { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: build-time macro under Tauri's gtk crates" },
@@ -35,6 +44,15 @@ allow = [
     "MPL-2.0",
 ]
 confidence-threshold = 0.9
+# iroh only (crates/method-sync). The first three are its browser transport,
+# built only for WebAssembly, which method-sync never is; spez is a build-time
+# macro under a permissive license.
+exceptions = [
+    { allow = ["Unlicense"], crate = "async_io_stream" },
+    { allow = ["Unlicense"], crate = "pharos" },
+    { allow = ["Unlicense"], crate = "ws_stream_wasm" },
+    { allow = ["BSD-2-Clause"], crate = "spez" },
+]
 
 [bans]
 # Duplicate versions are common under Tauri; worth seeing, not worth failing.

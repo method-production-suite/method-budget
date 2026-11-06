@@ -3328,6 +3328,7 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
                      the read-only switch
   src/host/*.rs      each moved module's commands as the host dispatches them
 
+crates/method-sync/      the live link between members (decisions.md, entry 98): no app uses it yet
 crates/method-web/       the page in a browser: Host as WebAssembly (wasm32 only)
   src/web.rs         the JS API (wasm-bindgen): new Host(), dispatch, openMthd, saveMthd,
                      setReadOnly, hostInfo, commands(); the browser's clock
