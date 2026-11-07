@@ -4,7 +4,7 @@
 
 .modal.imp-dialog {
   width: 620px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(86vh - 16px);
 }
 
 .imp-scroll {
@@ -90,7 +90,7 @@
 /* New From Template's bundled charts of accounts, by group (src/coa_import.rs). */
 .modal.tpl-dialog {
   width: 560px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(86vh - 16px);
 }
 
 .tpl-charts {

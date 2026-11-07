@@ -911,6 +911,15 @@
   gap: 8px;
 }
 
+.share-live-row .share-line {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.share-live-row .share-line-value {
+  white-space: normal;
+}
+
 .share-live-sends {
   margin: 4px 0 8px;
   padding-left: 18px;

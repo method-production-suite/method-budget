@@ -1182,6 +1182,9 @@ table.grid {
   gap: 12px;
   width: 420px;
   max-width: calc(100vw - 32px);
+  /* The backdrop starts it 14vh down: a long dialog's buttons stay in reach. */
+  max-height: calc(86vh - 16px);
+  overflow-y: auto;
   padding: 18px;
   background: var(--surface);
   border: 1px solid var(--border);
