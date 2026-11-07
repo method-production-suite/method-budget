@@ -399,4 +399,48 @@ mod tests {
         assert!(sign_file_command(&file, &trusted, &sk, "pass").is_err());
         assert!(!r.root().join("dist/SHA256SUMS.minisig").exists());
     }
+
+    /// Through the command line the release runs, not just the functions: its
+    /// options are a list of their own (a rehearsal found `--file` missing).
+    #[test]
+    fn sign_file_and_verify_file_run_from_the_command_line() {
+        let (_, pk) = keygen("pass");
+        let r = TempRepo::new("sign-file-cli");
+        r.write("dist/SHA256SUMS", "abc  a-file\n");
+        let file = r.root().join("dist/SHA256SUMS");
+        let config = r.root().join("tauri.conf.json");
+        std::fs::write(
+            &config,
+            format!(
+                r#"{{"plugins":{{"updater":{{"pubkey":"{pk}","endpoints":["https://example.com/latest.json"]}}}}}}"#
+            ),
+        )
+        .unwrap();
+        let args = |cmd: &str| -> Vec<String> {
+            [
+                cmd,
+                "--root",
+                &r.root().to_string_lossy(),
+                "--file",
+                &file.to_string_lossy(),
+                "--config",
+                &config.to_string_lossy(),
+            ]
+            .map(String::from)
+            .to_vec()
+        };
+        // The option is read: what fails is the signature that isn't there yet.
+        let err = crate::run(&args("verify-file")).unwrap_err();
+        assert!(err.contains("SHA256SUMS.minisig"), "{err}");
+        let (sk, pk2) = keygen("pass");
+        sign_file_command(&file, &pk2, &sk, "pass").unwrap();
+        std::fs::write(
+            &config,
+            format!(
+                r#"{{"plugins":{{"updater":{{"pubkey":"{pk2}","endpoints":["https://example.com/latest.json"]}}}}}}"#
+            ),
+        )
+        .unwrap();
+        crate::run(&args("verify-file")).unwrap();
+    }
 }
