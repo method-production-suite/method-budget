@@ -291,6 +291,11 @@
   gap: 2px;
 }
 
+.share-person-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
 .share-person {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto auto;

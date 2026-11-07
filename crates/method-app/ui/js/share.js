@@ -58,6 +58,7 @@ let ctx = null;
 const st = {
   status: new Map(), // doc -> { status, at: Date.now() when received }
   panel: null, // the status panel, while open
+  following: null, // { actor, name, doc, at }, while following someone (Follow)
   popover: null, // a conflict popover, while open
   placeSent: '', // the last place reported to Rust, as JSON
   placeTimer: null,
@@ -72,6 +73,8 @@ const st = {
 const FLASH_MS = 1600;
 // How long the cursor rests on a cell before the others are told.
 const CELL_WAIT_MS = 120;
+// What stops Follow: anything this person does.
+const FOLLOW_STOPS = ['keydown', 'mousedown', 'wheel', 'touchstart'];
 
 export function initShare(context) {
   ctx = context;
@@ -112,8 +115,9 @@ function statusArrived(p) {
     if (locksChanged && typeof ctx.render === 'function') ctx.render();
     renderBar(ctx.view());
     decorateShare(ctx.view());
+    followOn(p.status);
     // Someone moving their cursor doesn't redraw the panel under this person.
-    const panelText = JSON.stringify({ ...p.status, people: p.status.people.map((q) => ({ ...q, cell: null })), me: null });
+    const panelText = JSON.stringify({ ...p.status, people: p.status.people.map((q) => ({ ...q, cell: !!q.cell })), me: null });
     if (st.panel && panelText !== st.panelText) drawPanel();
     st.panelText = panelText;
   }
@@ -690,7 +694,91 @@ function personRow(p, s) {
     el('span', { class: 'share-person-when', text: when }),
     p.role_text ? el('span', { class: 'share-person-role', text: p.role_text, title: p.role_text }) : null,
     signed ? el('span', { class: 'share-person-role share-person-signed', text: signed, title: signed }) : null,
+    !p.me && p.cell ? personActions(p) : null,
   );
+}
+
+function personActions(p) {
+  const go = el('button', {
+    class: 'btn',
+    text: t('share.go_there'),
+    attrs: { type: 'button' },
+    on: {
+      click: () => {
+        stopFollowing(false);
+        toggleStatusPanel();
+        goToCell(p.cell);
+      },
+    },
+  });
+  const follow = el('button', {
+    class: 'btn',
+    text: t('share.follow'),
+    attrs: { type: 'button' },
+    on: {
+      click: () => {
+        toggleStatusPanel();
+        startFollowing(p);
+      },
+    },
+  });
+  return el('span', { class: 'share-person-actions' }, go, follow);
+}
+
+// ---------------------------------------------------------------------------
+// Go there and Follow (design 9.3): my view moves only because I asked, and any
+// key, click or scroll of mine stops it.
+
+function goToCell(cell) {
+  if (!ctx || !cell) return;
+  if (cell.kind === 'row') {
+    ctx.jumpTo({ row_id: cell.key, account: cell.parent, field: cell.field });
+  } else if (cell.kind === 'account') {
+    ctx.jumpTo({ row_id: null, account: cell.key, field: cell.field });
+  } else if (cell.kind === 'category') {
+    ctx.jumpTo({ kind: 'category', category: cell.key });
+  }
+}
+
+function startFollowing(p) {
+  stopFollowing(false);
+  st.following = { actor: p.actor, name: p.name, doc: ctx.doc(), at: JSON.stringify(p.cell) };
+  for (const kind of FOLLOW_STOPS) window.addEventListener(kind, onFollowStop, true);
+  goToCell(p.cell);
+  ctx.toast(t('share.following', { name: p.name }));
+}
+
+function onFollowStop() {
+  stopFollowing(true);
+}
+
+function stopFollowing(say) {
+  const was = st.following;
+  if (!was) return;
+  st.following = null;
+  for (const kind of FOLLOW_STOPS) window.removeEventListener(kind, onFollowStop, true);
+  if (say && ctx) ctx.toast(t('share.stopped_following', { name: was.name }));
+}
+
+/** A new status while following: go where they went. A link that ended stops it. */
+function followOn(status) {
+  const f = st.following;
+  if (!f) return;
+  if (ctx.doc() !== f.doc || !status.live_on) {
+    stopFollowing(true);
+    return;
+  }
+  const p = status.people.find((q) => q.actor === f.actor);
+  if (!p) {
+    stopFollowing(true);
+    return;
+  }
+  // No cell: on something the grid can't name, or gone. Stay until they say more.
+  if (!p.cell) return;
+  const at = JSON.stringify(p.cell);
+  if (at === f.at || isModalOpen()) return;
+  f.at = at;
+  goToCell(p.cell);
 }
 
 /** An ISO 8601 UTC time as the local clock shows it. */

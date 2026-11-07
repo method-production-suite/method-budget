@@ -5533,7 +5533,9 @@ Design 9.3 has an outline with initials in the other person's cell, in live mode
   for any frame.
 - **The protocol's name moved** to `method-budget/sync/2`, because an older build can't read the
   new frame. Live changes haven't been released, so nobody is left behind.
-- **Not built.** Follow and tinted selections. A cell shows when the app's share timer next runs,
+- **Follow (added the same day).** Go there and Follow in the status panel move my view only
+  because I asked. Any key, click or scroll of mine stops Follow, and so does the link ending.
+- **Not built.** Tinted selections. A cell shows when the app's share timer next runs,
   so it is as quick as that timer, not instant.
 
 Tests: `a_cursor_crosses_the_link_and_stops_with_it`, `a_bad_cursor_from_a_link_is_dropped`,

@@ -2108,7 +2108,9 @@ and through a relay, which the tests can't cover.
 While linked, each person's cell in the budget grid has an outline in their color with their
 initials, for those looking at the same level of the budget. It says which cell, never a value; it
 goes over the link and never into the folder or the log. Nothing of theirs goes inside a cell
-being typed in, and my cursor, selection and scroll don't move. Follow isn't built.
+being typed in, and my cursor, selection and scroll don't move on their own. In the status panel,
+**Go there** takes me to that person's cell, and **Follow** keeps going where they go until I press
+a key, click or scroll ("Stopped following Jordan"), or the link ends.
 
 **Inviting someone** (decision 97; design 9.1). In the Share dialog, whoever may give roles
 sees **Invite someone**: what the person can do (the same roles as the People list, with
