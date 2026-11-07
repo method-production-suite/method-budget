@@ -520,7 +520,7 @@ major version.
   can be the actor key itself, or a separate key bound to it by a signed record (to
   decide in phase 3; both are ed25519, so whether iroh's key types can sign our changes
   directly is worth checking then).
-- A small protocol of our own on its own ALPN (`method-budget/sync/1`): hello (budget
+- A small protocol of our own on its own ALPN (`method-budget/sync/2`): hello (budget
   id, membership proof), exchange version vectors, send each other the missing changes
   by (actor, seq) range, then stream new changes as they are made. Presence and cursors
   go as QUIC datagrams, throttled to about 10 a second, never stored.

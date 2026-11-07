@@ -443,3 +443,100 @@ fn quitting_takes_the_address_out() {
         std::thread::sleep(Duration::from_millis(50));
     }
 }
+
+fn cell(key: &str) -> method_sync::Cell {
+    method_sync::Cell {
+        kind: "row".into(),
+        key: key.into(),
+        parent: Some("50-01".into()),
+        field: Some("rate".into()),
+    }
+}
+
+fn cell_seen(s: &Session, actor: ActorId) -> Option<method_sync::Cell> {
+    let status = s.shared().unwrap().status(Instant::now());
+    status
+        .people
+        .into_iter()
+        .find(|p| p.actor == actor.hex())
+        .and_then(|p| p.cell)
+}
+
+#[test]
+fn a_cursor_crosses_the_link_and_stops_with_it() {
+    let mut t = apart();
+    // Set before the link is up, so it goes when the link opens.
+    Two::doc(&mut t.alex).set_cell(Some(cell("7")));
+    t.linked();
+    t.until("the first cell", |t| {
+        cell_seen(&t.jordan, ALEX) == Some(cell("7"))
+    });
+    Two::doc(&mut t.alex).set_cell(Some(cell("8")));
+    t.until("the move", |t| {
+        cell_seen(&t.jordan, ALEX) == Some(cell("8"))
+    });
+    // It isn't in the heartbeat or the log.
+    let heartbeat = std::fs::read_to_string(presence(&t.alex_log, ALEX)).unwrap();
+    assert!(!heartbeat.contains("\"rate\""), "{heartbeat}");
+    Two::doc(&mut t.alex).set_cell(None);
+    t.until("the cell cleared", |t| cell_seen(&t.jordan, ALEX).is_none());
+    Two::doc(&mut t.alex).set_cell(Some(cell("9")));
+    t.until("the cell back", |t| cell_seen(&t.jordan, ALEX).is_some());
+    Two::doc(&mut t.alex).live_stop();
+    t.until("the link gone", |t| cell_seen(&t.jordan, ALEX).is_none());
+}
+
+#[test]
+fn a_bad_cursor_from_a_link_is_dropped() {
+    let mut t = apart();
+    t.linked();
+    Two::doc(&mut t.alex).set_cell(Some(cell("7")));
+    t.until("the first cell", |t| {
+        cell_seen(&t.jordan, ALEX) == Some(cell("7"))
+    });
+    // What this computer's own checks would refuse never leaves it, so the
+    // session's check on what arrives is covered by the same function.
+    let mut odd = cell("8");
+    odd.kind = "script".into();
+    Two::doc(&mut t.alex).set_cell(Some(odd));
+    let mut long = cell("9");
+    long.key = "x".repeat(201);
+    assert_eq!(Two::doc(&mut t.alex).cell(), None);
+    Two::doc(&mut t.alex).set_cell(Some(long));
+    assert_eq!(Two::doc(&mut t.alex).cell(), None);
+    t.until("the cell cleared", |t| cell_seen(&t.jordan, ALEX).is_none());
+}
+
+#[test]
+fn with_live_mode_off_a_cell_goes_nowhere() {
+    let mut t = apart();
+    Two::doc(&mut t.alex).set_cell(Some(cell("7")));
+    t.round(10);
+    t.round(20);
+    assert_eq!(cell_seen(&t.jordan, ALEX), None);
+    assert!(!Two::doc(&mut t.alex).live_on());
+}
+
+/// The moment someone is removed their cell is gone, before the link ends.
+#[test]
+fn a_removed_person_shows_no_cursor() {
+    let mut t = apart();
+    let key = |seed: u8| -> std::sync::Arc<dyn method_core::log::Signer> {
+        std::sync::Arc::new(method_format::log::sign::KeyPair::from_seed([seed; 32]))
+    };
+    Two::doc(&mut t.alex).use_key(key(1)).unwrap();
+    Two::doc(&mut t.jordan).use_key(key(2)).unwrap();
+    t.linked();
+    Two::doc(&mut t.alex)
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    t.until("Jordan's role at Jordan", |t| {
+        Two::doc(&mut t.jordan).log().roles_started()
+    });
+    Two::doc(&mut t.jordan).set_cell(Some(cell("7")));
+    t.until("Jordan's cell at Alex", |t| {
+        cell_seen(&t.alex, JORDAN) == Some(cell("7"))
+    });
+    Two::doc(&mut t.alex).remove_person(&JORDAN.hex()).unwrap();
+    assert_eq!(cell_seen(&t.alex, JORDAN), None);
+}

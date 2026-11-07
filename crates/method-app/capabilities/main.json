@@ -226,6 +226,7 @@
     "allow-share-live-start",
     "allow-share-live-stop",
     "allow-share-place",
+    "allow-share-cell",
     "allow-share-review",
     "allow-share-activity",
     "allow-share-blame",

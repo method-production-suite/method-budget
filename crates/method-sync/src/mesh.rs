@@ -23,7 +23,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout, MissedTickBehavior};
 
-use crate::{Frame, Link, Node, Relay, SyncError};
+use crate::{Cell, Frame, Link, Node, Relay, SyncError};
 
 /// How often a member with no link is tried again.
 pub const RETRY: Duration = Duration::from_secs(3);
@@ -51,6 +51,8 @@ pub enum Event {
     },
     /// The peer sent changes.
     Changes { peer: String, lines: Vec<String> },
+    /// The peer moved to this cell.
+    Cursor { peer: String, cell: Option<Cell> },
 }
 
 enum Cmd {
@@ -362,6 +364,10 @@ fn open_link(
                 Ok(Frame::Changes { lines }) => Event::Changes {
                     peer: peer.clone(),
                     lines,
+                },
+                Ok(Frame::Cursor { cell }) => Event::Cursor {
+                    peer: peer.clone(),
+                    cell,
                 },
                 Ok(Frame::Hello { .. }) => continue,
                 Err(_) => break,

@@ -5513,3 +5513,30 @@ number and make a large shared budget slow to open for everyone. MReview raised 
 Tests: `opening_a_folder_settles_every_claim_with_one_fold`, `one_read_settles_many_forgeries_with_one_fold`,
 `one_read_reports_what_the_fold_settled`, `one_read_refuses_a_fork_loudly`, and newcomers
 reading all at once in `signed_changes_and_removals_converge_in_any_order`.
+
+## 100. Live cursors: which cell, over the link only (2026-11-06)
+
+Design 9.3 has an outline with initials in the other person's cell, in live mode only.
+
+- **What goes.** A `Cursor` frame on the link names the cell the way the change log does: kind,
+  key, its parent and the field. Never a value. It isn't written to the folder or the log, and
+  it stops when the link does. The notice lists it under what live changes send.
+- **What arrives is checked.** It comes from another computer, so only the grid's four kinds and
+  names up to 200 bytes reach the page; anything else clears that person's cell. A person is
+  matched to a link by the computer id in their heartbeat, so a cell shows only for someone in
+  the budget and never for someone removed. It carries the link's trust, which is the folder's
+  (decision 98): someone who can write in the folder can point a member's name at their own
+  computer and show a false cursor. A cursor changes nothing, so this is accepted.
+- **Rate.** The page waits 120 ms after the cursor rests before telling the session, and the
+  session sends only when the cell changed. Datagrams, in the design, aren't used: the link's
+  stream carries it, so a slow link queues rather than drops, and a full queue closes the link as
+  for any frame.
+- **The protocol's name moved** to `method-budget/sync/2`, because an older build can't read the
+  new frame. Live changes haven't been released, so nobody is left behind.
+- **Not built.** Follow and tinted selections. A cell shows when the app's share timer next runs,
+  so it is as quick as that timer, not instant.
+
+Tests: `a_cursor_crosses_the_link_and_stops_with_it`, `a_bad_cursor_from_a_link_is_dropped`,
+`with_live_mode_off_a_cell_goes_nowhere`, `a_removed_person_shows_no_cursor`, and
+`a_cell_from_a_link_is_checked` on the check itself. Loopback only, in the session: the outline
+hasn't been seen in a real window, and no test has a hostile computer on the other end.

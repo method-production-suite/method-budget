@@ -142,6 +142,20 @@ pub fn share_status(
     Ok(s.shared().map(|sh| sh.status(Instant::now())))
 }
 
+/// The cursor moved to this cell (or to none).
+#[tauri::command]
+pub fn share_cell(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    cell: Option<method_sync::Cell>,
+) -> Result<(), String> {
+    let mut s = state.lock_doc(doc)?;
+    if let Some(sh) = s.shared_mut() {
+        sh.set_cell(cell);
+    }
+    Ok(())
+}
+
 /// What the Share dialog needs before sharing: this person's name and
 /// color, the budget's folder and file, and whether it can be shared.
 #[derive(Clone, Debug, Serialize)]
