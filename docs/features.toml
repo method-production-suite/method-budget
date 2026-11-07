@@ -266,6 +266,13 @@ status = "have"
 ref = ["D64", "D78", "D89", "D97"]
 
 [[feature]]
+group = "editor"
+title = "Live changes"
+text = "In a shared budget, anyone can turn on an encrypted link between their computers, off until they do: changes arrive within seconds, you can see which cell the others are on and follow them there, and a notice says what it sends before anything connects."
+status = "have"
+ref = ["D98", "D100"]
+
+[[feature]]
 group = "versions"
 title = "Named versions"
 text = "Save, rename, annotate and restore versions, all kept inside the budget file."
@@ -481,8 +488,8 @@ ref = "3.14"
 
 [[feature]]
 group = "versions"
-title = "Live sessions"
-text = "Several people in one budget at once without a shared folder, over an encrypted link between their computers."
+title = "Live sessions without a folder"
+text = "Several people in one budget at once with no shared folder at all, over the same encrypted link as live changes."
 status = "soon"
 ref = "3.18"
 
