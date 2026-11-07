@@ -24,8 +24,11 @@ this page goes ahead without waiting.
 
 - **The next release must not carry the Live changes switch until these are done** (3.18;
   D98). Main has it, so hold the release or take the row out of the status panel first.
-  (1) The two-computer test below passes. (2) The website repo's `apps/budget/index.html`
-  (MOrg's) no longer says the app goes online only for updates or that nothing is uploaded.
+  (1) The two-computer test below passes. (2) The owner's yes. The site's wording is done:
+  `site/index.html` is what the website copies at the release tag. The release also needs its
+  version bump and notes, and a rehearsal on that commit. Main at a5da96f rehearsed green at
+  0.8.1 on 2026-11-06 (run 42330724035); the draft job's signing of SHA256SUMS first runs on
+  a tag.
 - **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
   opens to an empty window on current Arch-based systems. Its new packaging tool also packages
   the macOS and Windows builds, so the rehearsal has to pass first.
