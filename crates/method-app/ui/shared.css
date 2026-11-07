@@ -291,6 +291,11 @@
   gap: 2px;
 }
 
+.share-person-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
 .share-person {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto auto;
@@ -904,6 +909,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.share-live-row .share-line {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.share-live-row .share-line-value {
+  white-space: normal;
 }
 
 .share-live-sends {

@@ -5,7 +5,7 @@
 
 .modal.si-dialog {
   width: 860px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(86vh - 16px);
 }
 
 .si-scroll {
