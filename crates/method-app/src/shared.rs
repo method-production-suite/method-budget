@@ -299,6 +299,8 @@ pub struct PersonDto {
     pub changes: u64,
     /// The cell they are on, over a live link (never for this person).
     pub cell: Option<Cell>,
+    /// A live link to their computer is open now (never for this person).
+    pub linked: bool,
     /// What they may change: "owner", "co_owner", "admin", "editor", "department",
     /// "actuals", "comment" or "read_only".
     pub role: String,
@@ -1269,6 +1271,21 @@ impl SharedDoc {
         live.cells.get(&id).cloned()
     }
 
+    /// A live link to this person's computer is open. Someone removed has none.
+    fn live_linked(&self, actor: ActorId) -> bool {
+        let Some(live) = self.live.as_ref() else {
+            return false;
+        };
+        if self.shared.log.removed(actor) {
+            return false;
+        }
+        self.people
+            .get(&actor)
+            .and_then(|p| p.live.as_deref())
+            .and_then(live_id)
+            .is_some_and(|id| live.linked.contains(&id))
+    }
+
     /// Who should be connected: members whose heartbeat gives an address and
     /// is recent, or who have a link open already. Never someone removed.
     fn live_peers(&self) -> BTreeMap<String, String> {
@@ -1720,6 +1737,7 @@ impl SharedDoc {
             },
             changes: self.shared.log.frontier().get(&actor),
             cell: if me { None } else { self.live_cell(actor) },
+            linked: !me && self.live_linked(actor),
             role: role.key().to_string(),
             role_text: if removed {
                 crate::i18n::phrase(&word("engine.role.removed"))

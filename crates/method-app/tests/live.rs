@@ -486,6 +486,28 @@ fn a_cursor_crosses_the_link_and_stops_with_it() {
     t.until("the link gone", |t| cell_seen(&t.jordan, ALEX).is_none());
 }
 
+fn linked_seen(s: &Session, actor: ActorId) -> bool {
+    let status = s.shared().unwrap().status(Instant::now());
+    status
+        .people
+        .into_iter()
+        .find(|p| p.actor == actor.hex())
+        .is_some_and(|p| p.linked)
+}
+
+/// Follow stops when the link ends, so each person says whether theirs is open.
+#[test]
+fn each_person_says_whether_their_link_is_open() {
+    let mut t = apart();
+    assert!(!linked_seen(&t.jordan, ALEX));
+    t.linked();
+    t.until("Alex linked at Jordan", |t| linked_seen(&t.jordan, ALEX));
+    Two::doc(&mut t.alex).live_stop();
+    t.until("Alex's link gone at Jordan", |t| {
+        !linked_seen(&t.jordan, ALEX)
+    });
+}
+
 #[test]
 fn a_bad_cursor_from_a_link_is_dropped() {
     let mut t = apart();
