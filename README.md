@@ -74,7 +74,7 @@ is a file you own.
   [specification](docs/FORMAT.md), so you can open them in twenty years, whatever happens
   to any vendor or to this project.
 - **Works offline.** Nothing is uploaded unless you share a budget, and then only where you
-  share it. The app goes online to check for its own updates, which you can turn off, and for
+  share it. The app goes online only to check for its own updates, which you can turn off, and for
   live changes in a shared budget, if you turn those on: they are off each time it opens, and
   a notice says what they send first.
 - **Nothing invents your numbers.** There is no generative AI in the app: every figure
