@@ -769,7 +769,8 @@ function followOn(status) {
     return;
   }
   const p = status.people.find((q) => q.actor === f.actor);
-  if (!p) {
+  // Gone, or their link ended (they quit, turned it off or dropped).
+  if (!p || !p.linked) {
     stopFollowing(true);
     return;
   }
