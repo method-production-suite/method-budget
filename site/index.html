@@ -355,7 +355,7 @@
         </details>
         <details class="group" id="g-editor">
           <summary>
-            <span class="group-head"><span class="group-title">Editing, split view and history</span> <span class="group-count">10</span></span>
+            <span class="group-head"><span class="group-title">Editing, split view and history</span> <span class="group-count">11</span></span>
             <span class="group-teaser">Keyboard-first grid, Type-ahead and add on the fly, Never lose work, and more</span>
           </summary>
           <ul class="feats">
@@ -369,6 +369,7 @@
             <li><strong>Notes</strong> Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.</li>
             <li><strong>Signed and notarized Mac app</strong> The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.</li>
             <li><strong>Work on a budget together</strong> Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.</li>
+            <li><strong>Live changes</strong> In a shared budget, anyone can turn on an encrypted link between their computers, off until they do: changes arrive within seconds, you can see which cell the others are on and follow them there, and a notice says what it sends before anything connects.</li>
           </ul>
         </details>
         <details class="group" id="g-versions">
@@ -446,7 +447,7 @@
         <ul class="feats">
           <li><strong>Windows and Linux, tested</strong> Installers for both are built today; printing, keys and file types still need a hands-on check.</li>
           <li><strong>Accessibility</strong> A full pass with screen readers and the keyboard, building on the grid's screen-reader support.</li>
-          <li><strong>Live sessions</strong> Several people in one budget at once without a shared folder, over an encrypted link between their computers.</li>
+          <li><strong>Live sessions without a folder</strong> Several people in one budget at once with no shared folder at all, over the same encrypted link as live changes.</li>
           <li><strong>Rate card lookup</strong> Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.</li>
         </ul>
       </section>
@@ -673,8 +674,18 @@
         <details>
           <summary>Where does my data live?</summary>
           <p>On your own computer, in files you save wherever you like. There is no account
-            and no cloud. The app goes online only to check for its own updates, which you can
-            turn off, and for live changes in a shared budget, if you turn those on.</p>
+            and no cloud. The app goes online only to check for its own updates, which you can turn
+            off, and for live changes in a shared budget, if you turn those on. They are off
+            each time the budget opens.</p>
+          <p>While they are on, your changes and the cell you are on go over an encrypted link
+            to the others who have them on, as well as through the folder as usual. So that
+            they can reach you, your computer's IP addresses go in the shared folder, where
+            the folder's hosting service can read them too. Your computer also tries to connect
+            to the addresses in the others' files in that folder.</p>
+          <p>You choose what happens when two computers can't connect directly: the free public
+            relay, your production's own relay, or none. With a relay chosen, your computer stays
+            connected to it while live changes are on, so it sees your IP address, and who you
+            are talking to when it carries the link. It never sees the budget.</p>
         </details>
         <details>
           <summary>What does it cost?</summary>
