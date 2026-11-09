@@ -17,7 +17,7 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-06. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-09. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
@@ -27,8 +27,9 @@ this page goes ahead without waiting.
   (1) The two-computer test below passes. (2) The owner's yes. The site's wording is done:
   `site/index.html` is what the website copies at the release tag. The release also needs its
   version bump and notes, and a rehearsal on that commit. Main at a5da96f rehearsed green at
-  0.8.1 on 2026-11-06 (run 42330724035); the draft job's signing of SHA256SUMS first runs on
-  a tag.
+  0.8.1 on 2026-11-06 (run 42330724035), before the site wording (#131) and Follow's stop
+  (#132), so the release commit gets its own rehearsal; the draft job's signing of SHA256SUMS
+  first runs on a tag.
 - **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
   opens to an empty window on current Arch-based systems. Its new packaging tool also packages
   the macOS and Windows builds, so the rehearsal has to pass first.
@@ -54,9 +55,9 @@ this page goes ahead without waiting.
   Accepted cost, measured 2026-11-05: about 100 new crates (about 92 without port mapping)
   and up to 10.8 MB per architecture uncompressed (about 21.5 MB in the universal Mac app).
   Built; never yet run beyond one computer. Hold it back from a release until the test
-  below passes. "Goes online only to check
-  for updates" changes when it ships, in the README, docs/APP.md, site/index.html and the
-  website's apps/budget/index.html.
+  below passes. The README, docs/APP.md and site/index.html now say the app also goes
+  online for live changes when they are on (#131); the website's apps/budget/index.html
+  follows at the release tag.
 
 - **A key put in the owner's name before the owner's app does: decided by the owner
   (2026-10-20)** (3.18; D89, D95): "build 3.18 options 1 and 3". Built (decision 95; design
@@ -275,7 +276,11 @@ the screen-reader check.
       person's link should end); quitting one (the others' link should end, and that computer's
       `presence.json` in the folder should have no `live` in it). Move the cursor on one and
       open the same account on the other: that cell should have an outline in the person's
-      color with their initials, moving as they do, and not while you type in it. Note anything that doesn't connect, and any firewall prompt.
+      color with their initials, moving as they do, and not while you type in it. In the status panel, click Go there on
+      the other person (your view moves to their cell), then Follow: your view should move
+      as they do, stop with "Stopped following …" at a key, click or scroll of yours, and
+      stop the same way when they quit or turn live changes off (no automated test covers
+      Follow's own stop; the page has no JavaScript test harness). Note anything that doesn't connect, and any firewall prompt.
 - [ ] **A screen reader in the app** (3.14; D82): with VoiceOver on (Cmd+F5), open the
       Field Station sample (`method-budget sample` writes it); click into the topsheet
       grid and arrow through it (each move should be spoken, with the cell's value, column
