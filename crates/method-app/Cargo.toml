@@ -18,7 +18,7 @@ name = "method-budget-app"
 path = "src/main.rs"
 
 [build-dependencies]
-tauri-build = { version = "=2.7.1", features = [] }
+tauri-build = { version = "=2.7.2", features = [] }
 # build.rs reads the updater's endpoint and key from tauri.conf.json (already
 # in the build through Tauri; nothing new).
 serde_json = "=1.0.151"
@@ -35,8 +35,8 @@ method-sync = { path = "../method-sync" }
 getrandom = "=0.3.4"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
-tauri = { version = "=2.11.6", default-features = false, features = ["wry", "common-controls-v6", "x11", "dbus"] }
-tauri-plugin-dialog = "=2.7.3"
+tauri = { version = "=2.12.2", default-features = false, features = ["wry", "common-controls-v6", "x11", "dbus"] }
+tauri-plugin-dialog = "=2.8.3"
 # The suite's shared updater (method-production-suite/method-libs), pinned to a
 # full commit: the check, the download and its minisign signature, the Mac
 # bundle swap and restart, and the update policy (src/updater.rs).
