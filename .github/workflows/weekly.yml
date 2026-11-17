@@ -96,6 +96,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential pkg-config libgtk-3-dev file
 
+      # scripts/site.py (run by scripts/check.sh) needs Python 3.11 or later for tomllib;
+      # ubuntu-22.04 ships 3.10.
+      - name: Python 3.12 (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
       - name: Add Rust targets
         if: matrix.target != ''
         shell: bash
