@@ -5545,3 +5545,20 @@ Linux build in one container, each on its own X display, sharing a folder, with 
 all three levels, stopping it with a key, and a typed change crossing. That is one computer and one
 network; real networks and a relay are still the owner's two-computer test. No test has a hostile
 computer on the other end.
+
+## 101. The legal line: no bundled rate data and no industry bid form (2026-11-17, the owner's decision)
+
+Roadmap 3.9 and 3.13. Decisions 90 and 92 built the machinery for both and left one question
+each with the owner: which public union rate sources may ship, and whether the industry bid
+form's layout may be reproduced. MOrg asked "Budget's legal line (bundled rate data and the
+industry bid form): keep both left out?", and the owner answered "yes" (relayed 2026-11-17).
+
+- **No rate data ships.** Not union rates, not samples, not an example table, in the app, the
+  packs folder or the templates. Rate tables stay what decision 90 made them: tables the user
+  keeps, typed in or imported from their own spreadsheet, in their budget, library and packs.
+  Rate packs from a separate data project stay out too (docs/research/rate-data-plan.md,
+  section 4, "The ethical and legal line").
+- **No industry bid form.** The app ships only its own plain example layout (decision 92).
+  Users make their own bid layouts, and nothing of the industry form is built or bundled.
+- **Nothing waits on it now.** Roadmap 3.9 and 3.13 stay [partial] only for their live checks
+  in the app. Reopening either needs a new decision from the owner.
