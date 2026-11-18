@@ -48,12 +48,14 @@ pub fn ot_apply<R: Runtime>(
         method_session::overtime::ot_apply(
             s,
             row_id,
-            &pattern,
-            &base_rate,
-            &hours_per_day,
-            days_per_week,
-            &period,
-            &write,
+            &ApplyForm {
+                pattern: &pattern,
+                base_rate: &base_rate,
+                hours_per_day: &hours_per_day,
+                days_per_week,
+                period: &period,
+                write: &write,
+            },
         )
     })
 }
