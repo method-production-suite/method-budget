@@ -195,21 +195,26 @@ pub fn preview(
     Ok(result_dto(&p, &r))
 }
 
+/// What the Overtime form sends to write a result into a line: the pattern,
+/// the three boxes it is worked out from, per day or week (`period`), and
+/// as the line's rate or one line per multiplier (`write`: "rate" or
+/// "split").
+#[derive(Debug, Clone, Copy)]
+pub struct ApplyForm<'a> {
+    pub pattern: &'a PatternDto,
+    pub base_rate: &'a str,
+    pub hours_per_day: &'a str,
+    pub days_per_week: u8,
+    pub period: &'a str,
+    pub write: &'a str,
+}
+
 /// Writes the result into line `row` (a pure budget edit).
-#[allow(clippy::too_many_arguments)]
-pub fn apply(
-    b: &mut Budget,
-    row: RowId,
-    pattern: &PatternDto,
-    base_rate: &str,
-    hours_per_day: &str,
-    days_per_week: u8,
-    period: &str,
-    write: &str,
-) -> EditResult<Vec<RowId>> {
-    let p = pattern.pattern(false)?;
-    let i = input(base_rate, hours_per_day, days_per_week)?;
-    overtime::apply(b, row, &p, &i, per(period)?, write_mode(write)?).map_err(|e| e.to_string())
+pub fn apply(b: &mut Budget, row: RowId, form: &ApplyForm<'_>) -> EditResult<Vec<RowId>> {
+    let p = form.pattern.pattern(false)?;
+    let i = input(form.base_rate, form.hours_per_day, form.days_per_week)?;
+    overtime::apply(b, row, &p, &i, per(form.period)?, write_mode(form.write)?)
+        .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -226,20 +231,9 @@ pub fn ot_calculate(
     preview(pattern, base_rate, hours_per_day, days_per_week)
 }
 
-/// Writes the overtime result into line `row_id`, as its rate or as one
-/// line per multiplier (`write`: "rate" or "split"), per day or week
-/// (`period`), as one undo step.
-#[allow(clippy::too_many_arguments)]
-pub fn ot_apply(
-    s: &mut Session,
-    row_id: RowId,
-    pattern: &PatternDto,
-    base_rate: &str,
-    hours_per_day: &str,
-    days_per_week: u8,
-    period: &str,
-    write: &str,
-) -> EditResult<Vec<RowId>> {
+/// Writes the overtime result into line `row_id` as `form` says, as one
+/// undo step.
+pub fn ot_apply(s: &mut Session, row_id: RowId, form: &ApplyForm<'_>) -> EditResult<Vec<RowId>> {
     let label = match crate::history::row_place(s.budget(), row_id) {
         Some((code, line)) => crate::messages::msg(
             "engine.undo.overtime_at",
@@ -247,18 +241,7 @@ pub fn ot_apply(
         ),
         None => crate::messages::word("engine.undo.overtime"),
     };
-    s.edit(label, |b| {
-        apply(
-            b,
-            row_id,
-            pattern,
-            base_rate,
-            hours_per_day,
-            days_per_week,
-            period,
-            write,
-        )
-    })
+    s.edit(label, |b| apply(b, row_id, form))
 }
 
 /// Saves a named overtime pattern: a new one, or in place of `replacing`
@@ -345,6 +328,18 @@ mod tests {
         assert!(per("month").is_err() && write_mode("both").is_err());
     }
 
+    /// The form at a 50 base rate, 14 hours a day, 5 days a week.
+    fn form<'a>(pattern: &'a PatternDto, period: &'a str, write: &'a str) -> ApplyForm<'a> {
+        ApplyForm {
+            pattern,
+            base_rate: "50",
+            hours_per_day: "14",
+            days_per_week: 5,
+            period,
+            write,
+        }
+    }
+
     #[test]
     fn writing_is_one_undo_step() {
         let mut s = Session::new();
@@ -352,18 +347,14 @@ mod tests {
         let before = s.budget().clone();
         let n = rows_in(s.budget(), id);
         let ids = s
-            .edit("Overtime", |b| {
-                apply(b, id, &crew(), "50", "14", 5, "day", "split")
-            })
+            .edit("Overtime", |b| apply(b, id, &form(&crew(), "day", "split")))
             .unwrap();
         assert_eq!(ids.len(), 3);
         assert_eq!(rows_in(s.budget(), id), n + 2);
         s.undo();
         assert_eq!(s.budget(), &before);
-        s.edit("Overtime", |b| {
-            apply(b, id, &crew(), "50", "14", 5, "week", "rate")
-        })
-        .unwrap();
+        s.edit("Overtime", |b| apply(b, id, &form(&crew(), "week", "rate")))
+            .unwrap();
         let rate = &crate::edit::details(s.budget())
             .find(|d| d.id == id)
             .unwrap()
@@ -374,12 +365,7 @@ mod tests {
             .edit("Overtime", |b| apply(
                 b,
                 999_999,
-                &crew(),
-                "50",
-                "14",
-                5,
-                "day",
-                "rate"
+                &form(&crew(), "day", "rate")
             ))
             .unwrap_err()
             .contains("no longer in the budget"));

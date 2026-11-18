@@ -15,12 +15,14 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
             o::ot_apply(
                 s,
                 a.row_id,
-                &a.pattern,
-                &a.base_rate,
-                &a.hours_per_day,
-                a.days_per_week,
-                &a.period,
-                &a.write,
+                &o::ApplyForm {
+                    pattern: &a.pattern,
+                    base_rate: &a.base_rate,
+                    hours_per_day: &a.hours_per_day,
+                    days_per_week: a.days_per_week,
+                    period: &a.period,
+                    write: &a.write,
+                },
             )
         }),
         "ot_save_pattern" => {
