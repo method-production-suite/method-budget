@@ -199,11 +199,17 @@ What the slice built, against the list this audit gave:
    described as "Fringes" keeps its words; left as they come are the formulas in the
    Amount, X, 4X and Rate notes, a rate's source, a flat fringe's Count and Fringe
    sentences, a charge's excluded accounts and why, and sentences of numbers only.
-   Still sentences: What Changed's
+   The overtime helper and renaming a setup item have codes too (2026-11-18,
+   `engine.overtime.*` and `engine.rename.*`): their own refusals, and method-core's
+   overtime and rename refusals, made in method-session in the same English
+   method-core writes (a test makes each one and compares), so the command line and
+   the browser print what they did. Still sentences: What Changed's
    change sentences and Merge's conflict sentences (method-core), method-core's formula
    parse and calculation errors (left out because their templates would win over the
-   message they sit in) and its other errors, method-format's import problems, and the method-session modules not yet
-   converted (overtime, rename, renumber).
+   message they sit in) and its other errors, method-format's import problems, and
+   renumbering's conflicts (a number that doesn't fit the new pattern carries
+   method-core's reason as free text, so it needs method-core to give reasons as codes
+   first).
 4. **The menu bar and native dialogs reading the same table**: the menu bar is built
    (`src/menu.rs` takes every item's words from `menu.<id>`, and its menus' names, the app
    menu, Open Recent, Autosave, Revert to Backup and Check for Updates from the same

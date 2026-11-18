@@ -4,11 +4,12 @@
 //! the command the tools panel calls from an item's editor, its right-click
 //! menu, and the Find tab.
 
-use method_core::rename::{self as core_rename, SetupKind};
+use method_core::rename::{self as core_rename, RenameError, SetupKind};
 use method_core::Budget;
 use serde::Serialize;
 
 use crate::edit::EditResult;
+use crate::messages::{msg, word};
 use crate::session::Session;
 use crate::view::View;
 
@@ -22,10 +23,49 @@ pub fn rename_item(
     from: &str,
     to: &str,
 ) -> EditResult<(String, usize)> {
-    let kind =
-        SetupKind::from_name(kind).ok_or_else(|| format!("unknown kind of item `{kind}`"))?;
-    let places = core_rename::rename(b, kind, from, to).map_err(|e| e.to_string())?;
+    let kind = SetupKind::from_name(kind)
+        .ok_or_else(|| msg("engine.setup.unknown_kind", &[("kind", &kind)]))?;
+    let places = core_rename::rename(b, kind, from, to).map_err(|e| rename_err(&e))?;
     Ok((to.trim().to_string(), places))
+}
+
+/// method-core's rename refusal in the catalog's words (decision 94): the
+/// same English it writes itself (tested), with a code the desktop can show
+/// in the person's language.
+pub(crate) fn rename_err(e: &RenameError) -> String {
+    match e {
+        RenameError::Missing { kind, name } => msg(
+            "engine.edit.item_gone",
+            &[("what", &kind_noun(kind.name())), ("name", name)],
+        ),
+        RenameError::Same => word("engine.rename.same"),
+        RenameError::BadName { kind, name } => match kind {
+            SetupKind::Global => msg("engine.edit.global_name", &[("name", name)]),
+            _ if name.is_empty() => msg(
+                "engine.rename.new_name_empty",
+                &[("what", &kind_noun(kind.name()))],
+            ),
+            _ => msg(
+                "engine.edit.name_comma",
+                &[("what", &kind_noun(kind.name()))],
+            ),
+        },
+        RenameError::Taken { kind, name } => match kind {
+            SetupKind::Currency => msg("engine.rename.currency_taken", &[("name", name)]),
+            _ => msg(
+                "engine.rename.taken",
+                &[("what", &kind_noun(kind.name())), ("name", name)],
+            ),
+        },
+        RenameError::InUse { kind, name, places } => msg(
+            "engine.rename.in_use",
+            &[
+                ("name", name),
+                ("count", places),
+                ("what", &kind_noun(kind.name())),
+            ],
+        ),
+    }
 }
 
 /// A kind of setup item as a step label names it ("fringe", "global"); an
@@ -90,6 +130,52 @@ mod tests {
     use super::*;
     use crate::session::Session;
     use method_core::{Detail, RowId};
+
+    /// Every refusal method-core's rename can give comes out in the same
+    /// English, recognized as a code, for every kind of item.
+    #[test]
+    fn every_rename_refusal_keeps_its_english_and_has_a_code() {
+        for &kind in SetupKind::ALL {
+            let name = "Crew".to_string();
+            let errors = [
+                RenameError::Missing {
+                    kind,
+                    name: name.clone(),
+                },
+                RenameError::Same,
+                RenameError::BadName {
+                    kind,
+                    name: "a,b".into(),
+                },
+                RenameError::BadName {
+                    kind,
+                    name: String::new(),
+                },
+                RenameError::Taken {
+                    kind,
+                    name: name.clone(),
+                },
+                RenameError::InUse {
+                    kind,
+                    name: name.clone(),
+                    places: 1,
+                },
+                RenameError::InUse {
+                    kind,
+                    name: name.clone(),
+                    places: 3,
+                },
+            ];
+            for e in errors {
+                let text = rename_err(&e);
+                assert_eq!(text, e.to_string(), "{kind:?}");
+                assert!(
+                    crate::messages::recognize(&text).is_some(),
+                    "{kind:?}: {text} has no code"
+                );
+            }
+        }
+    }
 
     fn first_line(b: &Budget) -> RowId {
         b.categories()
