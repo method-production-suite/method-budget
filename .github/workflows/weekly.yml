@@ -209,3 +209,21 @@ jobs:
           args=(bundle --bundles "$BUNDLES")
           if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
           cargo tauri "${args[@]}"
+
+  # A failed scheduled run opens one "Weekly build failed" issue (or comments on the open one),
+  # so a red week is seen (SUITE-STANDARDS section 6, the same in every repo). Runs started by
+  # hand report in the Actions tab only.
+  alert:
+    needs: [decide, build]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          n=$(gh issue list --state open --search 'in:title "Weekly build failed"' --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "Failed again: $RUN"; else gh issue create --title "Weekly build failed" --body "Run: $RUN"; fi

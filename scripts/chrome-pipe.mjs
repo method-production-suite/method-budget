@@ -86,9 +86,25 @@ export function launch(chrome, extraArgs = []) {
     try {
       out.write(`${JSON.stringify({ id: nextId++, method: 'Browser.close' })}\0`);
     } catch (_) {}
+    // Remove the profile once Chrome has exited: under load it can still be writing there
+    // after the kill, and a busy folder (ENOTEMPTY) is retried, then left with a warning
+    // rather than failing a run that passed.
+    const removeProfile = () => {
+      try {
+        rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      } catch (e) {
+        console.warn(`chrome-pipe: left the temporary profile ${profile} (${e.code || e.message})`);
+      }
+    };
     setTimeout(() => {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        removeProfile();
+        return;
+      }
+      proc.once('exit', removeProfile);
       proc.kill();
-      rmSync(profile, { recursive: true, force: true });
+      // A Chrome that ignores the request to quit is stopped outright.
+      setTimeout(() => proc.exitCode === null && proc.signalCode === null && proc.kill('SIGKILL'), 5000).unref();
     }, 500);
   };
   return { send, on: (h) => handlers.push(h), close, proc, stderr: () => stderr };

@@ -2562,9 +2562,9 @@ in no section, an account two sections take, a pick that takes nothing, a markup
 section that isn't there. Figures come from the engine (`bid_sheet`) as the layout
 changes. The layout is saved with the preset, so it goes wherever a preset goes: in the
 budget, through What Changed and Merge, Import Setup and the setup library; a preset that
-prints Bid with no layout prints the example. The bid prints in the base currency. Not yet: a ready-made
-layout of the industry bid form, which waits on the owner's legal-line answer (roadmap,
-"Legal line before building").
+prints Bid with no layout prints the example. The bid prints in the base currency. No ready-made
+layout of the industry bid form: the owner decided on 2026-11-17 that it stays out (roadmap,
+"Legal line: decided").
 
 **Print… and Save as PDF….****Print… and Save as PDF….** Print… opens the system print sheet with the orientation
 already set. Save as PDF… asks where to save and writes the PDF straight there, with no
@@ -3828,8 +3828,8 @@ selection, and the dialogs.
 
 The report setup's Bid layout group (decisions.md, entry 92) needs a live check in the app
 (it is checked headless in the browser build): ticking Bid, editing the lines, saving the
-preset and printing a bid to PDF. A ready-made layout of the industry bid form waits on
-the owner's legal-line answer.
+preset and printing a bid to PDF. A ready-made layout of the industry bid form stays out
+(the owner's decision of 2026-11-17).
 
 Rate tables (decisions.md, entry 90) need a live check in the app: the Rate Tables tab
 (typing a table, Save Table and Revert, Add unit…, the rail and its Library switch), the
