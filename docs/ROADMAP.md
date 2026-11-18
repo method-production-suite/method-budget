@@ -17,7 +17,7 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-17. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-18. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
@@ -29,9 +29,13 @@ this page goes ahead without waiting.
   version bump and notes, and a rehearsal on that commit. Main at a5da96f rehearsed green at
   0.8.1 on 2026-11-06 (run 42330724035), before the site wording (#131) and Follow's stop
   (#132), so the release commit gets its own rehearsal; the draft job's signing of SHA256SUMS
-  first runs on a tag. The two waiting dependency bumps, Dependabot #106 (tauri 2.12) and
-  #121 (tokio, serde_json, getrandom), go through MReview and land before that rehearsal
-  (the owner, 2026-11-17, relayed by MOrg: "agreed make it so").
+  first runs on a tag. The dependency bumps landed first, as the owner asked (2026-11-17,
+  relayed by MOrg: "agreed make it so"): #106 (tauri 2.12) and #139 (tokio, serde_json,
+  getrandom; it replaced #121) are on main at 9b160d1 (2026-11-18).
+- **The next release's version** (asked through MOrg, 2026-11-18). Recommended: 0.9.0, since
+  live sessions are a feature; 0.8.2 if it should read as a fix release. Main is still at
+  0.8.1, so a rehearsal now would only rebuild that number: the version bump and notes come
+  first (a release PR, reviewed by MReview before merge), then the rehearsal on that commit.
 - **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
   opens to an empty window on current Arch-based systems. Its new packaging tool also packages
   the macOS and Windows builds, so the rehearsal has to pass first.
