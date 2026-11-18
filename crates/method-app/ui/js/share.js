@@ -356,7 +356,7 @@ function drawPanel() {
   if (s.waiting) rows.push(line(t('share.panel.waiting'), String(s.waiting), 'is-warn'));
   if (typeof s.synced_secs === 'number') rows.push(line(t('share.panel.folder_read'), ago(s.synced_secs + extra)));
   rows.push(line(t('share.panel.changes'), String(s.changes)));
-  rows.push(liveRow(s));
+  if (LIVE_CHANGES_SHOWN) rows.push(liveRow(s));
   const people = el('div', { class: 'share-people-list' });
   people.append(personRow(s.me, s));
   for (const p of s.people) people.append(personRow(p, s));
@@ -374,6 +374,13 @@ function drawPanel() {
   rows.push(actions);
   panel.replaceChildren(...rows);
 }
+
+/**
+ * Whether the status panel shows the Live changes row. Held back for 0.9.0 by
+ * the owner (2026-11-18) until the two-computer test; set to true to bring the
+ * row back. Without the row nothing can turn live changes on.
+ */
+const LIVE_CHANGES_SHOWN = false;
 
 /** Live changes: whether they are on here, with the switch. */
 function liveRow(s) {
