@@ -38,7 +38,9 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = resolve(process.argv[2] || join(process.env.CARGO_TARGET_DIR || join(REPO, 'target'), 'web'));
 const SAMPLE = join(REPO, 'fixtures', 'field-station', 'field-station.mthd');
 const SAMPLE_PATH = '/smoke-sample.mthd';
-const TIMEOUT_MS = 90_000;
+// The whole run normally takes well under a minute; the margin is for a loaded machine
+// (90 s timed out twice at a load average over 30, 2026-11-08).
+const TIMEOUT_MS = 180_000;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
