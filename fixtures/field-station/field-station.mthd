@@ -3190,6 +3190,24 @@
             "kind": "budget"
           },
           "round_account_totals": true,
+          "info": {
+            "Prep start": {
+              "kind": "date",
+              "value": "2027-04-05"
+            },
+            "Shoot end": {
+              "kind": "date",
+              "value": "2027-05-26"
+            },
+            "Shoot start": {
+              "kind": "date",
+              "value": "2027-05-03"
+            },
+            "Wrap end": {
+              "kind": "date",
+              "value": "2027-06-09"
+            }
+          },
           "currencies": {
             "EUR": {
               "description": "Euro",
