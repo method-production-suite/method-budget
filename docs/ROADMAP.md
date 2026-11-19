@@ -17,25 +17,23 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-18. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-19. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **The next release must not carry the Live changes switch until these are done** (3.18;
-  D98). Main has it, so hold the release or take the row out of the status panel first.
-  (1) The two-computer test below passes. (2) The owner's yes. The site's wording is done:
-  `site/index.html` is what the website copies at the release tag. The release also needs its
-  version bump and notes, and a rehearsal on that commit. Main at a5da96f rehearsed green at
-  0.8.1 on 2026-11-06 (run 42330724035), before the site wording (#131) and Follow's stop
-  (#132), so the release commit gets its own rehearsal; the draft job's signing of SHA256SUMS
-  first runs on a tag. The dependency bumps landed first, as the owner asked (2026-11-17,
-  relayed by MOrg: "agreed make it so"): #106 (tauri 2.12) and #139 (tokio, serde_json,
-  getrandom; it replaced #121) are on main at 9b160d1 (2026-11-18).
-- **The next release's version** (asked through MOrg, 2026-11-18). Recommended: 0.9.0, since
-  live sessions are a feature; 0.8.2 if it should read as a fix release. Main is still at
-  0.8.1, so a rehearsal now would only rebuild that number: the version bump and notes come
-  first (a release PR, reviewed by MReview before merge), then the rehearsal on that commit.
+- **0.9.0 waits on MReview's merge, then the rehearsal, then the owner's yes on that
+  commit.** The owner answered through MOrg (2026-11-18): "0.9.0, hide the row", and of the
+  headline, "Yes, use it". #141 bumps to 0.9.0, holds the Live changes row back
+  (`LIVE_CHANGES_SHOWN` in share.js), drops the live sections from the notes and moves
+  Live changes to the roadmap on the README and site. After MReview merges it, the release
+  workflow rehearses that merge commit and the run goes to MOrg; the tag waits for the
+  owner's yes on that exact commit. The dependency bumps landed first, as the owner asked:
+  #106 (tauri 2.12) and #139 (tokio, serde_json, getrandom) are on main at 9b160d1.
+- **Live changes come back after the two-computer test below** (3.18; D98) and the owner's
+  yes. To bring them back: set `LIVE_CHANGES_SHOWN` to true, set the feature's status in
+  docs/features.toml to "have", and restore the offline wording in the README and the
+  site's FAQ (the parent of #141's b94bac0 has it).
 - **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
   opens to an empty window on current Arch-based systems. Its new packaging tool also packages
   the macOS and Windows builds, so the rehearsal has to pass first.
