@@ -74,9 +74,7 @@ is a file you own.
   [specification](docs/FORMAT.md), so you can open them in twenty years, whatever happens
   to any vendor or to this project.
 - **Works offline.** Nothing is uploaded unless you share a budget, and then only where you
-  share it. The app goes online only to check for its own updates, which you can turn off, and for
-  live changes in a shared budget, if you turn those on: they are off each time it opens, and
-  a notice says what they send first.
+  share it. The app goes online only to check for its own updates, which you can turn off.
 - **Nothing invents your numbers.** There is no generative AI in the app: every figure
   comes from what you typed and the rules you set.
 
@@ -141,7 +139,6 @@ this section.
 - **Notes.** Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.
 - **Signed and notarized Mac app.** The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.
 - **Work on a budget together.** Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.
-- **Live changes.** In a shared budget, anyone can turn on an encrypted link between their computers, off until they do: changes arrive within seconds, you can see which cell the others are on and follow them there, and a notice says what it sends before anything connects.
 
 ### Versions, compare, diff and merge
 
@@ -189,6 +186,7 @@ this section.
 
 ### On the roadmap
 
+- **Live changes in a shared budget.** An encrypted link between the computers sharing a budget, off until each person turns it on: changes arrive within seconds, and you can see which cell the others are on.
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Accessibility.** A full pass with screen readers and the keyboard, building on the grid's screen-reader support.
 - **Live sessions without a folder.** Several people in one budget at once with no shared folder at all, over the same encrypted link as live changes.

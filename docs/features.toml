@@ -267,9 +267,9 @@ ref = ["D64", "D78", "D89", "D97"]
 
 [[feature]]
 group = "editor"
-title = "Live changes"
-text = "In a shared budget, anyone can turn on an encrypted link between their computers, off until they do: changes arrive within seconds, you can see which cell the others are on and follow them there, and a notice says what it sends before anything connects."
-status = "have"
+title = "Live changes in a shared budget"
+text = "An encrypted link between the computers sharing a budget, off until each person turns it on: changes arrive within seconds, and you can see which cell the others are on."
+status = "soon"
 ref = ["D98", "D100"]
 
 [[feature]]
