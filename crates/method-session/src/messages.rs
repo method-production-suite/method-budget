@@ -159,6 +159,7 @@ pub const MESSAGES: &[Message] = &[
     m("engine.days.bad_global", "{name} can't be a global name: use letters, digits and _, with at least one letter or _."),
     m("engine.days.bad_global_of", "{label}: {name} can't be a global name: use letters, digits and _, with at least one letter or _."),
     m("engine.days.claimed", "{globals} were all set from this figure before; only {kept} is offered here, the others are left as they are."),
+    plural("engine.days.dates_set", "Filled in {count} date from the schedule.", "Filled in {count} dates from the schedule."),
     m("engine.days.found_by_words", "Found by its description only (set before keys were recorded); setting it again records its key."),
     m("engine.days.goes_too", "{other} goes to {global} too."),
     m("engine.days.goes_too_of", "{label}: {other} goes to {global} too."),

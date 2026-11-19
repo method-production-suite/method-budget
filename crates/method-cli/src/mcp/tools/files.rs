@@ -251,14 +251,17 @@ pub fn tools() -> Vec<Tool> {
                 global's formula now and the new value, and what changes. Shoot days in all go \
                 to SHOOT_DAYS; any other figure only when picked (pick: its key, and global to \
                 name the global, else its default name); globals an earlier import set are \
-                picked again, and skip leaves one out. Prep and wrap are never touched. Applies \
+                picked again, and skip leaves one out. Prep and wrap day counts are never \
+                touched. The file's dates (keys date:prep_start, date:shoot_start, \
+                date:shoot_end, date:wrap_end) fill in the budget information fields of those \
+                names the budget doesn't have yet; picking one replaces a field it has. Applies \
                 as one undoable change unless dry_run.",
             mutating: true,
             destructive: false,
             schema: || {
                 let pick = object(
                     vec![
-                        ("key", s::text("A figure's key, as the review lists it.")),
+                        ("key", s::text("A figure's or date's key, as the review lists it.")),
                         ("global", s::name("The global to set (default: the figure's default name).")),
                     ],
                     &["key"],
@@ -898,17 +901,21 @@ pub(crate) fn schedule_summary(
     dry_run: bool,
 ) -> String {
     let picked = review.figures.iter().filter(|f| f.picked).count();
+    let dates = review.dates.iter().filter(|d| d.picked).count();
     let what = match message {
         Some(m) => m.to_string(),
-        None if picked == 0 => "Nothing is picked; nothing changed.".into(),
+        None if picked == 0 && dates == 0 => "Nothing is picked; nothing changed.".into(),
         None if !review.problems.is_empty() => format!("Refused: {}", review.problems.join(" ")),
         None if !review.can_apply => format!(
             "The {} already set from this schedule; nothing changed.",
             count_words(picked, "picked global is", "picked globals are")
         ),
         None if dry_run => format!(
-            "Dry run: would set {} new and {} changed globals ({} already match); nothing changed.",
-            review.adds, review.updates, review.same
+            "Dry run: would set {} new and {} changed globals ({} already match) and fill in {}; nothing changed.",
+            review.adds,
+            review.updates,
+            review.same,
+            count_words(review.date_sets, "date", "dates")
         ),
         None => "Nothing changed.".into(),
     };

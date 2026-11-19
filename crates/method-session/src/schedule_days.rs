@@ -31,9 +31,17 @@
 //!   is set to 0 only when picked. Remembering the file's `days_hash` would
 //!   need a new field in the budget file; that is proposed in the roadmap's
 //!   3.8 notes and not done here.
+//! - **Dates.** The file's prep start, shoot start, shoot end and wrap end,
+//!   where it has them, go to the budget information fields of those names
+//!   (the ones New Budget fills, decisions.md entry 63), keyed `date:prep_start`,
+//!   `date:shoot_start`, `date:shoot_end` and `date:wrap_end`. A field the
+//!   budget doesn't have yet is picked to start with; one it has with another
+//!   date only when the person picks it, so a date typed in by hand is never
+//!   replaced unasked.
 //! - **The review** lists every figure with its global, the global's value
-//!   now, the new value and what changes; **applying** sets the picked
-//!   globals (and their sources) as one undo step.
+//!   now, the new value and what changes, then the dates the same way;
+//!   **applying** sets the picked globals (and their sources) and dates as
+//!   one undo step.
 //!
 //! Bytes in, no file system: the desktop, the browser build, the command
 //! line and the MCP server all call these.
@@ -41,7 +49,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use method_core::{recalc, Budget, RecalcOptions};
+use method_core::{recalc, Budget, InfoValue, RecalcOptions};
 use method_format::import::schedule::{self, ScheduleDays, SHOOT_DAYS_GLOBAL};
 use serde::{Deserialize, Serialize};
 
@@ -431,6 +439,75 @@ pub struct FigureRow {
     pub changed: bool,
 }
 
+/// One of the file's dates, with the budget information field it would set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DateRow {
+    /// `date:prep_start`, `date:shoot_start`, `date:shoot_end` or
+    /// `date:wrap_end`.
+    pub key: &'static str,
+    /// The budget information field: `Prep start`, `Shoot start`, `Shoot
+    /// end` or `Wrap end`.
+    pub field: &'static str,
+    /// The field's value now, `None` when the budget doesn't have it.
+    pub current: Option<String>,
+    /// The file's date, `YYYY-MM-DD`.
+    pub new: String,
+    /// `add` (a new field), `update` (a new date) or `same`.
+    pub action: &'static str,
+    pub picked: bool,
+}
+
+/// The file's dates by key and budget information field, each with the date
+/// when the file has it.
+pub(crate) fn schedule_dates(
+    days: &ScheduleDays,
+) -> [(&'static str, &'static str, Option<&str>); 4] {
+    let sd = &days.shoot_days;
+    [
+        ("date:prep_start", "Prep start", sd.prep_start.as_deref()),
+        ("date:shoot_start", "Shoot start", Some(sd.start.as_str())),
+        ("date:shoot_end", "Shoot end", sd.end.as_deref()),
+        ("date:wrap_end", "Wrap end", sd.wrap_end.as_deref()),
+    ]
+}
+
+/// A budget information value in words, as the review shows it.
+fn info_words(v: &InfoValue) -> String {
+    match v {
+        InfoValue::Text(t) | InfoValue::Date(t) => t.clone(),
+        InfoValue::Number(n) => n.to_string(),
+    }
+}
+
+/// The dates the file has, against budget `b`. `chosen`: the picked keys,
+/// `None` for the defaults (a field the budget doesn't have yet).
+fn date_rows(b: &Budget, days: &ScheduleDays, chosen: Option<&BTreeSet<&str>>) -> Vec<DateRow> {
+    schedule_dates(days)
+        .into_iter()
+        .filter_map(|(key, field, date)| {
+            let new = date.map(str::trim).filter(|d| !d.is_empty())?.to_string();
+            let now = b.info.get(field);
+            let action = match now {
+                None => "add",
+                Some(InfoValue::Date(d)) if d.trim() == new => "same",
+                Some(_) => "update",
+            };
+            let picked = match chosen {
+                Some(c) => c.contains(key),
+                None => action == "add",
+            };
+            Some(DateRow {
+                key,
+                field,
+                current: now.map(info_words),
+                new,
+                action,
+                picked,
+            })
+        })
+        .collect()
+}
+
 /// The review: the file, every figure, and what applying would do.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Review {
@@ -454,6 +531,10 @@ pub struct Review {
     pub adds: usize,
     pub updates: usize,
     pub same: usize,
+    /// The file's dates, with the budget information fields they would set.
+    pub dates: Vec<DateRow>,
+    /// Picked dates that fill in or change a field.
+    pub date_sets: usize,
     /// Globals an earlier import set that the schedule has changed since.
     pub changed: Vec<String>,
     /// Why applying is refused, if it is.
@@ -591,9 +672,21 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
             .collect(),
     };
 
+    let dates_chosen: Option<BTreeSet<&str>> = picks.map(|p| {
+        p.iter()
+            .map(|p| p.key.as_str())
+            .filter(|k| k.starts_with("date:"))
+            .collect()
+    });
+    let dates = date_rows(b, days, dates_chosen.as_ref());
     let mut problems = Vec::new();
     for key in chosen.keys() {
-        if !figs.iter().any(|f| f.key == *key) {
+        let known = if key.starts_with("date:") {
+            dates.iter().any(|d| d.key == *key)
+        } else {
+            figs.iter().any(|f| f.key == *key)
+        };
+        if !known {
             problems.push(msg("engine.days.no_figure", &[("key", key)]));
         }
     }
@@ -667,7 +760,12 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
         .filter(|r| r.changed)
         .map(|r| r.global.clone())
         .collect();
-    let can_apply = problems.is_empty() && picked().any(|r| r.action != "same" || !r.linked);
+    let date_sets = dates
+        .iter()
+        .filter(|d| d.picked && d.action != "same")
+        .count();
+    let can_apply =
+        problems.is_empty() && (picked().any(|r| r.action != "same" || !r.linked) || date_sets > 0);
     Review {
         token: 0,
         file: String::new(),
@@ -686,6 +784,8 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
         adds,
         updates,
         same,
+        dates,
+        date_sets,
         changed,
         problems,
         can_apply,
@@ -703,7 +803,9 @@ pub fn picks_with(
     skip: &[String],
 ) -> Result<Vec<Pick>, String> {
     let start = review(b, days, None);
-    let has = |k: &str| start.figures.iter().any(|f| f.key == k);
+    let has = |k: &str| {
+        start.figures.iter().any(|f| f.key == k) || start.dates.iter().any(|d| d.key == k)
+    };
     for k in add.iter().map(|(k, _)| k).chain(skip) {
         if !has(k) {
             return Err(msg(
@@ -720,6 +822,16 @@ pub fn picks_with(
             key: f.key.clone(),
             global: String::new(),
         })
+        .chain(
+            start
+                .dates
+                .iter()
+                .filter(|d| d.picked && !skip.iter().any(|k| k == d.key))
+                .map(|d| Pick {
+                    key: d.key.to_string(),
+                    global: String::new(),
+                }),
+        )
         .collect();
     for (key, global) in add {
         let global = global.clone().unwrap_or_default();
@@ -743,14 +855,32 @@ pub struct Applied {
     pub updated: Vec<String>,
     /// Globals already at their value (now linked to the figure).
     pub same: Vec<String>,
+    /// Budget information fields given the file's date.
+    pub dates: Vec<String>,
 }
 
 impl Applied {
     /// The sentence an import ends with.
     pub fn message(&self) -> String {
+        let dates = (!self.dates.is_empty())
+            .then(|| msg("engine.days.dates_set", &[("count", &self.dates.len())]));
+        let globals = self.globals_message();
+        match (globals, dates) {
+            (Some(g), Some(d)) => format!("{g} {d}"),
+            (Some(g), None) => g,
+            (None, Some(d)) => d,
+            (None, None) => String::new(),
+        }
+    }
+
+    /// The sentence about the globals, `None` when none was picked.
+    fn globals_message(&self) -> Option<String> {
         let set = self.added.len() + self.updated.len();
+        if set == 0 && self.same.is_empty() {
+            return None;
+        }
         if set == 0 {
-            return msg("engine.days.all_match", &[("count", &self.same.len())]);
+            return Some(msg("engine.days.all_match", &[("count", &self.same.len())]));
         }
         let mut s = if self.added.is_empty() {
             msg("engine.days.set", &[("count", &set)])
@@ -767,15 +897,15 @@ impl Applied {
                 &[("count", &self.same.len())],
             ));
         }
-        s
+        Some(s)
     }
 }
 
 /// Sets the picked globals in `b` as the review says, with each one's setup
-/// source naming the figure. A new global gets the figure as its
-/// description (and the Day unit when the budget has one). Refused, with
-/// `b` unchanged, when the review has a problem or a global can't take the
-/// value.
+/// source naming the figure, and the picked dates in the budget information.
+/// A new global gets the figure as its description (and the Day unit when
+/// the budget has one). Refused, with `b` unchanged, when the review has a
+/// problem or a global or field can't take the value.
 pub fn apply(
     b: &mut Budget,
     days: &ScheduleDays,
@@ -826,7 +956,20 @@ pub fn apply(
             _ => done.same.push(row.global.clone()),
         }
     }
-    if done.added.is_empty() && done.updated.is_empty() && done.same.is_empty() {
+    for d in r.dates.iter().filter(|d| d.picked && d.action != "same") {
+        let input = crate::edit::InfoInput {
+            kind: "date".into(),
+            value: d.new.clone(),
+        };
+        crate::edit::set_info(&mut next, d.field, &input)
+            .map_err(|e| format!("{}: {e}", d.field))?;
+        done.dates.push(d.field.to_string());
+    }
+    if done.added.is_empty()
+        && done.updated.is_empty()
+        && done.same.is_empty()
+        && done.dates.is_empty()
+    {
         return Err(word("engine.days.nothing_picked"));
     }
     *b = next;
@@ -1128,6 +1271,8 @@ mod tests {
         let picks = [
             pick("total", ""),
             pick("location:Pine Hollow camp", "CAMP_DAYS"),
+            pick("date:shoot_start", ""),
+            pick("date:shoot_end", ""),
         ];
         apply(&mut b, &days(), Some(&picks)).unwrap();
         // The same file again: picked again by the link, nothing to change.
@@ -1318,12 +1463,160 @@ mod tests {
             p,
             [
                 pick("total", "DAYS"),
+                pick("date:shoot_start", ""),
+                pick("date:shoot_end", ""),
                 pick("location:Pine Hollow camp", "CAMP_DAYS")
             ]
         );
-        let p = picks_with(&b, &days(), &[], &["total".into()]).unwrap();
+        let p = picks_with(
+            &b,
+            &days(),
+            &[],
+            &[
+                "total".into(),
+                "date:shoot_start".into(),
+                "date:shoot_end".into(),
+            ],
+        )
+        .unwrap();
         assert!(p.is_empty());
+        // The file has no prep start, so there is nothing to pick.
+        assert!(picks_with(&b, &days(), &[("date:prep_start".into(), None)], &[]).is_err());
         assert!(picks_with(&b, &days(), &[("set:NOPE".into(), None)], &[]).is_err());
+    }
+
+    fn date_row<'a>(r: &'a Review, key: &str) -> &'a DateRow {
+        r.dates.iter().find(|d| d.key == key).unwrap()
+    }
+
+    fn set_date(b: &mut Budget, field: &str, date: &str) {
+        let input = crate::edit::InfoInput {
+            kind: "date".into(),
+            value: date.into(),
+        };
+        crate::edit::set_info(b, field, &input).unwrap();
+    }
+
+    #[test]
+    fn the_files_dates_fill_in_the_budget_information_a_typed_one_stays() {
+        let mut b = budget();
+        // A shoot start typed in by hand, and a shoot end already right.
+        set_date(&mut b, "Shoot start", "2027-02-22");
+        set_date(&mut b, "Shoot end", "2027-03-05");
+        let every = read(
+            "every.json",
+            include_bytes!("../../method-format/tests/fixtures/schedule/every-field-days.json"),
+        )
+        .unwrap();
+        let r = review(&b, &every, None);
+        let rows: Vec<(&str, &str, Option<&str>, &str, &str, bool)> = r
+            .dates
+            .iter()
+            .map(|d| {
+                (
+                    d.key,
+                    d.field,
+                    d.current.as_deref(),
+                    d.new.as_str(),
+                    d.action,
+                    d.picked,
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                (
+                    "date:prep_start",
+                    "Prep start",
+                    None,
+                    "2027-01-18",
+                    "add",
+                    true
+                ),
+                (
+                    "date:shoot_start",
+                    "Shoot start",
+                    Some("2027-02-22"),
+                    "2027-03-01",
+                    "update",
+                    false
+                ),
+                (
+                    "date:shoot_end",
+                    "Shoot end",
+                    Some("2027-03-05"),
+                    "2027-03-09",
+                    "update",
+                    false
+                ),
+                ("date:wrap_end", "Wrap end", None, "2027-03-26", "add", true),
+            ]
+        );
+        assert_eq!(r.date_sets, 2);
+        // Applying the defaults fills in the two missing dates only.
+        let mut after = b.clone();
+        let done = apply(&mut after, &every, None).unwrap();
+        assert_eq!(done.dates, ["Prep start", "Wrap end"]);
+        assert_eq!(
+            after.info.get("Shoot start"),
+            Some(&InfoValue::Date("2027-02-22".into())),
+            "a typed date is never replaced unasked"
+        );
+        assert_eq!(
+            after.info.get("Prep start"),
+            Some(&InfoValue::Date("2027-01-18".into()))
+        );
+        // Picked, the typed date takes the schedule's.
+        let picks = [pick("date:shoot_start", "")];
+        let r = review(&b, &every, Some(&picks));
+        assert!(date_row(&r, "date:shoot_start").picked);
+        assert!(!date_row(&r, "date:prep_start").picked);
+        assert!(r.can_apply && r.problems.is_empty());
+        let mut only = b.clone();
+        let done = apply(&mut only, &every, Some(&picks)).unwrap();
+        assert_eq!(
+            (done.added.len(), done.updated.len(), done.dates.as_slice()),
+            (0, 0, ["Shoot start".to_string()].as_slice())
+        );
+        assert_eq!(done.message(), "Filled in 1 date from the schedule.");
+        assert_eq!(
+            only.info.get("Shoot start"),
+            Some(&InfoValue::Date("2027-03-01".into()))
+        );
+        assert_eq!(only.globals, b.globals, "no global picked, none set");
+    }
+
+    #[test]
+    fn a_date_already_right_or_missing_from_the_file_isnt_offered_to_set() {
+        let mut b = budget();
+        set_date(&mut b, "Shoot start", "2027-03-01");
+        // A field of another kind with that name is changed only when picked.
+        crate::edit::set_info(
+            &mut b,
+            "Shoot end",
+            &crate::edit::InfoInput {
+                kind: "text".into(),
+                value: "early March".into(),
+            },
+        )
+        .unwrap();
+        let r = review(&b, &days(), None);
+        // Kettle Lake has no prep start or wrap end.
+        let keys: Vec<&str> = r.dates.iter().map(|d| d.key).collect();
+        assert_eq!(keys, ["date:shoot_start", "date:shoot_end"]);
+        let start = date_row(&r, "date:shoot_start");
+        assert_eq!((start.action, start.picked), ("same", false));
+        let end = date_row(&r, "date:shoot_end");
+        assert_eq!(
+            (end.current.as_deref(), end.action, end.picked),
+            (Some("early March"), "update", false)
+        );
+        assert_eq!(r.date_sets, 0);
+        // A date the file doesn't have, picked anyway, is a problem.
+        let r = review(&b, &days(), Some(&[pick("date:wrap_end", "")]));
+        assert_eq!(r.problems, ["The file has no figure date:wrap_end."]);
+        assert!(!r.can_apply);
     }
 
     #[test]
@@ -1350,11 +1643,19 @@ mod tests {
             (1, "kettle.json", 5)
         );
         let (_, msg) = schedule_days_apply(&state, &sources, None, r.token, None).unwrap();
-        assert_eq!(msg, "Set 1 global from the schedule.");
+        assert_eq!(
+            msg,
+            "Set 1 global from the schedule. Filled in 2 dates from the schedule."
+        );
         let mut s = state.lock_doc(None).unwrap();
         assert_eq!(s.budget().globals["SHOOT_DAYS"].0, "5");
+        assert_eq!(
+            s.budget().info.get("Shoot end"),
+            Some(&InfoValue::Date("2027-03-05".into()))
+        );
         s.undo();
         assert_eq!(s.budget().globals["SHOOT_DAYS"].0, "25");
+        assert!(!s.budget().info.contains_key("Shoot end"), "one undo step");
         assert_eq!(s.budget(), &budget());
         drop(s);
         sources.keep("other.json".into(), days());

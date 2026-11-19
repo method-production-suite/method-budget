@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use method_format::serde_json::{self, json, Value};
-use method_session::schedule_days::{self as sd, FigureRow, Review};
+use method_session::schedule_days::{self as sd, DateRow, FigureRow, Review};
 
 use crate::cli::{load, save, CliError, Flags, Outcome};
 
@@ -24,7 +24,11 @@ pub const USAGE: &str =
       name one with =GLOBAL to update it. Globals an earlier import set are
       picked again; --skip KEY leaves one out. A global set from a figure the
       file no longer has is listed as linked:GLOBAL at 0 days, unpicked: only
-      --pick linked:GLOBAL sets it to 0. Prep and wrap are never touched. Nothing is written unless --apply,
+      --pick linked:GLOBAL sets it to 0. Prep and wrap day counts are never
+      touched. The file's dates (date:prep_start, date:shoot_start,
+      date:shoot_end, date:wrap_end) fill in the budget information fields of
+      those names the budget doesn't have yet; --pick date:KEY replaces one it
+      has, --skip date:KEY leaves one out. Nothing is written unless --apply,
       which saves the budget atomically. --json prints the review as JSON.
       Exit 3 when a pick is refused.
 ";
@@ -87,7 +91,9 @@ pub fn run(args: &[String]) -> Outcome {
             let _ = writeln!(out, "{m}");
             let _ = writeln!(out, "wrote {path}");
         }
-        None => out.push_str("dry run: nothing written (pass --apply to set the globals)\n"),
+        None => {
+            out.push_str("dry run: nothing written (pass --apply to set the globals and dates)\n")
+        }
     }
     Ok(out)
 }
@@ -194,10 +200,44 @@ pub fn describe(r: &Review) -> String {
             }
         }
     }
+    let picked: Vec<&DateRow> = r.dates.iter().filter(|d| d.picked).collect();
+    if !picked.is_empty() {
+        s.push_str("dates:\n");
+        for d in picked {
+            let was = match (&d.current, d.action) {
+                (None, _) => "new".to_string(),
+                (Some(_), "same") => "already set".to_string(),
+                (Some(c), _) => format!("was {c}"),
+            };
+            let _ = writeln!(s, "  {} = {} ({was})  [{}]", d.field, d.new, d.key);
+        }
+    }
+    let rest: Vec<&DateRow> = r.dates.iter().filter(|d| !d.picked).collect();
+    if !rest.is_empty() {
+        s.push_str("dates not picked (--pick KEY to set one):\n");
+        for d in rest {
+            let _ = writeln!(
+                s,
+                "  {}  {}: {}{}",
+                d.key,
+                d.field,
+                d.new,
+                match (&d.current, d.action) {
+                    (Some(_), "same") => " (already set)".to_string(),
+                    (Some(c), _) => format!(" (now {c})"),
+                    (None, _) => String::new(),
+                }
+            );
+        }
+    }
     let _ = writeln!(
         s,
-        "{} new, {} changed, {} already set",
-        r.adds, r.updates, r.same
+        "{} new, {} changed, {} already set; {} date{} to fill in",
+        r.adds,
+        r.updates,
+        r.same,
+        r.date_sets,
+        if r.date_sets == 1 { "" } else { "s" }
     );
     s
 }
