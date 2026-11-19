@@ -1509,48 +1509,23 @@ mod tests {
         )
         .unwrap();
         let r = review(&b, &every, None);
-        let rows: Vec<(&str, &str, Option<&str>, &str, &str, bool)> = r
+        let rows: Vec<String> = r
             .dates
             .iter()
             .map(|d| {
-                (
-                    d.key,
-                    d.field,
-                    d.current.as_deref(),
-                    d.new.as_str(),
-                    d.action,
-                    d.picked,
+                format!(
+                    "{} {} {:?} {} {} {}",
+                    d.key, d.field, d.current, d.new, d.action, d.picked
                 )
             })
             .collect();
         assert_eq!(
             rows,
             [
-                (
-                    "date:prep_start",
-                    "Prep start",
-                    None,
-                    "2027-01-18",
-                    "add",
-                    true
-                ),
-                (
-                    "date:shoot_start",
-                    "Shoot start",
-                    Some("2027-02-22"),
-                    "2027-03-01",
-                    "update",
-                    false
-                ),
-                (
-                    "date:shoot_end",
-                    "Shoot end",
-                    Some("2027-03-05"),
-                    "2027-03-09",
-                    "update",
-                    false
-                ),
-                ("date:wrap_end", "Wrap end", None, "2027-03-26", "add", true),
+                "date:prep_start Prep start None 2027-01-18 add true",
+                "date:shoot_start Shoot start Some(\"2027-02-22\") 2027-03-01 update false",
+                "date:shoot_end Shoot end Some(\"2027-03-05\") 2027-03-09 update false",
+                "date:wrap_end Wrap end None 2027-03-26 add true",
             ]
         );
         assert_eq!(r.date_sets, 2);
