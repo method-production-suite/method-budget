@@ -328,6 +328,11 @@ mod tests {
             include_str!("../ui/js/apply.js"),
             include_str!("../ui/js/setup.js"),
             include_str!("../ui/js/topsheet-setup.js"),
+            include_str!("../ui/js/topsheet-setup-common.js"),
+            include_str!("../ui/js/topsheet-setup-incentives.js"),
+            include_str!("../ui/js/topsheet-setup-info.js"),
+            include_str!("../ui/js/topsheet-setup-settings.js"),
+            include_str!("../ui/js/topsheet-setup-baseline.js"),
             include_str!("../ui/js/renumber.js"),
             include_str!("../ui/js/display-settings.js"),
             // The Currency tab's base and totals currency band.
