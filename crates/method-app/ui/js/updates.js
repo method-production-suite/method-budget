@@ -33,6 +33,8 @@ export const TEXT = {
   // were universal again in 0.6, or anything that isn't a Mac).
   'no-build': t('updates.no_build'),
   'install-failed': t('updates.install_failed'),
+  // The new copy's code signature isn't this app's: not installed.
+  'install-refused': t('updates.install_refused'),
 };
 
 const PHASES = new Set(['idle', 'checking', 'downloading', 'ready', 'installing']);
@@ -60,7 +62,7 @@ export function view(status, said) {
     case 'ready':
       return {
         hidden: false,
-        text: said === 'install-failed' ? TEXT['install-failed'] : '',
+        text: said === 'install-failed' || said === 'install-refused' ? TEXT[said] : '',
         button: { label: TEXT.ready, disabled: false },
         tip: t('updates.ready_tip', { version: v }),
       };
@@ -73,7 +75,7 @@ export function view(status, said) {
     default:
       break;
   }
-  if (said && said !== 'install-failed') return { hidden: false, text: TEXT[said], button: null, tip: '' };
+  if (said && said !== 'install-failed' && said !== 'install-refused') return { hidden: false, text: TEXT[said], button: null, tip: '' };
   return { hidden: true, text: '', button: null, tip: '' };
 }
 

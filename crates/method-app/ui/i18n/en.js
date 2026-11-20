@@ -4938,6 +4938,7 @@ export default {
   "updates.downloading": "Downloading the update…",
   "updates.failed": "Couldn’t check for updates",
   "updates.install_failed": "Couldn’t install the update. Try again in a moment.",
+  "updates.install_refused": "This update wasn’t installed: the new copy isn’t signed as Method Budget. Your copy is unchanged. Download the latest version from methodproduction.com instead.",
   "updates.installing": "Restarting to update…",
   "updates.no_build": "There’s no update for this computer yet. This version stays as it is.",
   "updates.no_notes": "There are no release notes for this version.",
