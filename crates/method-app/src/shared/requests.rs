@@ -151,8 +151,15 @@ impl SharedDoc {
         RequestDto {
             actor: actor.hex(),
             name_taken,
-            // Applied changes only: a refused one still moves the frontier.
-            new_here: !self.shared.log.changes().any(|c| c.actor == actor),
+            // Applied changes that do more than publish a key: a refused
+            // one still moves the frontier, and a key alone can be someone
+            // else's, put in first.
+            new_here: !self.shared.log.changes().any(|c| {
+                c.actor == actor
+                    && c.ops
+                        .iter()
+                        .any(|op| !matches!(op, method_core::log::Op::Key { .. }))
+            }),
             removed: self.shared.log.removed(actor),
             no_key: self.shared.log.signing_started() && self.shared.log.key_of(actor).is_none(),
             code: self.request_code(actor),

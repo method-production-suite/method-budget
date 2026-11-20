@@ -3820,6 +3820,7 @@ export default {
   "share.requests.asks_about": "{name} asks for access to {codes}",
   "share.requests.badge": {"one": "{count} asking", "other": "{count} asking"},
   "share.requests.check_message": "Something about this request is worth checking first. Ask {name}, in person or by phone, whether their computer code is {code}.",
+  "share.requests.check_message_no_key": "No key in {name}’s name is in this budget yet, so there’s no code to compare. Allow only if you’re sure the request is theirs, or wait until their computer’s code shows here.",
   "share.requests.check_title": "Allow {name}?",
   "share.requests.code": "Computer code {code}",
   "share.requests.decline": "Decline",

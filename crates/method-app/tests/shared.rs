@@ -1469,6 +1469,7 @@ fn a_requests_code_comes_from_the_key() {
         .unwrap();
     assert!(!r.no_key);
     assert_eq!(r.code, method_app::shared::key_code(&theirs.public()));
+    assert!(r.new_here, "a key alone doesn't make a computer known here");
 
     // Jordan's own request: both sides show the code of Jordan's key, and
     // it isn't the stranger's.

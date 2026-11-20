@@ -628,7 +628,7 @@ function requestRows(s) {
         if (toCheck) {
           const yes = await confirmDialog({
             title: t('share.requests.check_title', { name: r.name }),
-            message: t('share.requests.check_message', { name: r.name, code: r.code }),
+            message: r.code ? t('share.requests.check_message', { name: r.name, code: r.code }) : t('share.requests.check_message_no_key', { name: r.name }),
             confirmText: t('share.requests.allow'),
           });
           if (!yes) return;
