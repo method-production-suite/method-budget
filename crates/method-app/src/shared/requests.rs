@@ -135,7 +135,8 @@ impl SharedDoc {
         RequestDto {
             actor: actor.hex(),
             name_taken,
-            new_here: self.shared.log.frontier().get(&actor) == 0,
+            // Applied changes only: a refused one still moves the frontier.
+            new_here: !self.shared.log.changes().any(|c| c.actor == actor),
             code: computer_code(actor),
             name,
             color: self.color_of(actor),

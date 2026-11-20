@@ -478,16 +478,24 @@ pub struct RequestDto {
     pub name_taken: bool,
     /// No change of theirs is in the budget yet: a computer new to it.
     pub new_here: bool,
-    /// A short code for the computer asking, from its id ("3fa9 c1d2"): the
-    /// asker sees the same code on their own request, so the two can compare.
+    /// A code for the computer asking ("3fa9 c1d2 07be 5e41"): the asker
+    /// sees the same code on their own request, so the two can compare.
     pub code: String,
 }
 
-/// A computer's short code, as people compare it out loud: the first eight
-/// hex characters of its id, in two groups.
+/// A computer's code, as people compare it out loud: the first 16 hex
+/// characters of the SHA-256 of its whole id, in four groups. A hash, not
+/// the id's own first characters, so matching another computer's code takes
+/// about 2^64 tries, whatever id is chosen.
 pub fn computer_code(actor: ActorId) -> String {
-    let hex = actor.hex();
-    format!("{} {}", &hex[..4], &hex[4..8])
+    let hex = method_core::log::hash::sha256_hex(&actor.0);
+    format!(
+        "{} {} {} {}",
+        &hex[..4],
+        &hex[4..8],
+        &hex[8..12],
+        &hex[12..16]
+    )
 }
 
 /// How long a note on an access request may be, in characters.

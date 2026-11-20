@@ -1350,6 +1350,19 @@ fn a_request_under_a_members_name_is_flagged() {
         at: planted.at.clone(),
     });
     dir.write_presence(stranger, &planted).unwrap();
+    // A refused change under the new id moves its frontier, but it is still
+    // a computer new to the budget: only applied changes count.
+    let refused = method_core::log::Change {
+        actor: stranger,
+        seq: 1,
+        deps: Default::default(),
+        lamport: 1,
+        time: "2026-11-20T00:00:00Z".into(),
+        label: "planted".into(),
+        ops: vec![],
+        sig: None,
+    };
+    dir.write_segment(&[refused]).unwrap();
     tick_at(&mut alex, 60);
     let st = alex.shared().unwrap().status(Instant::now());
     let r = st
@@ -1359,8 +1372,15 @@ fn a_request_under_a_members_name_is_flagged() {
         .expect("the request is listed");
     assert_eq!(r.name, "Jordan Lee");
     assert!(r.name_taken, "another person here is Jordan Lee");
+    assert_eq!(
+        alex.shared().unwrap().log().frontier().get(&stranger),
+        1,
+        "the refused change took its number"
+    );
     assert!(r.new_here, "no change of theirs is in the budget");
-    assert_eq!(r.code, "0808 0808");
+    assert_eq!(r.code, method_app::shared::computer_code(stranger));
+    assert_eq!(r.code.len(), 19, "16 hex characters in four groups");
+    assert_ne!(r.code, method_app::shared::computer_code(JORDAN));
 
     // Jordan's own request: the name is theirs alone, and they see the
     // same code the owner does.

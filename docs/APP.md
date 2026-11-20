@@ -2084,9 +2084,10 @@ it names, the note, and **Allow**, **Allow 2400 Grip only** (that person edits t
 categories or accounts, added to the ones they have; not offered when Allow gives just that
 already, as it does for a request from a muted cell) and **Decline**. Allow records the role
 through the same path as the Share dialog's Set, so it is checked and signed like any role
-change. Each request also shows the asking computer's code ("Computer code 3fa9 c1d2", from
-its sharing id; the asker sees the same code on their own request), and says so when the name
-is also another person's in the budget or when the computer hasn't made a change in it yet.
+change. Each request also shows the asking computer's code ("Computer code 3fa9 c1d2 07be
+5e41", from a hash of its sharing id; the asker sees the same code on their own request), and
+says so when the name is also another person's in the budget or when the computer hasn't made a
+change in it yet.
 Check the code with the person before allowing a request like that. Decline
 is remembered on the computer that declined (beside its sharing id, in
 `~/.method/declined-requests/`, never in the shared folder) and changes nothing in the
