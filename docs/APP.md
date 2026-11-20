@@ -2812,12 +2812,19 @@ anything changes:
   `RIDGE_DAYS` is the fire road location's days, so the RIDGE set defaults to
   `RIDGE_DAYS_2`). An element's days
   are its day out of days total. Prep and wrap globals are never touched.
-- **What Set Globals does**: how many globals are new, change or already match, and
-  anything refused (a name that can't be a global, two figures in one global), which keeps
-  Set Globals off.
+- **Dates**: the file's prep start, shoot start, shoot end and wrap end, where it has
+  them, each with the budget information field of that name (the fields New Budget fills),
+  the field's value now and the file's date. A field the budget doesn't have yet is ticked
+  to start; one it has with another date (or another kind of value) only when ticked by
+  hand, so a date typed in is never replaced unasked; one already at that date has nothing
+  to do. The command line and MCP tool call them `date:prep_start`, `date:shoot_start`,
+  `date:shoot_end` and `date:wrap_end`.
+- **What Set Globals does**: how many globals are new, change or already match, how many
+  dates are filled in, and anything refused (a name that can't be a global, two figures in
+  one global), which keeps Set Globals off.
 
 **Set Globals** applies it as one undo step ("Set globals from the schedule Field
-Station"); the toast says how many globals were set. A new global gets the figure as its
+Station"), dates included; the toast says how many globals were set and dates filled in. A new global gets the figure as its
 description ("Shoot days at location Cold Spring field station") and the Day unit when the
 budget has one. Each global set records its figure in its source (the setup source packs
 use, so the file format is unchanged), with the figure's key: "Shoot days at location Cold

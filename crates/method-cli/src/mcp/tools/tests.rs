@@ -1621,7 +1621,11 @@ fn globals_from_a_schedules_days() {
         )
         .unwrap();
     assert_eq!(r["applied"], true);
-    assert_eq!(r["message"], "Set 2 globals from the schedule (1 new).");
+    // The file's four dates fill in the budget information it doesn't have.
+    assert_eq!(
+        r["message"],
+        "Set 2 globals from the schedule (1 new). Filled in 4 dates from the schedule."
+    );
     assert_ne!(net(&mut f, "film.mthd"), before);
     let g = f
         .tool("list_globals", json!({"path": "film.mthd"}))
@@ -1658,7 +1662,8 @@ fn globals_from_a_schedules_days() {
     let r = f
         .tool(
             "schedule_days",
-            json!({"path": "film.mthd", "file": "days.json", "skip": ["total"]}),
+            json!({"path": "film.mthd", "file": "days.json",
+                   "skip": ["total", "date:prep_start", "date:shoot_start", "date:shoot_end", "date:wrap_end"]}),
         )
         .unwrap();
     assert_eq!(r["applied"], false);

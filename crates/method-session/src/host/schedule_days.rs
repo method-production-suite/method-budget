@@ -84,6 +84,31 @@ mod tests {
             (&total["global"], &total["picked"], &total["new"]),
             (&json!("SHOOT_DAYS"), &json!(true), &json!("18"))
         );
+        // The file's dates, each with the budget information field it fills.
+        let dates: Vec<(String, String, bool)> = r["dates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| {
+                (
+                    d["key"].as_str().unwrap().to_string(),
+                    d["action"].as_str().unwrap().to_string(),
+                    d["picked"].as_bool().unwrap(),
+                )
+            })
+            .collect();
+        let keys: Vec<&str> = dates.iter().map(|d| d.0.as_str()).collect();
+        assert_eq!(
+            keys,
+            [
+                "date:prep_start",
+                "date:shoot_start",
+                "date:shoot_end",
+                "date:wrap_end"
+            ]
+        );
+        assert!(dates.iter().all(|d| d.1 == "add" && d.2), "{dates:?}");
+        assert_eq!(r["date_sets"], 4);
         let picks = json!([
             {"key": "total"},
             {"key": "location:Cold Spring field station", "global": "STATION_DAYS"},
@@ -97,6 +122,8 @@ mod tests {
             (r2["adds"].clone(), r2["updates"].clone()),
             (json!(1), json!(1))
         );
+        // Picks that leave the dates out fill none in.
+        assert_eq!(r2["date_sets"], 0);
         let done = call(
             &h,
             "schedule_days_apply",

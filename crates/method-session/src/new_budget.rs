@@ -156,17 +156,6 @@ pub fn bring_in(b: &mut Budget, ticked: &[Ticked]) -> Result<SetupBrought, Strin
     Ok(done)
 }
 
-/// The budget info fields a linked schedule's dates go to, with each date.
-fn schedule_dates(days: &ScheduleDays) -> [(&'static str, Option<&str>); 4] {
-    let sd = &days.shoot_days;
-    [
-        ("Prep start", sd.prep_start.as_deref()),
-        ("Shoot start", Some(sd.start.as_str())),
-        ("Shoot end", sd.end.as_deref()),
-        ("Wrap end", sd.wrap_end.as_deref()),
-    ]
-}
-
 /// New Budget's **Link a Schedule…** (roadmap 3.19 with 3.8; decisions.md,
 /// entries 76 and 91): a schedule days file's shoot days in all go to
 /// `SHOOT_DAYS`, linked to the schedule as File > Import Schedule Days links
@@ -178,22 +167,10 @@ fn schedule_dates(days: &ScheduleDays) -> [(&'static str, Option<&str>); 4] {
 /// what came in.
 pub fn link_schedule(b: &mut Budget, days: &ScheduleDays) -> Result<String, String> {
     let mut next = b.clone();
-    crate::schedule_days::apply(&mut next, days, None)?;
-    let mut dates = 0;
-    for (name, value) in schedule_dates(days) {
-        let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
-            continue;
-        };
-        if next.info.contains_key(name) {
-            continue;
-        }
-        let input = crate::edit::InfoInput {
-            kind: "date".into(),
-            value: value.to_string(),
-        };
-        crate::edit::set_info(&mut next, name, &input).map_err(|e| format!("{name}: {e}"))?;
-        dates += 1;
-    }
+    // The defaults: shoot days in all, and the dates the budget has no
+    // field for yet (a date typed into the form stays).
+    let done = crate::schedule_days::apply(&mut next, days, None)?;
+    let dates = done.dates.len();
     *b = next;
     let title = days.schedule.trim();
     let from = if title.is_empty() {

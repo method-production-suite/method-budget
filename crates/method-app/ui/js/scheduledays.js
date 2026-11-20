@@ -8,8 +8,10 @@
 //   locations, weeks, then the elements by category), each with the global
 //   it would set, that global's value now and the new one. The page only
 //   keeps the picks; Rust works out every row again (schedule_days_review)
-//   when a figure is picked or a global renamed. Nothing changes until Set
-//   Globals, which is one undo step.
+//   when a figure is picked or a global renamed. The file's dates follow,
+//   each with the budget information field it fills in (a missing field is
+//   ticked to start, one already there only by hand). Nothing changes until
+//   Set Globals, which is one undo step.
 //
 // Everything is drawn with el() and textContent: text from a file is never
 // read as HTML.
@@ -48,12 +50,20 @@ export function scheduleLine(r) {
   return t('scheduledays.line', { schedule, days });
 }
 
+/** What a date row would do, in words. */
+export function dateStatus(d) {
+  if (d.action === 'add') return t('scheduledays.status.new_field');
+  if (d.action === 'update') return t('scheduledays.status.new_date');
+  return t('scheduledays.status.same_date');
+}
+
 /** What Set Globals would do, in one sentence. */
 export function applyLine(r) {
   const parts = [];
   if (r.adds) parts.push(t('scheduledays.apply.adds', { count: r.adds }));
   if (r.updates) parts.push(t('scheduledays.apply.updates', { count: r.updates }));
   if (r.same) parts.push(t('scheduledays.apply.same', { count: r.same }));
+  if (r.date_sets) parts.push(t('scheduledays.apply.dates', { count: r.date_sets }));
   if (!parts.length) return t('scheduledays.apply.nothing');
   let s = `${parts.join(', ')}.`;
   const unlinked = r.figures.filter((f) => f.picked && !f.linked).length;
@@ -85,7 +95,10 @@ export async function importScheduleDays(ctx) {
 export function showScheduleDays(ctx, first) {
   const st = {
     review: first,
-    picks: first.figures.filter((f) => f.picked).map((f) => ({ key: f.key, global: f.global })),
+    picks: [
+      ...first.figures.filter((f) => f.picked).map((f) => ({ key: f.key, global: f.global })),
+      ...(first.dates || []).filter((d) => d.picked).map((d) => ({ key: d.key, global: '' })),
+    ],
     failed: false,
     // Groups opened or closed by hand, by name: kept as the rows redraw.
     open: new Map(),
@@ -166,6 +179,46 @@ export function showScheduleDays(ctx, first) {
     );
   };
 
+  const dateRow = (d) => {
+    const cb = el('input', { attrs: { type: 'checkbox', 'aria-label': t('scheduledays.date_aria', { field: d.field }) }, data: { key: d.key, role: 'use' } });
+    cb.checked = d.picked;
+    cb.addEventListener('change', () => setPick(d, cb.checked, ''));
+    const now = d.current === null || d.current === undefined ? t('scheduledays.none') : d.current;
+    return el(
+      'tr',
+      { class: d.picked ? '' : 'sd-off' },
+      el('td', {}, cb),
+      el('td', { class: 'si-desc', text: d.field }),
+      el('td', { class: 'num', text: now }),
+      el('td', { class: 'num', text: d.new }),
+      el('td', { text: d.picked ? dateStatus(d) : '' }),
+    );
+  };
+
+  const dateTable = (rows) =>
+    el(
+      'div',
+      { class: 'si-table-wrap' },
+      el(
+        'table',
+        { class: 'si-table sd-table' },
+        el(
+          'thead',
+          {},
+          el(
+            'tr',
+            {},
+            el('th', { text: t('scheduledays.col.use') }),
+            el('th', { text: t('scheduledays.col.field') }),
+            el('th', { class: 'num', text: t('scheduledays.col.now') }),
+            el('th', { class: 'num', text: t('scheduledays.col.new') }),
+            el('th', { text: '' }),
+          ),
+        ),
+        el('tbody', {}, ...rows.map(dateRow)),
+      ),
+    );
+
   const table = (rows) =>
     el(
       'div',
@@ -232,6 +285,12 @@ export function showScheduleDays(ctx, first) {
     for (const c of categories) {
       const rows = elements.filter((f) => (f.category || other) === c);
       parts.push(group(`element:${c}`, t('scheduledays.group.category', { category: c, count: rows.length }), rows.some((f) => f.picked), rows));
+    }
+    const dates = r.dates || [];
+    if (dates.length) {
+      const d = el('details', { class: 'si-details', attrs: { open: st.open.has('dates') ? st.open.get('dates') : true } }, el('summary', { text: t('scheduledays.group.dates', { count: dates.length }) }), dateTable(dates));
+      d.addEventListener('toggle', () => st.open.set('dates', d.open));
+      parts.push(d);
     }
     ui.figures.replaceChildren(...parts);
     if (focused) {
