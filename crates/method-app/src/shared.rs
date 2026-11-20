@@ -475,8 +475,9 @@ pub struct RequestDto {
     pub at: String,
 }
 
-/// How long a note on an access request may be, in characters.
-pub const REQUEST_NOTE_MAX_CHARS: usize = 200;
+/// How long a note on an access request may be, in characters (the same
+/// limit every app applies to a note it reads).
+pub const REQUEST_NOTE_MAX_CHARS: usize = flog::REQUEST_NOTE_MAX_CHARS;
 
 /// The roles a person may ask for.
 const ASKABLE: [&str; 4] = ["editor", "department", "actuals", "comment"];
