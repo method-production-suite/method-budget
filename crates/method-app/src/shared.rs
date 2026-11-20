@@ -882,6 +882,17 @@ impl SharedDoc {
     pub fn set_me(&mut self, me: Person) {
         self.me = me;
         self.place_changed = true;
+        // The signed name follows (decisions.md, entry 103).
+        match self.sign_profile() {
+            Ok(true) => {
+                let now = Instant::now();
+                self.last_edit = Some(now);
+                self.unwritten_since.get_or_insert(now);
+                self.last_change = now;
+            }
+            Ok(false) => {}
+            Err(e) => self.error = Some(e),
+        }
     }
 
     pub fn is_keeper(&self) -> bool {
