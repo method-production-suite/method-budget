@@ -581,3 +581,154 @@ fn signed(c: Cents) -> String {
         money(c)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::build::{LineLink, Links};
+    use super::*;
+
+    /// A fixture export (invented figures), read and built but not yet
+    /// reconciled.
+    fn imported(name: &str) -> Imported {
+        let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/exchange")
+            .join(name);
+        let bytes = std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+        super::super::import(&bytes, name, None)
+            .unwrap_or_else(|e| panic!("{name}: {e}"))
+            .0
+    }
+
+    fn empty(places: u8) -> Reconciliation {
+        Reconciliation {
+            currency: "USD".into(),
+            places,
+            ..Reconciliation::default()
+        }
+    }
+
+    #[test]
+    fn every_level_has_its_own_key() {
+        let keys: std::collections::BTreeSet<&str> = Level::ALL.iter().map(|l| l.key()).collect();
+        assert_eq!(keys.len(), Level::ALL.len());
+    }
+
+    #[test]
+    fn an_export_with_nothing_in_it_matches_an_empty_budget() {
+        let mut im = imported("by-budget-credits.json");
+        im.budget = method_core::starter::blank("Field Station", "USD");
+        im.links = Links::default();
+        let rec = reconcile(&im);
+        assert!(rec.matches(), "{:?}", rec.differences);
+        assert_eq!((rec.export_grand, rec.export_net), (0, 0));
+        assert_eq!((rec.grand, rec.net), (Some(0), Some(0)));
+        // Only the grand and net totals are compared.
+        assert_eq!(rec.compared(), 2);
+        assert_eq!(rec.tallies[&Level::GrandTotal].compared, 1);
+    }
+
+    #[test]
+    fn a_line_figure_that_differs_is_named_with_its_row() {
+        let mut im = imported("by-budget-credits.json");
+        assert!(reconcile(&im).matches());
+        let line = &mut im.links.lines[0];
+        let row = line.id;
+        line.total += 1.0;
+        let rec = reconcile(&im);
+        assert!(!rec.matches());
+        let lines: Vec<&Difference> = rec
+            .differences
+            .iter()
+            .filter(|d| d.level == Level::Line)
+            .collect();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].row, Some(row));
+        assert_eq!(lines[0].export - lines[0].ours, 100);
+        assert_eq!(rec.tallies[&Level::Line].different, 1);
+        // The export's grand total adds up its categories, which didn't
+        // change, so it still matches.
+        assert_eq!(rec.grand, Some(rec.export_grand));
+    }
+
+    #[test]
+    fn a_line_the_budget_lacks_counts_as_nothing() {
+        let mut im = imported("by-budget-credits.json");
+        let before = reconcile(&im).tallies[&Level::Line].compared;
+        im.links.lines.push(LineLink {
+            id: u64::MAX,
+            account: "9999".into(),
+            description: "  ".into(),
+            total: 12.5,
+        });
+        let rec = reconcile(&im);
+        assert_eq!(rec.tallies[&Level::Line].compared, before + 1);
+        let d = rec.differences.last().unwrap();
+        assert_eq!((d.export, d.ours), (1_250, 0));
+        assert_eq!(d.what, "9999: (no description)");
+    }
+
+    #[test]
+    fn whole_units_compare_rounded() {
+        let mut rec = empty(0);
+        // 10.49 and 10.00 are both 10; 10.50 rounds up to 11.
+        rec.check(Level::Line, || "a".into(), None, 1_049, 1_000);
+        rec.check(Level::Line, || "b".into(), None, 1_050, 1_000);
+        rec.check(Level::Line, || "c".into(), None, -1_049, -1_000);
+        assert_eq!(
+            rec.tallies[&Level::Line],
+            Tally {
+                compared: 3,
+                different: 1
+            }
+        );
+        assert_eq!(rec.differences[0].what, "b");
+        // At two places every cent counts.
+        let mut rec = empty(2);
+        rec.check(Level::Line, || "a".into(), None, 1_001, 1_000);
+        assert_eq!(rec.differences.len(), 1);
+    }
+
+    #[test]
+    fn a_budget_that_does_not_recalculate_is_said_in_one_line() {
+        let rec = Reconciliation {
+            calc_error: Some("a formula refers to itself".into()),
+            ..empty(2)
+        };
+        assert!(!rec.matches());
+        assert_eq!(
+            summary_lines(&rec, None),
+            ["The imported budget doesn't recalculate: a formula refers to itself"]
+        );
+    }
+
+    #[test]
+    fn the_summary_counts_kinds_and_stops_at_the_limit() {
+        let mut rec = empty(2);
+        rec.export_grand = 10_000;
+        rec.export_net = 10_000;
+        rec.grand = Some(10_000);
+        rec.net = Some(10_000);
+        rec.check(Level::Account, || "1100 Story".into(), None, 500, 500);
+        for (i, ours) in [600, 700, 800].into_iter().enumerate() {
+            rec.check(Level::Line, || format!("1100: line {i}"), None, 500, ours);
+        }
+        let lines = summary_lines(&rec, Some(2));
+        assert_eq!(
+            lines,
+            [
+                "Grand total: export 100.00 USD, imported 100.00 USD (same)",
+                "3 lines: 3 different",
+                "1 account total: the same",
+                "  line 1100: line 0: export 5.00, imported 6.00 (+1.00)",
+                "  line 1100: line 1: export 5.00, imported 7.00 (+2.00)",
+                "  ... and 1 more differences",
+            ]
+        );
+        // A net total that differs from the grand gets its own line.
+        rec.export_net = 9_000;
+        rec.net = Some(9_100);
+        let lines = summary_lines(&rec, Some(0));
+        assert_eq!(lines[1], "Net total: export 90.00 USD, imported 91.00 USD");
+        assert_eq!(lines.last().unwrap(), "  ... and 3 more differences");
+    }
+}

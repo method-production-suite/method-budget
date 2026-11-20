@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [inflate, zip, xlsx, csv, xml, exchange_json, mthd, delta]
+        target: [inflate, zip, xlsx, csv, xml, exchange_json, exchange_any, schedule, mapping_file, mthd, delta]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
