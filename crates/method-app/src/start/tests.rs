@@ -950,6 +950,21 @@ fn a_project_folder_is_shown_itself() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// A pinned folder that is really a bundle (an app) is shown selected, never
+/// opened, which would launch it.
+#[test]
+fn a_bundle_is_shown_in_its_folder_not_opened() {
+    let dir = std::fs::canonicalize(safety::tests::temp_dir("start-bundle")).unwrap();
+    let app = dir.join("Tool.app");
+    std::fs::create_dir_all(&app).unwrap();
+    let cmd = reveal_command(&app).unwrap();
+    let args: Vec<&std::ffi::OsStr> = cmd.get_args().collect();
+    if cfg!(target_os = "macos") {
+        assert_eq!(args, [std::ffi::OsStr::new("-R"), app.as_os_str()]);
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 #[test]
 fn a_shared_budget_says_so_with_who_was_in_it() {
     use method_core::log::ActorId;

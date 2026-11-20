@@ -517,6 +517,13 @@ pub(super) fn reveal_command(path: &Path) -> Result<std::process::Command, Strin
         return Ok(cmd);
     }
     let dir = dir.ok_or("That folder isn't there any more.")?;
+    // A folder with an extension may be a bundle (an app, say), which
+    // `open` would launch: show it selected in its folder instead.
+    if cfg!(target_os = "macos") && dir.extension().is_some() {
+        let mut cmd = Command::new("open");
+        cmd.arg("-R").arg(dir);
+        return Ok(cmd);
+    }
     let program = if cfg!(target_os = "macos") {
         "open"
     } else if cfg!(windows) {
