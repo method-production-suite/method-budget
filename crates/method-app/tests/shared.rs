@@ -1435,7 +1435,11 @@ fn a_requests_code_comes_from_the_key() {
     dir.write_presence(stranger, &asks).unwrap();
     tick_at(&mut alex, 60);
     let st = alex.shared().unwrap().status(Instant::now());
-    let r = st.requests.iter().find(|r| r.actor == stranger.hex()).unwrap();
+    let r = st
+        .requests
+        .iter()
+        .find(|r| r.actor == stranger.hex())
+        .unwrap();
     assert!(r.no_key, "no key in that name yet");
     assert!(r.code.is_empty(), "nothing to compare yet");
 
@@ -1458,7 +1462,11 @@ fn a_requests_code_comes_from_the_key() {
     dir.write_segment(&[planted]).unwrap();
     tick_at(&mut alex, 120);
     let st = alex.shared().unwrap().status(Instant::now());
-    let r = st.requests.iter().find(|r| r.actor == stranger.hex()).unwrap();
+    let r = st
+        .requests
+        .iter()
+        .find(|r| r.actor == stranger.hex())
+        .unwrap();
     assert!(!r.no_key);
     assert_eq!(r.code, method_app::shared::key_code(&theirs.public()));
 
@@ -1478,7 +1486,11 @@ fn a_requests_code_comes_from_the_key() {
     assert_eq!(mine.code, method_app::shared::key_code(&key(2).public()));
     tick_at(&mut alex, 180);
     let st = alex.shared().unwrap().status(Instant::now());
-    let real = st.requests.iter().find(|r| r.actor == JORDAN.hex()).unwrap();
+    let real = st
+        .requests
+        .iter()
+        .find(|r| r.actor == JORDAN.hex())
+        .unwrap();
     assert_eq!(real.code, mine.code);
     assert_ne!(real.code, method_app::shared::key_code(&theirs.public()));
     assert!(!real.removed && !real.no_key);
