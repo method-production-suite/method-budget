@@ -44,6 +44,12 @@ jobs:
               python3 scripts/check-crate-ages.py --lock "$lock"
             fi
           done
+      - name: Git dependencies are on their repository's main
+        # deny.toml allows one git source; a commit pinned there must be on its main
+        # branch, since GitHub also serves a fork's commits at the parent's address.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-git-deps.py
   deny:
     # deny.toml: known advisories, licenses compatible with MIT OR Apache-2.0,
     # crates.io as the only source.
