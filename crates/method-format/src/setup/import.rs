@@ -1357,3 +1357,232 @@ fn rename_setup_items(s: &mut method_core::SetupItems, r: &Renames) {
         g.0 = clipboard::rename_globals(&g.0, &r.globals);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use method_core::{starter, Currency, ReportSpec};
+
+    fn blank() -> Budget {
+        starter::blank("Field Station", "USD")
+    }
+
+    fn with_globals(pairs: &[(&str, &str)]) -> Budget {
+        let mut b = blank();
+        for (n, f) in pairs {
+            b.globals.insert((*n).into(), (*f).into());
+        }
+        b
+    }
+
+    fn pick(kind: &str, name: &str) -> ItemRef {
+        ItemRef {
+            kind: kind.into(),
+            name: name.into(),
+        }
+    }
+
+    fn item<'a>(p: &'a ImportPreview, kind: &str, name: &str) -> &'a ImportItem {
+        p.items
+            .iter()
+            .find(|i| i.kind == kind && i.name == name)
+            .unwrap_or_else(|| panic!("no {kind} {name} in the review"))
+    }
+
+    #[test]
+    fn every_kind_reads_back_from_its_key() {
+        for w in What::ALL {
+            assert_eq!(What::parse(w.key()), Ok(w));
+            // Settings can't be added under a new name; currencies name
+            // real currencies, so they can't either.
+            if w.is_setting() || w == What::Currency {
+                assert!(!w.renamable(), "{w:?}");
+            }
+        }
+        assert!(What::parse("tea_break").is_err());
+        assert!(What::parse("").is_err());
+    }
+
+    #[test]
+    fn closure_follows_needs_however_deep_and_stops_on_a_cycle() {
+        let src = with_globals(&[
+            ("HOURS", "DAYS * 10"),
+            ("DAYS", "WEEKS * 5"),
+            ("WEEKS", "4"),
+            ("PING", "PONG + 1"),
+            ("PONG", "PING + 1"),
+        ]);
+        let deep = closure(&src, [(What::Global, "HOURS".to_string())]);
+        let names: Vec<&str> = deep.iter().map(|(_, n)| n.as_str()).collect();
+        assert_eq!(names, ["DAYS", "HOURS", "WEEKS"]);
+
+        let cycle = closure(&src, [(What::Global, "PING".to_string())]);
+        assert_eq!(cycle.len(), 2);
+        // Nothing asked for, nothing needed.
+        assert!(closure(&src, []).is_empty());
+    }
+
+    #[test]
+    fn the_review_says_new_same_or_differs_and_offers_a_free_name() {
+        let here = with_globals(&[("RATE", "100"), ("SAME", "1")]);
+        let src = with_globals(&[
+            ("RATE", "120"),
+            ("RATE_2", "5"),
+            ("SAME", "1"),
+            ("NEW", "2"),
+        ]);
+        let p = preview(&here, &src, 7, "Library", "/library/setup.mthd");
+        assert_eq!(p.token, 7);
+        assert_eq!(item(&p, "global", "NEW").status, "new");
+        assert_eq!(item(&p, "global", "SAME").status, "same");
+        assert_eq!(item(&p, "global", "SAME").here, None);
+        let rate = item(&p, "global", "RATE");
+        assert_eq!(rate.status, "differs");
+        assert!(rate.here.is_some());
+        // RATE_2 is taken in the source, so the next free one is offered.
+        assert_eq!(rate.rename_to.as_deref(), Some("RATE_3"));
+        assert!(p.notes.is_empty());
+    }
+
+    #[test]
+    fn the_base_currency_here_is_left_out_of_the_review() {
+        let here = blank();
+        let mut src = starter::blank("Field Station", "EUR");
+        for code in ["USD", "CAD"] {
+            src.currencies.insert(
+                code.into(),
+                Currency {
+                    description: code.into(),
+                    symbol: "$".into(),
+                    rate: "1".parse().unwrap(),
+                    format: Default::default(),
+                },
+            );
+        }
+        let p = preview(&here, &src, 1, "Other", "other.mthd");
+        assert!(p
+            .items
+            .iter()
+            .all(|i| !(i.kind == "currency" && i.name == "USD")));
+        assert_eq!(item(&p, "currency", "CAD").status, "new");
+        // The base currencies differ, which the review says.
+        assert_eq!(p.notes.len(), 1);
+        assert!(p.notes[0].contains("EUR"), "{}", p.notes[0]);
+    }
+
+    #[test]
+    fn importing_brings_what_a_pick_needs_and_keeps_what_differs() {
+        let mut here = with_globals(&[("DAYS", "20")]);
+        let src = with_globals(&[("WEEKS", "DAYS / 5"), ("DAYS", "25")]);
+        let done = import(&mut here, &src, &[pick("global", "WEEKS")], &[]).unwrap();
+        assert_eq!((done.added, done.replaced, done.kept), (1, 0, 1));
+        assert_eq!(here.globals["WEEKS"], src.globals["WEEKS"]);
+        // DAYS differs and nothing chose otherwise: this budget's stays.
+        assert_eq!(here.globals["DAYS"], "20".into());
+        assert_eq!(
+            done.message(),
+            "Imported setup: 1 item added, 1 item kept as this budget had it."
+        );
+
+        // Once more, nothing is left to add.
+        let again = import(&mut here, &src, &[pick("global", "WEEKS")], &[]).unwrap();
+        assert_eq!((again.added, again.replaced), (0, 0));
+        assert!(again.message().starts_with("Nothing to import"));
+    }
+
+    #[test]
+    fn a_differing_item_can_replace_or_be_added_under_a_new_name() {
+        let src = with_globals(&[("RATE", "120")]);
+        let choose = |choice: &str| Resolution {
+            kind: "global".into(),
+            name: "RATE".into(),
+            choice: choice.into(),
+        };
+
+        let mut replaced = with_globals(&[("RATE", "100")]);
+        let done = import(
+            &mut replaced,
+            &src,
+            &[pick("global", "RATE")],
+            &[choose("imported")],
+        )
+        .unwrap();
+        assert_eq!(done.replaced, 1);
+        assert_eq!(replaced.globals["RATE"], "120".into());
+
+        let mut renamed = with_globals(&[("RATE", "100")]);
+        let done = import(
+            &mut renamed,
+            &src,
+            &[pick("global", "RATE")],
+            &[choose("rename")],
+        )
+        .unwrap();
+        assert_eq!(done.added, 1);
+        assert_eq!(renamed.globals["RATE"], "100".into());
+        assert_eq!(renamed.globals["RATE_2"], "120".into());
+        assert_eq!(
+            done.written,
+            vec![(What::Global, "RATE".to_string(), "RATE_2".to_string())]
+        );
+    }
+
+    #[test]
+    fn a_refused_import_leaves_the_budget_as_it_was() {
+        let src = with_globals(&[("RATE", "120")]);
+        let here = with_globals(&[("RATE", "100")]);
+        let bad = |kind: &str, choice: &str| Resolution {
+            kind: kind.into(),
+            name: "RATE".into(),
+            choice: choice.into(),
+        };
+        let mut b = here.clone();
+
+        let e = import(&mut b, &src, &[pick("global", "MISSING")], &[]).unwrap_err();
+        assert!(e.contains("not in that budget"), "{e}");
+        let e = import(
+            &mut b,
+            &src,
+            &[pick("global", "RATE")],
+            &[bad("global", "maybe")],
+        )
+        .unwrap_err();
+        assert!(e.contains("unknown choice"), "{e}");
+        let e = import(
+            &mut b,
+            &src,
+            &[pick("global", "RATE")],
+            &[bad("currency", "rename")],
+        )
+        .unwrap_err();
+        assert!(e.contains("can't be added under a new name"), "{e}");
+        assert!(import(&mut b, &src, &[pick("tea_break", "RATE")], &[]).is_err());
+        assert_eq!(b, here);
+    }
+
+    #[test]
+    fn report_presets_match_ignoring_case_and_spaces() {
+        let mut here = blank();
+        let mut src = blank();
+        let preset = |name: &str| ReportPreset {
+            name: name.into(),
+            default: false,
+            spec: ReportSpec::default(),
+        };
+        here.report_presets.push(preset("Topsheet"));
+        src.report_presets.push(preset("  TOPSHEET "));
+        assert!(has(&here, What::ReportPreset, " topsheet"));
+        let p = preview(&here, &src, 1, "Other", "other.mthd");
+        assert_eq!(item(&p, "report_preset", "  TOPSHEET ").status, "same");
+        let done = import(&mut here, &src, &[pick("report_preset", "topsheet")], &[]).unwrap();
+        assert_eq!((done.added, done.replaced), (0, 0));
+        assert_eq!(here.report_presets.len(), 1);
+    }
+
+    #[test]
+    fn counts_in_words() {
+        assert_eq!(count(0, "item", "items"), "0 items");
+        assert_eq!(count(1, "item", "items"), "1 item");
+        assert_eq!(count(3, "item", "items"), "3 items");
+    }
+}
