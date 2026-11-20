@@ -632,10 +632,11 @@ pub fn duplicate(
     if !is_budget_path(path) {
         return Err(crate::i18n::tr("start.only_budget_duplicated"));
     }
-    // Refuse what isn't a readable budget before copying it.
+    // Refuse what isn't a readable budget before copying it, then copy the
+    // bytes read with the same cap (the file may have changed in between).
     crate::session::read_budget(path)?;
-    let bytes =
-        std::fs::read(path).map_err(|e| format!("Couldn't read {}: {e}.", path.display()))?;
+    let bytes = method_format::fsio::read_capped(path, method_format::fsio::MAX_READ_BYTES)
+        .map_err(|e| format!("Couldn't read {}: {e}.", path.display()))?;
     let dir = path
         .parent()
         .filter(|d| d.is_dir())
