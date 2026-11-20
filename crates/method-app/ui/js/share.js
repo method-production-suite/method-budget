@@ -769,26 +769,37 @@ function stopFollowing(say) {
   if (say && ctx) ctx.toast(t('share.stopped_following', { name: was.name }));
 }
 
+/**
+ * What a new status means while following `f` ({ actor, doc, at }) in
+ * budget `doc`: 'stop' (another budget, live mode off, the person gone or
+ * their link ended), 'stay' (no cell, the same cell, or a dialog open), or
+ * { go: cell, at } to move there. Pure, for the tests.
+ */
+export function followStep(f, status, doc, modalOpen = false) {
+  if (doc !== f.doc || !status || !status.live_on) return 'stop';
+  const people = Array.isArray(status.people) ? status.people : [];
+  const p = people.find((q) => q.actor === f.actor);
+  // Gone, or their link ended (they quit, turned it off or dropped).
+  if (!p || !p.linked) return 'stop';
+  // No cell: on something the grid can't name, or gone. Stay until they say more.
+  if (!p.cell) return 'stay';
+  const at = JSON.stringify(p.cell);
+  if (at === f.at || modalOpen) return 'stay';
+  return { go: p.cell, at };
+}
+
 /** A new status while following: go where they went. A link that ended stops it. */
 function followOn(status) {
   const f = st.following;
   if (!f) return;
-  if (ctx.doc() !== f.doc || !status.live_on) {
+  const step = followStep(f, status, ctx.doc(), isModalOpen());
+  if (step === 'stop') {
     stopFollowing(true);
     return;
   }
-  const p = status.people.find((q) => q.actor === f.actor);
-  // Gone, or their link ended (they quit, turned it off or dropped).
-  if (!p || !p.linked) {
-    stopFollowing(true);
-    return;
-  }
-  // No cell: on something the grid can't name, or gone. Stay until they say more.
-  if (!p.cell) return;
-  const at = JSON.stringify(p.cell);
-  if (at === f.at || isModalOpen()) return;
-  f.at = at;
-  goToCell(p.cell);
+  if (step === 'stay') return;
+  f.at = step.at;
+  goToCell(step.go);
 }
 
 /** An ISO 8601 UTC time as the local clock shows it. */

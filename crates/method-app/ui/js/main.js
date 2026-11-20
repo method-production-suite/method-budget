@@ -28,24 +28,9 @@
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { t } from './i18n.js';
 import { el, $, isTextField } from './dom.js';
-// A review file's close question (comments.js).
 import { confirmCloseReview } from './comments.js';
 import { Grid, parseTSV } from './grid.js';
-import {
-  indexView,
-  findCategory,
-  accountList,
-  topsheetColumns,
-  accountColumns,
-  detailColumns,
-  columnShown,
-  OPTIONAL_DETAIL_COLUMNS,
-  BASELINE_COLUMNS,
-  COST_COLUMNS,
-  topsheetRows,
-  accountRows,
-  detailRows,
-} from './levels.js';
+import { indexView, findCategory, accountList, topsheetColumns, accountColumns, topsheetRows, accountRows, detailRows } from './levels.js';
 import { renderFooter } from './footer.js';
 import { formDialog, confirmDialog, customDialog, isModalOpen } from './modal.js';
 import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout, findUses } from './tools.js';
@@ -55,7 +40,7 @@ import { printReport } from './report.js';
 import { showReportSetup } from './reportsetup.js';
 import { SHORTCUTS, matchShortcut, menuRunsAppKeys, pageRunsAppKeys, shortcutById, shortcutText, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
-import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor, openContextMenu } from './menu.js';
+import { openMenu, closeMenu, openContextMenu } from './menu.js';
 import { readPref, writePref } from './prefs.js';
 import { wirePanelResizer, syncResizer, sizePanel, isResizer } from './panelsize.js';
 import { initSafety } from './safety.js';
@@ -66,7 +51,7 @@ import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE 
 import { initContextMenu, initContextMenuPresets, watchContextMenu } from './context.js';
 import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
 import { createTabStrip } from './tabs.js';
-import { firstPane, secondPane, layoutPanes, isSplitLayout, markTarget, moveFormulaBar } from './pane.js';
+import { firstPane, secondPane, layoutPanes, markTarget, moveFormulaBar } from './pane.js';
 import { localStamp } from './versions.js';
 import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
@@ -88,6 +73,9 @@ import { setExplainTarget, explainTargetAt } from './explain.js';
 import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
 import { loadHost, isWeb } from './host.js';
+import { readColumnChoices, gridDetailColumns, withColumnMenu } from './columnmenu.js';
+import { moveSelected } from './moverows.js';
+// A review file's close question (comments.js).
 
 // The panes (pane.js): the first is always there, the second once the window
 // has been split. `target` is the pane commands act on; `cur` the pane `state`
@@ -97,7 +85,7 @@ let target = panes[0];
 let cur = panes[0];
 
 /** The pane in use. */
-function P() {
+export function P() {
   return cur;
 }
 
@@ -120,7 +108,7 @@ function withPane(pane, fn) {
 // or created, after the latest command, and the latest edit's effect.
 const PANE_FIELDS = new Set(['doc', 'view', 'ix', 'level', 'cat', 'acct', 'selection', 'memory', 'changes']);
 
-const state = new Proxy(
+export const state = new Proxy(
   {
     tabs: [], // every open budget's tab, in order (the view's `tabs`)
     panelOpen: true, // the tools panel shows (docked, or its window)
@@ -182,7 +170,7 @@ panes[0].grid = makeGrid(panes[0]);
 // The grid in use. Display choices (zoom, formulas in a selection) go to
 // every pane's grid.
 const EVERY_GRID = new Set(['setZoom', 'setShowFormulas']);
-const grid = new Proxy(
+export const grid = new Proxy(
   {},
   {
     get: (_, k) => {
@@ -235,7 +223,7 @@ initClipboard({ grid, level: () => state.level, ix: () => state.ix, cat: () => s
 // Talking to Rust
 
 /** Runs a command and redraws from the view it returns. Rejects with a message. */
-async function call(cmd, args = {}, opts = {}) {
+export async function call(cmd, args = {}, opts = {}) {
   const v = await invoke(cmd, args);
   if (v && typeof v === 'object' && 'budget' in v) apply(v, { ...opts, cmd });
   return v;
@@ -376,7 +364,7 @@ function trackChanges(view, opts) {
 
 let toastTimer = null;
 /** A short message at the bottom; `action` ({ label, run }) adds a button, and keeps it longer. */
-function toast(message, action = null) {
+export function toast(message, action = null) {
   const t = $('toast');
   t.textContent = String(message);
   if (action && action.label && typeof action.run === 'function') {
@@ -620,7 +608,6 @@ initShare({
   rowKeyFor,
   jumpTo: (entry) => jumpTo(entry),
 });
-
 
 /**
  * Topsheet and account-list rows without the zero-balance ones, when the
@@ -2059,113 +2046,6 @@ function findUsesFromSetup(p) {
   findUses(p.table, p.name);
 }
 
-// ---------------------------------------------------------------------------
-// View: optional detail columns (the menu in the grid's top-left corner; saved per user)
-
-function readColumnChoices() {
-  const saved = readPref('detailColumns', null);
-  const out = {};
-  if (saved && typeof saved === 'object') {
-    for (const c of [...OPTIONAL_DETAIL_COLUMNS, ...COST_COLUMNS]) if (typeof saved[c.key] === 'boolean') out[c.key] = saved[c.key];
-  }
-  return out;
-}
-
-/**
- * What the column choices depend on: whether the budget has a baseline (Orig
- * and Var) and actuals (the cost report columns, levels.js).
- */
-function columnContext() {
-  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost), persons: Boolean(state.ix && state.ix.hasPersons) };
-}
-
-function gridDetailColumns() {
-  return detailColumns(state.columns, columnContext()).map((c) => (c.key === 'num' ? { ...c, head: columnMenuButton } : c));
-}
-
-/**
- * Topsheet and account-list columns: with a baseline, the column menu (Orig
- * and Var) sits in the Acct # header, as it does in the # header of lines.
- */
-function withColumnMenu(cols) {
-  const ctx = columnContext();
-  if (!ctx.baseline && !ctx.cost) return cols;
-  const head = (label) => () => el('span', { class: 'col-head-menu' }, columnMenuButton(), el('span', { text: label }));
-  return cols.map((c) => (c.key === 'code' ? { ...c, head: head(c.label) } : c));
-}
-
-/** The column menu: every optional column on the lines, Orig, Var and the cost columns elsewhere. */
-function columnMenuItems() {
-  const ctx = columnContext();
-  const list = state.level === 'details' ? OPTIONAL_DETAIL_COLUMNS : [...BASELINE_COLUMNS, ...COST_COLUMNS];
-  return list
-    .filter((c) => (!c.baseline || ctx.baseline) && (!c.cost || ctx.cost))
-    .map((c) => ({
-      id: c.key,
-      label: c.name || c.label,
-      title: c.title,
-      checked: columnShown(c, state.columns, ctx),
-    }));
-}
-
-function columnsIcon() {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
-    svg.setAttribute(k, v);
-  }
-  for (const x of [1.5, 6.5, 11.5]) {
-    const r = document.createElementNS(NS, 'rect');
-    for (const [k, v] of Object.entries({ x: String(x), y: '2', width: '3', height: '12', rx: '0.8' })) r.setAttribute(k, v);
-    svg.append(r);
-  }
-  return svg;
-}
-
-function openColumnMenu(anchor) {
-  openMenu(anchor, {
-    owner: 'columns',
-    label: t('main.columns'),
-    checkable: true,
-    items: columnMenuItems(),
-    returnFocus: () => P().host.querySelector('.col-chooser'),
-    onPick: (item) => {
-      const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id) || COST_COLUMNS.find((c) => c.key === item.id);
-      if (!col) return;
-      state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns, columnContext()) };
-      writePref('detailColumns', state.columns);
-      renderAll();
-      updateMenu(columnMenuItems());
-    },
-  });
-}
-
-/** The header button for the column menu (the grid draws it in the # column's header). */
-function columnMenuButton() {
-  const b = el(
-    'button',
-    {
-      class: 'col-chooser',
-      title: t('main.show_or_hide_columns'),
-      attrs: { type: 'button', 'aria-label': t('main.choose_columns'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
-      data: { focusId: 'col-chooser' },
-      on: {
-        click: (e) => openColumnMenu(e.currentTarget),
-        keydown: (e) => {
-          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-          e.preventDefault();
-          e.stopPropagation();
-          openColumnMenu(e.currentTarget);
-        },
-      },
-    },
-    columnsIcon(),
-  );
-  // The grid redraws while the menu is open (a column was toggled): follow it.
-  if (isMenuOpen('columns')) setMenuAnchor('columns', b);
-  return b;
-}
-
 /** In a text field, Undo, Redo and Select All act on the field. */
 function fieldEdit(kind) {
   const a = document.activeElement;
@@ -2335,62 +2215,6 @@ function explainCell(row, colKey) {
   setExplainTarget(at, state.doc);
   toolsExplain = state.position === 'window' ? at : null;
   showTab('explain');
-}
-
-// One move at a time, each built from the newest view (accounts and
-// topsheet rows are named by place, which a move changes). A held key adds
-// at most one press behind the one running, so moves never pile up.
-let moveQueue = Promise.resolve();
-let movesWaiting = 0;
-
-function moveSelected(by) {
-  if (!state.view || movesWaiting > 1) return;
-  movesWaiting += 1;
-  moveQueue = moveQueue
-    .then(() => moveOnce(by))
-    .catch((e) => toast(e))
-    .finally(() => {
-      movesWaiting -= 1;
-    });
-}
-
-async function moveOnce(by) {
-  const keys = grid.selectedKeys();
-  const cursor = grid.cursorKey();
-  let cmd;
-  let args;
-  let keyFor;
-  if (state.level === 'details') {
-    const ids = keys.filter((k) => /^r\d+$/.test(k)).map((k) => Number(k.slice(1)));
-    if (!ids.length) return;
-    [cmd, args, keyFor] = ['move_rows', { rowIds: ids, by }, (id) => `r${id}`];
-  } else if (state.level === 'accounts') {
-    const entry = state.cat ? findCategory(state.ix, state.cat.code, state.cat.ti) : null;
-    const accts = entry ? entry.cat.accounts || [] : [];
-    const codes = keys
-      .filter((k) => /^a\d+$/.test(k))
-      .map((k) => accts[Number(k.slice(1))])
-      .filter(Boolean)
-      .map((a) => a.code);
-    if (!codes.length) return;
-    [cmd, args, keyFor] = ['move_accounts', { codes, by }, (i) => `a${i}`];
-  } else {
-    const indexes = keys.filter((k) => /^t\d+$/.test(k)).map((k) => Number(k.slice(1)));
-    if (!indexes.length) return;
-    [cmd, args, keyFor] = ['move_topsheet_rows', { indexes, by }, (i) => `t${i}`];
-  }
-  const v = await call(cmd, args);
-  if (!v || !Array.isArray(v.moved)) return;
-  // The moved rows stay selected and the cursor stays on its row: lines
-  // keep their keys; accounts and topsheet rows are found by their order
-  // among the selected ones, which a move keeps.
-  const moved = v.moved.map(keyFor);
-  let at = cursor;
-  if (state.level !== 'details') {
-    const i = keys.indexOf(cursor);
-    at = moved[i >= 0 ? i : 0] || cursor;
-  }
-  grid.selectRows(moved, at);
 }
 
 // File > Versions… and File > Compare Budgets…, and their toolbar buttons
@@ -3156,7 +2980,7 @@ async function fetchPaneView(p) {
 }
 
 /** Redraws every pane (a display choice or the columns changed). */
-function renderAll() {
+export function renderAll() {
   for (const p of panes) {
     if (!p || !p.st.view) continue;
     if (p.index === 1 && !isSplit()) continue;

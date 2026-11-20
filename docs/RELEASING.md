@@ -123,6 +123,7 @@ python3 scripts/site.py                     # the website's "What's new" box fol
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
 python3 scripts/check-crate-ages.py --release   # every locked crate 14 days old, bar RUSTSEC fixes (fuzz/Cargo.lock too, with --lock)
 scripts/check.sh                            # the full local check
+node --test crates/method-app/ui/test/     # the page's pure modules without a browser (check.sh runs it too)
 cargo test --workspace --locked --target x86_64-apple-darwin   # the Mac app's Intel half, under Rosetta (rustup target add x86_64-apple-darwin once)
 git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html assets/screens site/img
 git commit -m "0.2.0"

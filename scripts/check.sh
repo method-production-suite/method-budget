@@ -25,6 +25,10 @@ tests="$(cargo test --workspace --locked --no-fail-fast 2>&1 | tee /dev/stderr |
 passed="$(printf '%s\n' "$tests" | awk '{s+=$4} END {print s}')"
 failed="$(printf '%s\n' "$tests" | awk '{f+=$6} END {print f}')"
 [ "$failed" = 0 ] || { echo "check.sh: $failed tests failed" >&2; exit 1; }
+step "page unit tests"
+# The page's pure modules, without a browser (node:test; crates/method-app/ui/test).
+page="$(node --test --test-reporter=spec crates/method-app/ui/test/ 2>&1 | tee /dev/stderr)" || { echo "check.sh: page unit tests failed" >&2; exit 1; }
+passed=$((passed + $(printf '%s\n' "$page" | awk '/^ℹ pass /{print $3}')))
 step "Field Station";        cargo build --locked -p method-cli
 METHOD="$built/debug/method-budget" python3 scripts/make-field-station.py --check
 step "third-party notices";  cargo xtask notices --check
