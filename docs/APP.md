@@ -3244,7 +3244,10 @@ and page.
 - **Quietly.** A newer version downloads in the background. Its signature is checked
   against the public key the app was built with (`plugins.updater.pubkey`, baked in the
   same way) before it is kept, and the signature must name the version the manifest
-  announces; anything else is thrown away. Then the toolbar shows **Update ready: Restart
+  announces; anything else is thrown away. A version lower than the highest one ever
+  downloaded and checked is refused before anything is downloaded (method-update's
+  high-water mark, `updates.high-water.json` beside `updates.json`), so an older signed
+  release can't be offered in its place. Then the toolbar shows **Update ready: Restart
   to update**. An automatic check that finds nothing or can't reach the endpoint says
   nothing at all; only Help > Check for Updates answers, in the same place for a few
   seconds ("Method Budget is up to date." or "Couldn't check for updates"). Releases are
@@ -3266,7 +3269,10 @@ and page.
   backed up beside it, on the same volume; an /Applications the user can't write asks for
   an administrator through the system's own prompt), and the app starts again with its
   tabs, split view and tools panel as they were (the files reopen as at any start:
-  src/tabs.rs). A failed install leaves the update ready and the app running. At the next
+  src/tabs.rs). Before the swap, the new copy must pass a code-signature check under the
+  running app's Developer ID team; a copy that doesn't is not installed, and the toolbar
+  says so ("This update wasn't installed: the new copy isn't signed as Method Budget...").
+  A failed install leaves the update ready and the app running. At the next
   start, a bundle an interrupted swap left hidden is put back.
 - **What's New** for the new version opens once after an update, after any start-up
   question (recovered budgets, a file to open). Help > Release Notes shows this version's

@@ -121,6 +121,9 @@ pub enum Said {
     NoBuild,
     /// Restart to update couldn't install; the update is still ready.
     InstallFailed,
+    /// Restart to update refused the update: the new copy's code signature
+    /// isn't this app's ([`InstallError::Signature`]). This copy is unchanged.
+    InstallRefused,
 }
 
 /// Why a check didn't work.
@@ -390,11 +393,14 @@ pub fn flush_for_restart(state: &AppState, safety: &Safety, now: u64) -> Flushed
 /// Discard All chosen on the way to the restart is taken back. The app goes
 /// on running with those budgets open, so autosave and recovery copies take
 /// up again (otherwise nothing would be kept for the rest of the run).
-pub fn install_failed(safety: Option<&Safety>) -> Said {
+pub fn install_failed(safety: Option<&Safety>, error: &InstallError) -> Said {
     if let Some(s) = safety {
         crate::safety_app::discard_cancelled(s);
     }
-    Said::InstallFailed
+    match error {
+        InstallError::Signature(_) => Said::InstallRefused,
+        _ => Said::InstallFailed,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -484,9 +490,9 @@ fn install_and_restart<R: Runtime>(app: &AppHandle<R>) {
         // renamed), so Tauri's own restart starts the new version, after
         // the app's exit work, as before.
         Ok(_) => app.restart(),
-        Err(_) => {
+        Err(e) => {
             let safety = app.try_state::<Safety>();
-            let said = install_failed(safety.as_deref());
+            let said = install_failed(safety.as_deref(), &e);
             tell(app, updates.status(Some(said)));
         }
     }
@@ -990,7 +996,10 @@ mod tests {
         assert!(matches!(u.updater.phase(), Phase::Ready { .. }));
         assert!(bundle.join("Contents").is_dir());
         // What the page hears then: the same five fields as always.
-        let s = serde_json::to_value(u.status(Some(install_failed(None)))).unwrap();
+        let s = serde_json::to_value(
+            u.status(Some(install_failed(None, &InstallError::Io("x".into())))),
+        )
+        .unwrap();
         assert_eq!(
             s,
             serde_json::json!({ "phase": "ready", "version": "0.4.0", "manual": false, "said": "install-failed", "automatic": true })
@@ -1404,8 +1413,8 @@ mod tests {
         let bundle = dir.join(BUNDLE_NAME);
         std::fs::create_dir_all(bundle.join("Contents")).unwrap();
         let no_admin = |_: &Path, _: &Path| -> Result<(), InstallError> { unreachable!() };
-        assert!(u.updater.install_ready(&bundle, &no_admin).is_err());
-        assert_eq!(install_failed(Some(&safety)), Said::InstallFailed);
+        let e = u.updater.install_ready(&bundle, &no_admin).unwrap_err();
+        assert_eq!(install_failed(Some(&safety), &e), Said::InstallFailed);
         assert!(
             matches!(u.updater.phase(), Phase::Ready { .. }),
             "ready for another try"
@@ -1539,5 +1548,47 @@ mod tests {
         assert!(!UPDATES_JS.contains("innerHTML"));
         assert!(!UPDATES_JS.contains("insertAdjacentHTML"));
         assert!(!UPDATES_JS.contains("outerHTML"));
+    }
+
+    /// Once a version has been downloaded and checked, a lower one offered
+    /// later is refused before anything is downloaded (method-update's
+    /// high-water mark, kept beside the settings file).
+    #[test]
+    fn a_lower_version_after_a_higher_one_is_refused() {
+        let dir = temp_dir("updates-high-water");
+        let file = dir.join("updates.json");
+        let u = updates(Some(file.clone()));
+        let (said, _) = run(
+            &u,
+            true,
+            || Ok(Some(update("0.6.0"))),
+            |_| Ok(b"bytes".to_vec()),
+        );
+        assert_ne!(said, Some(Said::Failed));
+        assert!(matches!(u.updater.phase(), Phase::Ready { .. }));
+        // The app starts again later; the mark is in the folder.
+        let u = updates(Some(file));
+        let (said, _) = run(
+            &u,
+            true,
+            || Ok(Some(update("0.5.0"))),
+            |_| panic!("a lower version is never downloaded"),
+        );
+        assert_eq!(said, Some(Said::Failed));
+        assert!(!matches!(u.updater.phase(), Phase::Ready { .. }));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A new copy whose code signature isn't this app's is refused with its
+    /// own plain answer, not the try-again one.
+    #[test]
+    fn a_refused_signature_says_so() {
+        let e = InstallError::Signature(method_update::codesign::SignatureError::TeamMismatch {
+            expected: "XSRB3D643J".into(),
+            found: None,
+        });
+        assert_eq!(install_failed(None, &e), Said::InstallRefused);
+        let v = serde_json::to_value(Said::InstallRefused).unwrap();
+        assert_eq!(v, "install-refused");
     }
 }

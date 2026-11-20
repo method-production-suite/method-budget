@@ -40,7 +40,7 @@ tauri-plugin-dialog = "=2.8.4"
 # The suite's shared updater (method-production-suite/method-libs), pinned to a
 # full commit: the check, the download and its minisign signature, the Mac
 # bundle swap and restart, and the update policy (src/updater.rs).
-method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "25c80f8cfcc2e5222de4c5b79413a9de488196af" }
+method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "bfc6441a1015793e665aa59478b6a434fb915062" }
 # Release plumbing shared with the release tooling: versions, release notes
 # (What's New), the updater key's shape. No dependencies of its own.
 method-release = { path = "../method-release" }
