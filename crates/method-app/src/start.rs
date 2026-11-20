@@ -204,9 +204,18 @@ fn stamp_time(t: Option<(u64, u32)>) -> Option<SystemTime> {
     UNIX_EPOCH.checked_add(Duration::new(s, n.min(999_999_999)))
 }
 
+/// The most the start window's own files (its list and its summaries) are
+/// read up to: far more than they hold, and nothing larger is read in.
+const START_FILE_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
+/// One of the start window's own files as text, up to [`START_FILE_MAX_BYTES`].
+fn read_start_file(path: &Path) -> Option<String> {
+    method_format::fsio::read_to_string_capped(path, START_FILE_MAX_BYTES).ok()
+}
+
 /// The summaries kept in `file` (none when missing or unreadable).
 fn load_cache(file: Option<&Path>) -> HashMap<PathBuf, Cached> {
-    file.and_then(|f| std::fs::read_to_string(f).ok())
+    file.and_then(read_start_file)
         .and_then(|t| serde_json::from_str::<CacheJson>(&t).ok())
         .filter(|c| c.version == CACHE_VERSION)
         .unwrap_or_default()
@@ -232,7 +241,7 @@ impl StartState {
     pub fn load(file: Option<PathBuf>) -> StartState {
         let json = file
             .as_deref()
-            .and_then(|f| std::fs::read_to_string(f).ok())
+            .and_then(read_start_file)
             .and_then(|t| serde_json::from_str::<StartJson>(&t).ok())
             .unwrap_or_default();
         let mut pinned = bookmark::load_list(json.pinned, &json.bookmarks);
