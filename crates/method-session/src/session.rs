@@ -848,12 +848,6 @@ impl Session {
             .is_some_and(method_core::Provenance::is_shared_copy)
     }
 
-    /// Whether the host shows this budget read-only
-    /// ([`Session::set_held_read_only`]).
-    pub fn is_held_read_only(&self) -> bool {
-        self.held
-    }
-
     /// Shows this budget read-only for the host (a partner's viewer), or
     /// lets it be changed again: while on, every edit, undo, redo and
     /// history jump is refused ([`held_read_only`]). Set through

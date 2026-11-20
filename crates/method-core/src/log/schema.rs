@@ -15,10 +15,9 @@ use super::op::{Field, Kind, Member, Value};
 use super::state::Entity;
 use crate::actuals::{BatchId, EtcMethod, ImportBatch, Transaction};
 use crate::model::{
-    Account, Baseline, Budget, Category, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Detail, DisplayPrefs, FlatBasis, Formula, Fringe, FringeKind,
-    GlobalInfo, Group, InfoValue, Location, Note, ProductionTotal, RowId, RowKind, SetDef, UnitDef,
-    Version,
+    Account, Budget, Category, Charge, ChargeKind, Credit, CreditCap, CreditRow, CreditSource,
+    Currency, Detail, DisplayPrefs, FlatBasis, Formula, Fringe, FringeKind, GlobalInfo, Group,
+    InfoValue, Location, Note, ProductionTotal, RowId, RowKind, SetDef, UnitDef, Version,
 };
 use crate::{Arithmetic, CurrencyFormat, CutoffFactor, Dec, Separators, TrailingFringes};
 
@@ -1050,9 +1049,4 @@ pub fn record_id(e: &Entity) -> Option<u64> {
     e.get(Field::Id)
         .and_then(Value::as_int)
         .and_then(|n| u64::try_from(n).ok())
-}
-
-/// The baseline as the file keeps it, for the one `baseline` register.
-pub fn baseline_value(b: Option<&Baseline>) -> Value {
-    b.map_or(Value::Null, |base| Value::Baseline(base.clone()))
 }

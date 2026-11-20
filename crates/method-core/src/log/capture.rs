@@ -213,13 +213,49 @@ impl<'a> BeforeIndex<'a> {
     }
 }
 
+/// The most cells the exact table may have (16 MB of `u32`). A longer list
+/// pair uses the longest increasing run instead (`stable_by_positions`).
+const STABLE_TABLE_CELLS: usize = 1 << 22;
+
 /// The longest common subsequence of two sequences of ids, as the set of
-/// ids that stay put.
+/// ids that stay put. Their common start and end stay put as they are: the
+/// table below would match them the same way, so only the middle is
+/// compared. That middle is compared with the table when it is small and,
+/// when it isn't and no id is listed twice, through the order of their
+/// positions, which finds a subsequence as long in O(n log n) time and
+/// O(n) memory.
 fn stable_set(before: &[Uid], after: &[Uid]) -> BTreeSet<Uid> {
-    let (n, m) = (before.len(), after.len());
+    let head = before.iter().zip(after).take_while(|(a, b)| a == b).count();
+    let (before_rest, after_rest) = (&before[head..], &after[head..]);
+    let tail = before_rest
+        .iter()
+        .rev()
+        .zip(after_rest.iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mid_before = &before_rest[..before_rest.len() - tail];
+    let mid_after = &after_rest[..after_rest.len() - tail];
+    let mut out: BTreeSet<Uid> = before[..head].iter().copied().collect();
+    out.extend(before_rest[before_rest.len() - tail..].iter().copied());
+    let (n, m) = (mid_before.len(), mid_after.len());
     if n == 0 || m == 0 {
-        return BTreeSet::new();
+        return out;
     }
+    if (n + 1).saturating_mul(m + 1) <= STABLE_TABLE_CELLS {
+        out.extend(stable_by_table(mid_before, mid_after));
+    } else if let Some(found) = stable_by_positions(mid_before, mid_after) {
+        out.extend(found);
+    }
+    // Otherwise (a huge list with an id listed twice, which the log
+    // repairs), nothing in the middle is taken to stay put: every item
+    // there is written where it now is, which is right if not the least.
+    out
+}
+
+/// The longest common subsequence by the full table: exact, and the same
+/// choice among equal ones every time.
+fn stable_by_table(before: &[Uid], after: &[Uid]) -> BTreeSet<Uid> {
+    let (n, m) = (before.len(), after.len());
     let mut table = vec![0u32; (n + 1) * (m + 1)];
     let at = |i: usize, j: usize| i * (m + 1) + j;
     for i in (0..n).rev() {
@@ -245,6 +281,50 @@ fn stable_set(before: &[Uid], after: &[Uid]) -> BTreeSet<Uid> {
         }
     }
     out
+}
+
+/// A longest common subsequence when no id is listed twice on either side:
+/// the ids of `before` that are also in `after`, taken in `before`'s order,
+/// whose positions in `after` rise for longest. `None` when an id is listed
+/// twice.
+fn stable_by_positions(before: &[Uid], after: &[Uid]) -> Option<BTreeSet<Uid>> {
+    let mut place = std::collections::HashMap::with_capacity(after.len());
+    for (j, u) in after.iter().enumerate() {
+        if place.insert(*u, j).is_some() {
+            return None;
+        }
+    }
+    let mut seen = std::collections::HashSet::with_capacity(before.len());
+    let mut items: Vec<(usize, Uid)> = Vec::new();
+    for u in before {
+        if !seen.insert(*u) {
+            return None;
+        }
+        if let Some(&j) = place.get(u) {
+            items.push((j, *u));
+        }
+    }
+    // Patience: `ends[k]` is the index into `items` ending the best rising
+    // run of length k + 1 found so far; `back` links each item to the one
+    // before it in its run.
+    let mut ends: Vec<usize> = Vec::new();
+    let mut back: Vec<Option<usize>> = vec![None; items.len()];
+    for (i, &(j, _)) in items.iter().enumerate() {
+        let k = ends.partition_point(|&e| items[e].0 < j);
+        back[i] = k.checked_sub(1).map(|p| ends[p]);
+        if k == ends.len() {
+            ends.push(i);
+        } else {
+            ends[k] = i;
+        }
+    }
+    let mut out = BTreeSet::new();
+    let mut cur = ends.last().copied();
+    while let Some(i) = cur {
+        out.insert(items[i].1);
+        cur = back[i];
+    }
+    Some(out)
 }
 
 struct Capture<'a> {
@@ -1488,4 +1568,103 @@ pub fn capture(
     c.write_root(after);
     c.write_deletes();
     c.ops
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A small seeded generator (xorshift), as the other property tests use.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    fn ids(v: &[u128]) -> Vec<Uid> {
+        v.iter().map(|&n| Uid(n)).collect()
+    }
+
+    /// Whether `kept` appears in both, in the same order.
+    fn in_order(kept: &BTreeSet<Uid>, list: &[Uid]) -> Vec<Uid> {
+        list.iter().filter(|u| kept.contains(u)).copied().collect()
+    }
+
+    /// A list, then the same list edited: some removed, some added, some
+    /// moved. Every id appears once.
+    fn edited(rng: &mut Rng, n: usize) -> (Vec<Uid>, Vec<Uid>) {
+        let before: Vec<Uid> = (0..n as u128).map(Uid).collect();
+        let mut after: Vec<Uid> = before
+            .iter()
+            .filter(|_| rng.below(5) != 0)
+            .copied()
+            .collect();
+        for k in 0..rng.below(4) {
+            let at = rng.below(after.len() + 1);
+            after.insert(at, Uid(10_000 + k as u128));
+        }
+        for _ in 0..rng.below(4) {
+            if after.len() > 1 {
+                let from = rng.below(after.len());
+                let u = after.remove(from);
+                let to = rng.below(after.len() + 1);
+                after.insert(to, u);
+            }
+        }
+        (before, after)
+    }
+
+    /// Trimming the common start and end gives exactly the table's answer.
+    #[test]
+    fn stable_set_matches_the_full_table() {
+        let mut rng = Rng(0x5eed);
+        for round in 0..500 {
+            let (before, after) = edited(&mut rng, 1 + round % 40);
+            assert_eq!(
+                stable_set(&before, &after),
+                stable_by_table(&before, &after),
+                "{before:?} {after:?}"
+            );
+        }
+        assert_eq!(stable_set(&ids(&[1, 2, 3]), &ids(&[1, 2, 3])).len(), 3);
+        assert!(stable_set(&[], &ids(&[1])).is_empty());
+    }
+
+    /// The order of positions finds a common subsequence as long as the
+    /// table's, and one that really is common.
+    #[test]
+    fn positions_find_a_longest_common_subsequence() {
+        let mut rng = Rng(0xfeed);
+        for round in 0..500 {
+            let (before, after) = edited(&mut rng, 1 + round % 60);
+            let exact = stable_by_table(&before, &after);
+            let fast = stable_by_positions(&before, &after).unwrap();
+            assert_eq!(fast.len(), exact.len(), "{before:?} {after:?}");
+            assert_eq!(in_order(&fast, &before), in_order(&fast, &after));
+        }
+        assert!(stable_by_positions(&ids(&[1, 1]), &ids(&[1])).is_none());
+    }
+
+    /// A list far past the table's size: one move among 250,000 items is
+    /// found without the table (it would need 250 GB).
+    #[test]
+    fn a_huge_list_stays_put_but_for_what_moved() {
+        let before: Vec<Uid> = (0..250_000u128).map(Uid).collect();
+        let mut after = before.clone();
+        let moved = after.remove(1_000);
+        after.insert(200_000, moved);
+        // A change at each end too, so the middle is long.
+        after[0] = Uid(900_000);
+        after[249_999] = Uid(900_001);
+        let kept = stable_set(&before, &after);
+        assert_eq!(kept.len(), 250_000 - 3);
+        assert!(!kept.contains(&moved));
+    }
 }

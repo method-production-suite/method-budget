@@ -164,7 +164,8 @@ impl Library {
         let config = dir.map(|d| d.join("library.json"));
         let path = config
             .as_deref()
-            .and_then(|f| std::fs::read_to_string(f).ok())
+            // A file of one path: nothing larger is read in.
+            .and_then(|f| method_format::fsio::read_to_string_capped(f, 1024 * 1024).ok())
             .and_then(|t| serde_json::from_str::<LibraryJson>(&t).ok())
             .and_then(|j| j.path)
             .map(PathBuf::from);

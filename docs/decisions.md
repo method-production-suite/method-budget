@@ -5572,6 +5572,42 @@ industry bid form): keep both left out?", and the owner answered "yes" (relayed 
 - **Nothing waits on it now.** Roadmap 3.9 and 3.13 stay [partial] only for their live checks
   in the app. Reopening either needs a new decision from the owner.
 
+## 102. Limits on what a shared folder may hold (2026-11-20)
+
+The shared folder is written by everyone in the budget, so whatever an app reads from it is
+checked as if anyone could have written it. Three limits now apply to every read.
+
+- **A change's clock moves by at most 2^20 at a time** (`MAX_CLOCK_STEP`). A change's
+  Lamport clock may be at most that far above the highest clock among the changes in its
+  `deps`. Changes from an honest app are one above. A change beyond the limit is refused,
+  with the reason `clock: ` (`log::refused::CLOCK`), before its clock is counted, so it
+  can't move this computer's next clock. Every computer refuses the same changes. The check
+  that an invite claim's clock is above its `deps` (decision 97) skips a dependency that
+  was refused this way, because its clock was never counted.
+  - A refused change still takes its number, as before. Its author's next change follows
+    it, and this computer's next change names it in `deps`. That is harmless, because every
+    computer refuses it the same way.
+  - Our own next clock is one more than everything counted, and it saturates rather than
+    overflows.
+- **A segment's range is checked before any arithmetic.** Numbers start at 1 and run
+  forward, the count of changes must match the range, and the writer's arithmetic is
+  checked the same way.
+- **Heartbeats and written-file records are read up to 64 KB** (`MAX_SMALL_FILE_BYTES`). A
+  larger one is left unread. An access request read from a heartbeat is cut to what an app
+  writes: a note of 200 characters, and 64 codes of 40 characters each.
+
+**Not built yet:**
+- a limit on how many actor folders are read, which needs a way to keep real members from
+  being pushed out;
+- a faster structure for changes waiting on their dependencies.
+
+Tests:
+- `a_change_with_a_clock_far_ahead_is_refused_and_not_counted`
+- `a_change_at_the_largest_clock_step_is_taken`
+- `a_refused_change_in_deps_is_harmless`
+- `a_segment_header_with_a_range_no_app_writes_is_refused`
+- `heartbeats_are_capped_when_read`
+
 ## 103. Signed names, and roles tied to a key (2026-11-20, the owner's decision)
 
 Each person's name and color came from their own heartbeat file, and a role (decision 78)

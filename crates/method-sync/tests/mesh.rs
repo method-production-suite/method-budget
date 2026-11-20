@@ -164,3 +164,73 @@ fn a_link_comes_back_after_the_other_side_returns() {
     know(&b, &[&a]);
     until("the link back", || a.connected() == 1 && b.connected() == 1);
 }
+
+/// Everything that arrives at `m` until an event `last` matches, that one
+/// included (frames on one link arrive in the order sent).
+fn events_until(m: &Mesh, what: &str, last: impl Fn(&Event) -> bool) -> Vec<Event> {
+    let start = Instant::now();
+    let mut seen = Vec::new();
+    loop {
+        for e in m.events() {
+            let done = last(&e);
+            seen.push(e);
+            if done {
+                return seen;
+            }
+        }
+        assert!(start.elapsed() < WAIT, "not seen in time: {what}");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// A peer asking again for what it lacks soon after it asked is ignored:
+/// each answer may be every change it lacks.
+#[test]
+fn a_second_ask_soon_after_the_first_is_ignored() {
+    let (a, b) = linked();
+    for _ in 0..3 {
+        b.send_to(
+            &a.id(),
+            Frame::Have {
+                frontier: BTreeMap::new(),
+            },
+        );
+    }
+    b.send_to(
+        &a.id(),
+        Frame::Changes {
+            lines: vec!["after".into()],
+        },
+    );
+    let seen = events_until(
+        &a,
+        "the change after",
+        |e| matches!(e, Event::Changes { lines, .. } if lines == &["after".to_string()]),
+    );
+    let asks = seen
+        .iter()
+        .filter(|e| matches!(e, Event::Have { .. }))
+        .count();
+    assert_eq!(asks, 1, "{seen:?}");
+}
+
+/// A cursor naming more cells than an app ever sends ends that link.
+#[test]
+fn a_cursor_with_too_many_cells_ends_the_link() {
+    let (a, b) = linked();
+    let cell = |i: usize| method_sync::Cell {
+        kind: "row".into(),
+        key: i.to_string(),
+        parent: None,
+        field: None,
+    };
+    b.send_to(
+        &a.id(),
+        Frame::Cursor {
+            cell: None,
+            selection: (0..=method_sync::MOST_SELECTED).map(cell).collect(),
+        },
+    );
+    until("the link ended", || a.connected() == 0);
+    assert!(!a.events().iter().any(|e| matches!(e, Event::Cursor { .. })));
+}

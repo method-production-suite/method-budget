@@ -120,7 +120,16 @@ pub mod refused {
     pub const INVITE: &str = "invite: ";
     /// Two changes that both pass claim one number.
     pub const FORK: &str = "fork: ";
+    /// A Lamport clock too far above its dependencies' ([`MAX_CLOCK_STEP`]).
+    pub const CLOCK: &str = "clock: ";
 }
+
+/// How far a change's Lamport clock may be above the highest clock among the
+/// changes in its `deps`. An honest app's change is one above: its `deps` is
+/// its whole frontier, and each actor's clock rises with its sequence. A
+/// change beyond this is refused before its clock is counted, so one change
+/// from the folder can't push every later clock toward the integer limit.
+pub const MAX_CLOCK_STEP: u64 = 1 << 20;
 
 impl fmt::Display for LogError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -421,7 +430,7 @@ impl Log {
         time: &str,
     ) -> Result<Option<ChangeId>, LogError> {
         let seq = self.own_seq() + 1;
-        let lamport = self.lamport() + 1;
+        let lamport = self.lamport().saturating_add(1);
         let ops = capture::capture(
             &self.state,
             before,
@@ -564,6 +573,35 @@ impl Log {
         })
     }
 
+    /// A change taken in with this id: applied, refused, or one of a fork.
+    fn taken(&self, id: ChangeId) -> Option<(&Change, Option<&str>)> {
+        if let Some(c) = self.changes.get(&id) {
+            return Some((c, None));
+        }
+        self.rejected
+            .iter()
+            .chain(self.forks.iter())
+            .find(|(c, _)| c.id() == id)
+            .map(|(c, why)| (c, Some(why.as_str())))
+    }
+
+    /// Whether `change`'s Lamport clock is at most [`MAX_CLOCK_STEP`] above
+    /// the highest among its `deps` (a dependency refused for its own clock
+    /// doesn't count: its clock was never counted anywhere).
+    fn clock_in_step(&self, change: &Change) -> bool {
+        let base = change
+            .deps
+            .0
+            .iter()
+            .filter(|(_, s)| **s != 0)
+            .filter_map(|(a, s)| self.taken(ChangeId { actor: *a, seq: *s }))
+            .filter(|(_, why)| !why.is_some_and(|w| w.starts_with(refused::CLOCK)))
+            .map(|(c, _)| c.lamport)
+            .max()
+            .unwrap_or(0);
+        change.lamport <= base.saturating_add(MAX_CLOCK_STEP)
+    }
+
     /// Whether `change`'s Lamport clock is above that of every change in its
     /// `deps`, as this log took them in (applied or refused). Checked for
     /// claims only (decisions.md, entry 97): an honest app's changes before
@@ -575,11 +613,17 @@ impl Log {
                 return true;
             }
             let id = ChangeId { actor: *a, seq: *s };
-            let taken = self
-                .changes
-                .get(&id)
-                .or_else(|| self.rejected.iter().map(|(c, _)| c).find(|c| c.id() == id));
-            taken.is_none_or(|c| change.lamport > c.lamport)
+            let taken = self.changes.get(&id).map(|c| (c, None)).or_else(|| {
+                self.rejected
+                    .iter()
+                    .find(|(c, _)| c.id() == id)
+                    .map(|(c, why)| (c, Some(why.as_str())))
+            });
+            // A dependency refused for its clock was never counted, so a
+            // claim needn't be above it (`clock_in_step`).
+            taken.is_none_or(|(c, why)| {
+                why.is_some_and(|w| w.starts_with(refused::CLOCK)) || change.lamport > c.lamport
+            })
         })
     }
 
@@ -641,7 +685,7 @@ impl Log {
             actor: self.actor,
             seq: self.own_seq() + 1,
             deps: self.frontier.clone(),
-            lamport: self.lamport() + 1,
+            lamport: self.lamport().saturating_add(1),
             time: time.to_string(),
             label: label.to_string(),
             ops,
@@ -841,8 +885,19 @@ impl Log {
     /// differently makes the log fold everything again.
     fn take(&mut self, change: Change, refold: bool) -> Result<(), LogError> {
         let id = change.id();
+        // The number is seen even when the change is refused: the author's
+        // next change follows it, and this actor's next `deps` names it.
+        // Every computer refuses the same changes, so naming one is harmless.
         self.frontier.advance(change.actor, change.seq);
         self.received.push(id);
+        if !self.clock_in_step(&change) {
+            let reason = format!(
+                "{}more than {MAX_CLOCK_STEP} above its dependencies",
+                refused::CLOCK
+            );
+            self.rejected.push((change, reason.clone()));
+            return Err(LogError::Malformed { id, reason });
+        }
         self.seen_lamport = self.seen_lamport.max(change.lamport);
         if let Err(b) = self.judge(&change) {
             let (reason, e) = *b;

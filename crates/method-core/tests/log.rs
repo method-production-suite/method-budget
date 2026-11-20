@@ -653,6 +653,75 @@ fn a_malformed_change_is_refused_and_listed() {
     assert_eq!(a.project().budget.title, "fine");
 }
 
+/// A change whose clock is far above its dependencies' is refused before its
+/// clock counts, so the next edit here records normally (it used to overflow
+/// the clock and panic).
+#[test]
+fn a_change_with_a_clock_far_ahead_is_refused_and_not_counted() {
+    let mut a = adopt(1, &sample());
+    let before = a.lamport();
+    let mut ahead = forged(actor(2), 1, &a, vec![title_op("ahead")]);
+    ahead.lamport = u64::MAX;
+    assert!(matches!(
+        a.apply(ahead).unwrap_err(),
+        LogError::Malformed { .. }
+    ));
+    let (_, why) = &a.rejected()[0];
+    assert!(why.starts_with(method_core::log::refused::CLOCK), "{why}");
+    assert_eq!(a.lamport(), before);
+    assert_eq!(a.project().budget.title, sample().title);
+    let p = a.project();
+    let mut after = p.budget.clone();
+    after.title = "still editable".into();
+    record(&mut a, &p, &after, &[], "Title");
+    assert_eq!(a.changes().last().unwrap().lamport, before + 1);
+}
+
+/// The most a clock may be ahead is accepted and counted.
+#[test]
+fn a_change_at_the_largest_clock_step_is_taken() {
+    let mut a = adopt(1, &sample());
+    let mut far = forged(actor(2), 1, &a, vec![title_op("far")]);
+    far.lamport = a.lamport() + method_core::log::MAX_CLOCK_STEP;
+    assert!(matches!(a.apply(far).unwrap(), Applied::Applied { .. }));
+    assert_eq!(a.lamport(), 1 + method_core::log::MAX_CLOCK_STEP);
+    assert_eq!(a.project().budget.title, "far");
+}
+
+/// A refused change keeps its number (the author's next change follows it),
+/// so this actor's next change names it in `deps`. Every computer refuses it
+/// the same way, so another one applies the change in either order and ends
+/// with the same budget (MReview, the 2026-11-20 security review).
+#[test]
+fn a_refused_change_in_deps_is_harmless() {
+    let base = adopt(1, &sample());
+    let mut other = follower(3, &base);
+    let mut a = base;
+    let bogus = forged(
+        actor(2),
+        1,
+        &a,
+        vec![Op::Set {
+            entity: Uid(12345),
+            field: Field::Name,
+            value: Value::text("x"),
+        }],
+    );
+    assert!(a.apply(bogus.clone()).is_err());
+    let p = a.project();
+    let mut after = p.budget.clone();
+    after.title = "after a refusal".into();
+    record(&mut a, &p, &after, &[], "Title");
+    let mine = a.changes().last().unwrap().clone();
+    assert!(mine.deps.includes(bogus.id()));
+    // The change arrives before the refused one it names: it waits, then
+    // goes in once that one has been refused here too.
+    assert_eq!(other.apply(mine).unwrap(), Applied::Pending);
+    assert!(other.apply(bogus).is_err());
+    assert_eq!(other.project().budget.title, "after a refusal");
+    assert_eq!(rejected_ids(&other), rejected_ids(&a));
+}
+
 // ---------------------------------------------------------------------------
 // Conflicts and repairs (docs/research/collaboration.md, 3.8 and 3.10)
 

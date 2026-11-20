@@ -134,6 +134,25 @@ fn read_text(path: impl AsRef<Path>) -> std::io::Result<String> {
     read_to_string_capped(path.as_ref(), MAX_READ_BYTES)
 }
 
+/// The most a heartbeat or a written-file record may hold. An app writes a
+/// few hundred bytes; these are read for every person every few seconds,
+/// so a larger one is left unread rather than read again and again.
+pub const MAX_SMALL_FILE_BYTES: u64 = 64 * 1024;
+
+/// The most an access request's note and its codes may hold once read: what
+/// an app writes (the note is cut to 200 characters when asked), so a
+/// heartbeat someone made by hand carries no more to the screen.
+pub const REQUEST_NOTE_MAX_CHARS: usize = 200;
+/// See [`REQUEST_NOTE_MAX_CHARS`].
+pub const REQUEST_MAX_CODES: usize = 64;
+/// See [`REQUEST_NOTE_MAX_CHARS`].
+pub const REQUEST_CODE_MAX_CHARS: usize = 40;
+
+/// Reads a heartbeat or written-file record: at most [`MAX_SMALL_FILE_BYTES`].
+fn read_small(path: impl AsRef<Path>) -> std::io::Result<String> {
+    read_to_string_capped(path.as_ref(), MAX_SMALL_FILE_BYTES)
+}
+
 // ---------------------------------------------------------------------------
 // JSON encoding of changes
 
@@ -885,7 +904,7 @@ pub fn segment_bytes(changes: &[Change]) -> Result<Vec<u8>, String> {
         if c.actor != actor {
             return Err("a segment holds one actor's changes".into());
         }
-        if c.seq != first.seq + i as u64 {
+        if first.seq.checked_add(i as u64) != Some(c.seq) {
             return Err("a segment's changes run in sequence".into());
         }
         body.push_str(&change_to_json(c));
@@ -896,7 +915,8 @@ pub fn segment_bytes(changes: &[Change]) -> Result<Vec<u8>, String> {
             format: format_for(changes),
             actor: actor.hex(),
             from: first.seq,
-            to: first.seq + changes.len() as u64 - 1,
+            // At most the last change's number, checked in sequence above.
+            to: first.seq + (changes.len() as u64 - 1),
             hash: sha256_hex(body.as_bytes()),
         },
     };
@@ -926,18 +946,23 @@ pub fn read_segment(bytes: &[u8]) -> Result<Vec<Change>, String> {
         return Err("hash mismatch: the file is incomplete or altered".into());
     }
     let actor = ActorId::parse(&h.actor).ok_or_else(|| format!("bad actor {:?}", h.actor))?;
+    // Numbers start at 1 and the range runs forward; anything else is a
+    // file someone made by hand, refused before any arithmetic on it.
+    if h.from == 0 || h.to < h.from {
+        return Err(format!("bad range {}-{}", h.from, h.to));
+    }
     let mut out = Vec::new();
     for (i, line) in body.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
         let c = change_from_json(line).map_err(|e| format!("line {}: {e}", i + 2))?;
-        if c.actor != actor || c.seq != h.from + out.len() as u64 {
+        if c.actor != actor || h.from.checked_add(out.len() as u64) != Some(c.seq) {
             return Err(format!("line {}: out of sequence", i + 2));
         }
         out.push(c);
     }
-    if out.len() as u64 != h.to.saturating_sub(h.from) + 1 {
+    if (h.to - h.from).checked_add(1) != Some(out.len() as u64) {
         return Err("the header's range doesn't match the changes".into());
     }
     Ok(out)
@@ -1181,13 +1206,35 @@ impl LogDir {
         self.segments(actor).iter().map(|s| s.to).max().unwrap_or(0)
     }
 
+    /// `actor`'s folder, made if need be, for this computer to write in.
+    /// The `actors` folder and the actor's own may not be links: they are
+    /// inside the shared folder, and a link put in by someone else would
+    /// send this computer's writes, and its roll's removals, somewhere
+    /// outside it. (The log folder itself may be a link the person made.)
+    fn writable_actor_dir(&self, actor: ActorId) -> Result<PathBuf, LogFileError> {
+        let dir = self.actor_dir(actor);
+        let not_a_link = |p: &Path| -> Result<(), LogFileError> {
+            match fs::symlink_metadata(p) {
+                Ok(m) if m.file_type().is_symlink() => Err(LogFileError(format!(
+                    "{}: a link, where the shared folder should have a folder",
+                    p.display()
+                ))),
+                _ => Ok(()),
+            }
+        };
+        not_a_link(&self.actors_dir())?;
+        not_a_link(&dir)?;
+        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        not_a_link(&dir)?;
+        Ok(dir)
+    }
+
     /// Writes one sealed segment of `changes` (one actor, in sequence)
     /// into that actor's folder and returns its path.
     pub fn write_segment(&self, changes: &[Change]) -> Result<PathBuf, LogFileError> {
         let bytes = segment_bytes(changes)?;
         let first = &changes[0];
-        let dir = self.actor_dir(first.actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(first.actor)?;
         let path = dir.join(format!(
             "{:06}-{:06}.{SEGMENT_EXTENSION}",
             first.seq,
@@ -1449,8 +1496,7 @@ struct Written {
 impl LogDir {
     /// Notes that `actor` wrote (or started from) a `.mthd` holding `bytes`.
     pub fn note_written(&self, actor: ActorId, bytes: &[u8]) -> Result<(), LogFileError> {
-        let dir = self.actor_dir(actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(actor)?;
         // One program writes each actor folder (the app as the person, every
         // other program as a tool actor it holds alone), so this read,
         // change and write never races another.
@@ -1476,7 +1522,7 @@ impl LogDir {
     pub fn is_written(&self, bytes: &[u8]) -> bool {
         let hash = sha256_hex(bytes);
         self.actors().into_iter().any(|a| {
-            read_text(self.actor_dir(a).join(WRITTEN_FILE))
+            read_small(self.actor_dir(a).join(WRITTEN_FILE))
                 .ok()
                 .and_then(|t| serde_json::from_str::<Written>(&t).ok())
                 .is_some_and(|w| w.hashes.contains(&hash))
@@ -1545,8 +1591,7 @@ impl LogDir {
     /// Writes `actor`'s heartbeat (only that actor's own application
     /// does), through a temporary file and a rename like a segment.
     pub fn write_presence(&self, actor: ActorId, p: &Presence) -> Result<(), LogFileError> {
-        let dir = self.actor_dir(actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(actor)?;
         let mut text = serde_json::to_string_pretty(p).expect("presence serializes");
         text.push('\n');
         write_sealed(&dir.join(PRESENCE_FILE), text.as_bytes())
@@ -1554,8 +1599,15 @@ impl LogDir {
 
     /// `actor`'s heartbeat, if it has written one that reads.
     pub fn read_presence(&self, actor: ActorId) -> Option<Presence> {
-        let text = read_text(self.actor_dir(actor).join(PRESENCE_FILE)).ok()?;
-        serde_json::from_str(&text).ok()
+        let text = read_small(self.actor_dir(actor).join(PRESENCE_FILE)).ok()?;
+        let mut p: Presence = serde_json::from_str(&text).ok()?;
+        if let Some(req) = &mut p.request {
+            req.note = req.note.chars().take(REQUEST_NOTE_MAX_CHARS).collect();
+            req.codes.truncate(REQUEST_MAX_CODES);
+            req.codes
+                .retain(|c| c.chars().count() <= REQUEST_CODE_MAX_CHARS);
+        }
+        Some(p)
     }
 
     /// Every actor's heartbeat that reads.
@@ -2405,6 +2457,113 @@ mod tests {
         let mut a = [0u8; 32];
         a[0] = n;
         ActorId(a)
+    }
+
+    /// A link in place of an actor's folder is refused for writing, and
+    /// nothing is written where it points.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_in_place_of_an_actor_folder_is_refused() {
+        let base = std::env::temp_dir().join(format!("method-link-refused-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let log = LogDir::at(&base.join("Show.mthd-log"));
+        let elsewhere = base.join("elsewhere");
+        fs::create_dir_all(&elsewhere).unwrap();
+        fs::create_dir_all(log.actors_dir()).unwrap();
+        let who = actor(4);
+        std::os::unix::fs::symlink(&elsewhere, log.actor_dir(who)).unwrap();
+        let p = Presence {
+            name: "Field Station".into(),
+            ..Default::default()
+        };
+        assert!(log.write_presence(who, &p).is_err());
+        assert!(log.note_written(who, b"x").is_err());
+        assert_eq!(fs::read_dir(&elsewhere).unwrap().count(), 0);
+        // A real folder is written as before.
+        log.write_presence(actor(5), &p).unwrap();
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// A header's range is checked before any arithmetic on it: a range
+    /// no app writes is an error, never a panic.
+    #[test]
+    fn a_segment_header_with_a_range_no_app_writes_is_refused() {
+        let segment = |from: u64, to: u64, body: &str| {
+            let header = SegmentLine {
+                segment: SegmentHeader {
+                    format: 1,
+                    actor: actor(7).hex(),
+                    from,
+                    to,
+                    hash: sha256_hex(body.as_bytes()),
+                },
+            };
+            format!("{}\n{body}", serde_json::to_string(&header).unwrap()).into_bytes()
+        };
+        for (from, to) in [
+            (0, u64::MAX),
+            (0, 0),
+            (5, 3),
+            (u64::MAX, u64::MAX),
+            (1, u64::MAX),
+        ] {
+            assert!(read_segment(&segment(from, to, "")).is_err(), "{from}-{to}");
+        }
+        // A last number can't be passed: a second line would be past it.
+        let one = segment_bytes(&[Change {
+            actor: actor(7),
+            seq: u64::MAX,
+            deps: Default::default(),
+            lamport: 1,
+            time: "2026-11-20T00:00:00Z".into(),
+            label: "last".into(),
+            ops: vec![],
+            sig: None,
+        }]);
+        if let Ok(bytes) = one {
+            let text = String::from_utf8(bytes).unwrap();
+            let line = text.split_once('\n').unwrap().1.trim_end().to_string();
+            let body = format!("{line}\n{line}\n");
+            assert!(read_segment(&segment(u64::MAX, u64::MAX, &body)).is_err());
+        }
+    }
+
+    /// A heartbeat is read only up to its small cap, and a request read from
+    /// one carries no more than an app writes.
+    #[test]
+    fn heartbeats_are_capped_when_read() {
+        let root = std::env::temp_dir().join(format!("method-presence-cap-{}", std::process::id()));
+        let log = LogDir::at(&root);
+        let who = actor(9);
+        let dir = log.actor_dir(who);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut p = Presence {
+            name: "Field Station".into(),
+            color: "teal".into(),
+            at: "2026-11-20T00:00:00Z".into(),
+            ..Default::default()
+        };
+        p.request = Some(AccessRequest {
+            role: "editor".into(),
+            codes: (0..500)
+                .map(|i| i.to_string())
+                .chain(["x".repeat(41)])
+                .collect(),
+            note: "n".repeat(5_000),
+            at: "2026-11-20T00:00:00Z".into(),
+        });
+        std::fs::write(dir.join(PRESENCE_FILE), serde_json::to_string(&p).unwrap()).unwrap();
+        let got = log.read_presence(who).unwrap().request.unwrap();
+        assert_eq!(got.note.chars().count(), REQUEST_NOTE_MAX_CHARS);
+        assert_eq!(got.codes.len(), REQUEST_MAX_CODES);
+        // Past the cap, it isn't read at all.
+        let big = format!(
+            "{{\"name\":\"{}\"}}",
+            "x".repeat(MAX_SMALL_FILE_BYTES as usize)
+        );
+        std::fs::write(dir.join(PRESENCE_FILE), big).unwrap();
+        assert!(log.read_presence(who).is_none());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
