@@ -334,7 +334,9 @@ rules every contribution follows are in [CLEAN-ROOM.md](CLEAN-ROOM.md).
   or missing.
 - Contribute a chart-of-accounts template or an invented sample budget.
 
-Open an [issue](https://github.com/method-production-suite/method-budget/issues), or use
+[docs/TESTING.md](docs/TESTING.md) is a one-page guide: what to try in an hour, how to
+report what you find, and what alpha means here. Open an
+[issue](https://github.com/method-production-suite/method-budget/issues), or use
 **Help > Report a Bug…** in the app, which fills in the version for you. Please never attach
 a real budget, schedule or call sheet: an invented one that shows the problem
 (`method-budget sample` makes a large test budget) is always enough.
