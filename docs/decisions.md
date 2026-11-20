@@ -5571,3 +5571,42 @@ industry bid form): keep both left out?", and the owner answered "yes" (relayed 
   Users make their own bid layouts, and nothing of the industry form is built or bundled.
 - **Nothing waits on it now.** Roadmap 3.9 and 3.13 stay [partial] only for their live checks
   in the app. Reopening either needs a new decision from the owner.
+
+## 103. Signed names, and roles tied to a key (2026-11-20, the owner's decision)
+
+Each person's name and color came from their own heartbeat file, and a role (decision 78)
+named an actor id only. This decision puts both under the person's own key, so the name on
+screen and the role in the log belong to the key that signs that person's changes. MOrg asked
+"Sign each person's name and tie each role to their key (Budget decision 103)?", and the owner
+answered "Yes, decision 103".
+
+- **A name is a signed change of the person's own.** A new op, `profile` (`Op::Profile
+  { name, color }`), says the change's actor is called `name` and shown in `color`. Anyone may
+  write their own, as with `key`: it is about the person, not the budget. The last one an actor
+  wrote counts. A name is up to 60 characters on one line, and a color is one of the app's
+  person colors (any other shows as slate). The app writes it with this computer's key when it
+  shares or joins a budget, and again when the person changes their name or color.
+- **Names on screen come from the log.** The People list, requests, Activity, cursors and Who
+  Changed This show the signed name. A name known only from a heartbeat, for a computer with no
+  `profile` yet, is marked "not confirmed".
+- **A role can name a key.** A grant gains an optional `key` (`Op::Grant { actor, role, key }`).
+  A role with a key holds while the key published in that actor's name is that key, and the
+  actor is read only otherwise, on every computer alike. A grant without a key, which is every
+  grant made before this decision, works as before.
+- **New roles name the key.** Set, Allow and Allow-only write the key in the log for that
+  person. Once signing has started, the app gives no role to someone with no key there. An
+  invite claim (decision 97) gives a role tied to the key the claimant published.
+- **Existing roles are tied after a check.** For a person whose role has no key yet, the status
+  panel offers **Confirm key…**. It shows a code made from the key in the log under their name
+  (the first 16 hex characters of the SHA-256 of the public key, in four groups), and the
+  person's own app shows the code of the key their computer holds. The owner compares the two
+  with the person, by phone or in person, then confirms, which gives the same role again with
+  that key. If the codes don't match, the owner removes that actor and invites the person again.
+- **History format 5.** `budget.json` and every segment holding a `profile`, or a grant with a
+  key, say 5 (`LOG_FORMAT_KEYED`). An app that reads only 4 (Method Budget 0.9.0 and older)
+  refuses the folder as newer than it reads, rather than reading roles it can't judge.
+  Everyone who shares a budget updates together, and the release notes say so plainly.
+- **Unchanged:** removals and their cutoffs (decision 89), the owner's key pin (decision 95),
+  and invites (decision 97), apart from the key their claims now carry.
+
+Built in the pull request that follows this record. Its tests are listed there.
