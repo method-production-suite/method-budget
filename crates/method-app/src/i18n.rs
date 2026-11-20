@@ -753,8 +753,17 @@ mod tests {
             .chain(MESSAGES.iter().map(|m| m.code.to_string()))
             .collect();
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        // The files in src and in its module folders (src/shared/, src/start/).
+        let mut files = Vec::new();
         for e in std::fs::read_dir(src).unwrap() {
             let p = e.unwrap().path();
+            if p.is_dir() {
+                files.extend(std::fs::read_dir(&p).unwrap().map(|e| e.unwrap().path()));
+            } else {
+                files.push(p);
+            }
+        }
+        for p in files {
             if p.extension().is_none_or(|x| x != "rs") || p.ends_with("i18n.rs") {
                 continue;
             }
