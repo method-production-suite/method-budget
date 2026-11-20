@@ -1747,6 +1747,12 @@ for byte. A program that reads only version 3 (Method Budget 0.7.0 and older) wo
 change holding an op it doesn't know, so it refuses the folder as newer than it reads, as
 above. A log nobody was ever invited to never reaches 4.
 
+It is 5 from the first signed name or key-tied role on (decisions.md, entry 103): the
+computer writing the first `profile`, or a `grant` with a `key`, raises it before writing the
+segment, and every segment holding one has `format` 5. A program that reads only version 4
+(Method Budget 0.9.0 and older) would read a key-tied role as an untied one, so it refuses
+the folder as newer than it reads, as above. A log without roles never reaches 5.
+
 ### Segment files
 
 A segment is UTF-8 text: a header line, then one change per line, each a single-line
@@ -1912,7 +1918,8 @@ the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `n
 | `invite` | `id`, `role`, `scope`, `expires`, `key` | An invite (Signatures, "Invites"): `id` 32 hex characters, `role` and `scope` as in `grant`, `expires` an RFC 3339 time, `key` the public key of the secret in the link (64 hex characters). Who may give it follows a `grant` to a person with no role. A segment holding one has `format` 4. |
 | `claim` | `invite`, `proof` | Takes up invite `invite` for the change's actor; `proof` is the invite key's signature naming that actor. A segment holding one has `format` 4. |
 | `cancel_invite` | `invite` | Cancels an invite: claims outside this change's `deps` are refused. Given by the invite's maker, or anyone who may give its role. A segment holding one has `format` 4. |
-| `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. A grant made after seeing another for the same person replaces it; among grants made apart (none saw the others), the one whose granter ranked higher when giving it wins (owner, then co-owner, then admin), then the later stamp. |
+| `grant` | `actor`, `role`, `scope`, `key` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. A grant made after seeing another for the same person replaces it; among grants made apart (none saw the others), the one whose granter ranked higher when giving it wins (owner, then co-owner, then admin), then the later stamp. `key` (decisions.md, entry 103; left out when none) ties the role to that Ed25519 public key: it holds only while the key published in `actor`'s name is that one, and the person is `read_only` otherwise. A segment holding a grant with a `key` has `format` 5. |
+| `profile` | `name`, `color` | The change's actor's own name and color, signed (decisions.md, entry 103). `name` is one line of visible characters, up to 60, white space single and trimmed, with no control, direction or invisible characters; `color` is `teal`, `blue`, `purple`, `orange`, `rose`, `green`, `amber` or `slate`. Any other form is refused. Any role may write their own; the last one written counts. A segment holding one has `format` 5. |
 
 **Roles.** The actor of the first change (the genesis) owns the budget. Until a `grant`
 appears, every actor may write anything. Once one has, an actor without a role reads only.

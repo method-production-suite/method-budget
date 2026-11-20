@@ -441,6 +441,22 @@ pub fn share_remove_person(
     Ok(sh.status(Instant::now()))
 }
 
+/// Confirm key (decisions.md, entry 103): ties the person `actor`'s role to
+/// the key in their name, once the owner has checked `code` with them.
+/// Returns the status.
+#[tauri::command]
+pub fn share_confirm_key(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    actor: String,
+    code: String,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.confirm_key(&actor, &code)?;
+    Ok(sh.status(Instant::now()))
+}
+
 /// Ask for access (docs/APP.md, "Asking for access"): this person asks
 /// for `role` ("editor", "department", "actuals" or "comment") about the
 /// categories or accounts `codes`, with a short `note`. Written into this
@@ -876,6 +892,7 @@ mod tests {
             "share_use_value",
             "share_set_role",
             "share_remove_person",
+            "share_confirm_key",
             "share_start_again",
             "share_reopen",
             "share_request_access",

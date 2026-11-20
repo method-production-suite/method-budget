@@ -1538,6 +1538,7 @@ pub fn run() {
             crate::shared_app::share_use_value,
             crate::shared_app::share_set_role,
             crate::shared_app::share_remove_person,
+            crate::shared_app::share_confirm_key,
             crate::shared_app::share_start_again,
             crate::shared_app::share_reopen,
             crate::shared_app::share_request_access,

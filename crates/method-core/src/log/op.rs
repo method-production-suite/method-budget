@@ -833,7 +833,19 @@ pub enum Op {
     /// Gives `actor` a role (decisions.md, entry 78): last writer wins per
     /// person, judged at each change's causal point
     /// ([`super::access`]). About the budget, so its entity is the root.
-    Grant { actor: ActorId, role: Role },
+    Grant {
+        actor: ActorId,
+        role: Role,
+        /// The key the role is tied to (decisions.md, entry 103): the role
+        /// holds only while the key published in `actor`'s name is this
+        /// one. `None` for a grant made before roles were tied to keys.
+        key: Option<PublicKey>,
+    },
+    /// The change's actor's own name and color, signed (decisions.md, entry
+    /// 103). Anyone may write their own; the last one written counts. A
+    /// name is [`super::profile::normal_name`] form, a color one of the
+    /// person colors.
+    Profile { name: String, color: String },
     /// Says that the change's actor writes for `person` (a command line or
     /// an agent on that person's computer, which has an actor of its own so
     /// it never shares a sequence of changes with the app): it has that
@@ -885,6 +897,7 @@ impl Op {
             Op::Grant { .. }
             | Op::ActsFor { .. }
             | Op::Key { .. }
+            | Op::Profile { .. }
             | Op::Revoke { .. }
             | Op::Invite { .. }
             | Op::Claim { .. }
@@ -905,6 +918,7 @@ impl Op {
             Op::Grant { .. } => "grant",
             Op::ActsFor { .. } => "acts_for",
             Op::Key { .. } => "key",
+            Op::Profile { .. } => "profile",
             Op::Revoke { .. } => "revoke",
             Op::Invite { .. } => "invite",
             Op::Claim { .. } => "claim",

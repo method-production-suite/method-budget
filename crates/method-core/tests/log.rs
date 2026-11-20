@@ -1854,6 +1854,7 @@ fn a_forged_first_change_never_takes_the_budget() {
         ops: vec![Op::Grant {
             actor: actor(3),
             role: Role::Admin,
+            key: None,
         }],
         sig: None,
     };
@@ -2105,6 +2106,7 @@ fn acts_for_never_raises_a_member() {
             Op::Grant {
                 actor: actor(who),
                 role: Role::Admin,
+                key: None,
             },
         ],
         sig: None,
@@ -3122,6 +3124,7 @@ fn a_remembered_owner_key_keeps_a_different_one_out() {
             Op::Grant {
                 actor: actor(2),
                 role: Role::Editor,
+                key: None,
             },
             Op::Key {
                 key: TestKey(66).public(),
@@ -3964,4 +3967,109 @@ fn two_granters_sealing_at_once_converge() {
     deliver(&mut kim, &written(&[&owner]));
     assert!(owner.seal_invites(now_at_t(), T).is_empty());
     assert!(kim.seal_invites(now_at_t(), T).is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Signed names and roles tied to a key (decisions.md, entry 103)
+
+/// A role tied to a key holds only while that is the key in the person's
+/// name; with another key there, the person is read only.
+#[test]
+fn a_role_tied_to_a_key_holds_only_for_that_key() {
+    let mut owner = keyed(adopt(1, &sample()), Some(1));
+    // Jordan's computer joins and publishes key 2.
+    let mut jordan = signed_follower(2, &owner, 2);
+    jordan.publish_key_now("Key", T).unwrap();
+    send(&jordan, &mut owner);
+    owner
+        .grant_tied(
+            actor(2),
+            Role::Editor,
+            Some(PublicKey([2; 32])),
+            "Jordan edits",
+            T,
+        )
+        .unwrap();
+    assert_eq!(owner.role_of(actor(2)), Role::Editor);
+    assert_eq!(owner.role_key(actor(2)), Some(PublicKey([2; 32])));
+    // Tied to a key that isn't the one in Jordan's name: read only.
+    owner
+        .grant_tied(
+            actor(2),
+            Role::Editor,
+            Some(PublicKey([77; 32])),
+            "Again",
+            T,
+        )
+        .unwrap();
+    assert_eq!(owner.role_of(actor(2)), Role::ReadOnly);
+    // Every computer judges it alike.
+    let mut fresh = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver(&mut fresh, &written(&[&owner, &jordan]));
+    assert_eq!(fresh.role_of(actor(2)), Role::ReadOnly);
+}
+
+/// Someone who joins from an invite gets a role tied to the key their
+/// claim publishes, whatever order a computer reads the changes in.
+#[test]
+fn a_claimed_role_is_tied_to_the_claimants_key() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xD4);
+    owner
+        .invite(inv, Role::Editor, EXPIRES, invite_key(60), "Invite", T)
+        .unwrap();
+    let mut riley = signed_follower(6, &owner, 6);
+    riley
+        .claim(inv, proof(60, inv, actor(6)), "Joined", T)
+        .unwrap();
+    assert_eq!(riley.role_key(actor(6)), Some(PublicKey([6; 32])));
+    let all = written(&[&owner, &riley]);
+    let mut rng = Rng::new(21);
+    for n in 0..6 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert_eq!(fresh.role_of(actor(6)), Role::Editor);
+        assert_eq!(fresh.role_key(actor(6)), Some(PublicKey([6; 32])));
+    }
+}
+
+/// A profile is the person's own: the last one counts, every computer
+/// reads it, and one that isn't in normal form is refused.
+#[test]
+fn a_profile_is_signed_and_checked() {
+    let mut owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    jordan
+        .set_profile("  Jordan   Lee ", "blue", "Name", T)
+        .unwrap();
+    assert_eq!(
+        jordan.profile_of(actor(2)),
+        Some(&("Jordan Lee".to_string(), "blue".to_string()))
+    );
+    // Writing the same again records nothing.
+    assert_eq!(
+        jordan.set_profile("Jordan Lee", "blue", "Name", T).unwrap(),
+        None
+    );
+    jordan.set_profile("Jordan L.", "teal", "Name", T).unwrap();
+    send(&jordan, &mut owner);
+    assert_eq!(
+        owner.profile_of(actor(2)),
+        Some(&("Jordan L.".to_string(), "teal".to_string()))
+    );
+    // A name with hidden characters, made by hand, is refused.
+    let mut odd = forged(
+        actor(2),
+        jordan.own_seq() + 1,
+        &jordan,
+        vec![Op::Profile {
+            name: "Jordan\u{200B} Lee".into(),
+            color: "blue".into(),
+        }],
+    );
+    odd.sig = Some(TestKey(2).sign(&odd));
+    assert!(owner.apply(odd).is_err());
+    assert_eq!(owner.profile_of(actor(2)).unwrap().0, "Jordan L.");
 }

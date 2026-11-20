@@ -35,7 +35,7 @@ use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
 /// The highest log format version this build reads.
-pub const LOG_FORMAT_VERSION: u64 = 4;
+pub const LOG_FORMAT_VERSION: u64 = 5;
 /// The version a log is written at until someone is given a role.
 pub const LOG_FORMAT_BASE: u64 = 1;
 /// The version from the first role on (decisions.md, entry 78): `budget.json`
@@ -53,9 +53,22 @@ pub const LOG_FORMAT_SIGNED: u64 = 3;
 /// 0.7.0 and older) refuses the folder as newer than it reads rather than
 /// failing on an op it doesn't know.
 pub const LOG_FORMAT_INVITES: u64 = 4;
+/// The version from the first signed name or key-tied role on (decisions.md,
+/// entry 103): `budget.json` and every segment holding a `profile`, or a
+/// `grant` with a `key`, say 5, so a program that reads only 4 (Method
+/// Budget 0.9.0 and older) refuses the folder as newer than it reads
+/// rather than reading roles it can't judge.
+pub const LOG_FORMAT_KEYED: u64 = 5;
 
 /// The format a segment holding `changes` is written at.
 fn format_for(changes: &[Change]) -> u64 {
+    if changes.iter().any(|c| {
+        c.ops
+            .iter()
+            .any(|op| matches!(op, Op::Profile { .. } | Op::Grant { key: Some(_), .. }))
+    }) {
+        return LOG_FORMAT_KEYED;
+    }
     if changes.iter().any(|c| {
         c.ops.iter().any(|op| {
             matches!(
@@ -302,6 +315,14 @@ enum FileOp {
         role: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         scope: Vec<String>,
+        /// The key the role is tied to (decisions.md, entry 103).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        key: Option<String>,
+    },
+    /// The change's actor's signed name and color (decisions.md, entry 103).
+    Profile {
+        name: String,
+        color: String,
     },
     /// The change's actor writes for `person` (a command line or agent).
     #[serde(rename = "acts_for")]
@@ -440,14 +461,19 @@ impl From<&Op> for FileOp {
             },
             Op::Key { key } => FileOp::Key { key: key.hex() },
             Op::Revoke { actor } => FileOp::Revoke { actor: actor.hex() },
-            Op::Grant { actor, role } => {
+            Op::Grant { actor, role, key } => {
                 let (role, scope) = role_scope(role);
                 FileOp::Grant {
                     actor: actor.hex(),
                     role,
                     scope,
+                    key: key.map(|k| k.hex()),
                 }
             }
+            Op::Profile { name, color } => FileOp::Profile {
+                name: name.clone(),
+                color: color.clone(),
+            },
             Op::Invite {
                 id,
                 role,
@@ -556,10 +582,20 @@ impl TryFrom<FileOp> for Op {
             FileOp::Revoke { actor } => Op::Revoke {
                 actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
             },
-            FileOp::Grant { actor, role, scope } => Op::Grant {
+            FileOp::Grant {
+                actor,
+                role,
+                scope,
+                key,
+            } => Op::Grant {
                 actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
                 role: parse_role(&role, &scope)?,
+                key: match key {
+                    Some(k) => Some(PublicKey::parse(&k).ok_or_else(|| format!("bad key {k:?}"))?),
+                    None => None,
+                },
             },
+            FileOp::Profile { name, color } => Op::Profile { name, color },
             FileOp::Invite {
                 id,
                 role,
@@ -2715,6 +2751,7 @@ mod tests {
                 .map(|role| Op::Grant {
                     actor: actor(2),
                     role: role.clone(),
+                    key: None,
                 })
                 .chain([Op::ActsFor { person: actor(3) }])
                 .collect(),

@@ -212,13 +212,70 @@ impl SharedDoc {
                 ("role", &self.role_words(&role)),
             ],
         );
+        // Tied to the key in their name (decisions.md, entry 103). Once
+        // signing has started, a role beyond read only goes only to someone
+        // whose key is in the budget.
+        let key = self.shared.log.key_of(who);
+        if key.is_none() && self.shared.log.signing_started() && role != Role::ReadOnly {
+            return Err(tr_with(
+                "shared.no_key_yet",
+                &[("name", &self.name_of(who))],
+            ));
+        }
+        // A role from before roles were tied to keys is tied by Confirm key,
+        // after the code check, never by setting a role over it.
+        let current = self.shared.log.role_of(who);
+        if role != Role::ReadOnly
+            && current != Role::ReadOnly
+            && key.is_some()
+            && self.shared.log.role_key(who) != key
+        {
+            return Err(tr_with(
+                "shared.confirm_key_first",
+                &[("name", &self.name_of(who))],
+            ));
+        }
         let me = self.role();
         self.shared
             .log
-            .grant(who, role, &label, &iso_now())
+            .grant_tied(who, role, key, &label, &iso_now())
             .map_err(|e| match me {
                 Role::Admin => tr("shared.only_make_admins"),
                 Role::CoOwner => tr("shared.only_make_coowners"),
+                Role::Owner => tr_with("shared.role_not_set", &[("why", e.to_string().as_str())]),
+                _ => tr_with(
+                    "shared.only_set_roles",
+                    &[("owner", self.owner_name().as_str())],
+                ),
+            })?;
+        let now = Instant::now();
+        self.last_edit = Some(now);
+        self.unwritten_since.get_or_insert(now);
+        self.last_change = now;
+        Ok(())
+    }
+
+    /// Ties the person `actor`'s role to the key in their name, after the
+    /// owner has checked its code with them (decisions.md, entry 103): the
+    /// same role given again, with that key. `code` is the code the owner
+    /// was shown, so a key that changed in between isn't tied.
+    pub fn confirm_key(&mut self, actor: &str, code: &str) -> Result<(), String> {
+        let who = ActorId::parse(actor).ok_or_else(|| tr("shared.which_person"))?;
+        let key = self
+            .shared
+            .log
+            .key_of(who)
+            .ok_or_else(|| tr_with("shared.no_key_yet", &[("name", &self.name_of(who))]))?;
+        if key_code(&key) != code {
+            return Err(tr("shared.key_changed"));
+        }
+        let role = self.shared.log.role_of(who);
+        let label = msg("engine.undo.confirm_key", &[("name", &self.name_of(who))]);
+        let me = self.role();
+        self.shared
+            .log
+            .grant_tied(who, role, Some(key), &label, &iso_now())
+            .map_err(|e| match me {
                 Role::Owner => tr_with("shared.role_not_set", &[("why", e.to_string().as_str())]),
                 _ => tr_with(
                     "shared.only_set_roles",
@@ -381,7 +438,8 @@ impl SharedDoc {
             .log
             .publish_key("Added this computer\u{2019}s key", &iso_now())
             .map_err(|e| self.refused_text(&e))?;
-        if added.is_some() {
+        let signed = self.sign_profile()?;
+        if added.is_some() || signed {
             self.reproject();
             let now = Instant::now();
             self.last_edit = Some(now);
@@ -389,6 +447,29 @@ impl SharedDoc {
             self.last_change = now;
         }
         Ok(())
+    }
+
+    /// Writes this person's name and color as a signed change of their own
+    /// (decisions.md, entry 103) when it isn't what the log already says.
+    /// Only once this computer's key is in the log: a budget shared without
+    /// roles stays at the history format it has. Whether one was written.
+    pub(super) fn sign_profile(&mut self) -> Result<bool, String> {
+        let log = &self.shared.log;
+        let mine = log.signer_key();
+        if mine.is_none()
+            || log.key_of(self.actor()) != mine
+            || method_core::log::profile::normal_name(&self.me.name).is_empty()
+        {
+            return Ok(false);
+        }
+        let label = msg("engine.undo.profile", &[("name", &self.me.name)]);
+        let me = self.me.clone();
+        let wrote = self
+            .shared
+            .log
+            .set_profile(&me.name, &me.color, &label, &iso_now())
+            .map_err(|e| self.refused_text(&e))?;
+        Ok(wrote.is_some())
     }
 
     /// Removes the person `actor` (64 hex characters): they read only, and

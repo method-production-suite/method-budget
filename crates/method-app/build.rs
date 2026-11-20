@@ -274,6 +274,7 @@ const COMMANDS: &[&str] = &[
     "share_use_value",
     "share_set_role",
     "share_remove_person",
+    "share_confirm_key",
     "share_start_again",
     "share_reopen",
     "share_request_access",
