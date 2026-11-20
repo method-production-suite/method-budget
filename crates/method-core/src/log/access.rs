@@ -227,8 +227,15 @@ pub fn role_at(state: &State, actor: ActorId, deps: &Frontier) -> Role {
         Some(_) => {}
     }
     let grants = state.grants();
-    if let Some(r) = grants.get(&actor).and_then(|r| grant_at(r, deps)) {
-        return r.clone();
+    if let Some(w) = grants.get(&actor).and_then(|r| grant_write_at(r, deps)) {
+        // A role tied to a key holds only while that is the key published
+        // in this person's name (decisions.md, entry 103).
+        if let Some(k) = w.key {
+            if state.key_of(actor).map(|(pk, _)| pk) != Some(k) {
+                return Role::ReadOnly;
+            }
+        }
+        return w.role.clone();
     }
     if started(state, deps) {
         Role::ReadOnly
@@ -552,9 +559,10 @@ pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(
             made_links = true;
             continue;
         }
-        if let Op::Key { .. } = op {
-            // A key is about the computer, not the budget: anyone may
-            // publish theirs (the signature checks say whether it is theirs).
+        if let Op::Key { .. } | Op::Profile { .. } = op {
+            // A key is about the computer and a profile about the person,
+            // not the budget: anyone may publish their own (the signature
+            // checks say whether it is theirs).
             continue;
         }
         if let Op::Claim { .. } = op {
@@ -594,7 +602,7 @@ pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(
             continue;
         }
         let granted = match op {
-            Op::Grant { actor, role } => Some((actor, role.clone())),
+            Op::Grant { actor, role, .. } => Some((actor, role.clone())),
             Op::Revoke { actor } => Some((actor, Role::ReadOnly)),
             _ => None,
         };

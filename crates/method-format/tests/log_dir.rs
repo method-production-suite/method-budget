@@ -263,6 +263,7 @@ fn a_forged_first_change_in_the_folder_never_takes_the_budget() {
         ops: vec![Op::Grant {
             actor: actor(3),
             role: Role::Admin,
+            key: None,
         }],
         sig: None,
     };
@@ -1324,11 +1325,11 @@ fn an_invite_raises_the_log_format_to_4_and_a_newcomer_joins_with_it() {
         panic!("a folder newer than this program reads was opened");
     };
     assert!(
-        err.0.contains("newer than this program reads (4)"),
+        err.0.contains("newer than this program reads (5)"),
         "{}",
         err.0
     );
-    assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_INVITES);
+    assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_KEYED);
     let _ = fs::remove_dir_all(&dir);
 }
 

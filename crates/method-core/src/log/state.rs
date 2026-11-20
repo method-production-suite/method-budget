@@ -189,6 +189,8 @@ pub struct GrantWrite {
     /// Written by a removal (`Op::Revoke`): the role is read only and the
     /// person's later changes are kept aside.
     pub removed: bool,
+    /// The key the role is tied to (decisions.md, entry 103), if any.
+    pub key: Option<PublicKey>,
 }
 
 /// An invite as the state keeps it (decisions.md, entry 97): who made it,
@@ -253,6 +255,8 @@ pub struct State {
     keys: BTreeMap<ActorId, (PublicKey, ChangeId)>,
     /// Every invite applied, by id (decisions.md, entry 97).
     invites: BTreeMap<Uid, InviteRecord>,
+    /// Each actor's signed name and color (decisions.md, entry 103).
+    profiles: BTreeMap<ActorId, Register<(String, String)>>,
 }
 
 impl Default for State {
@@ -276,7 +280,14 @@ impl State {
             judged: std::collections::BTreeSet::new(),
             keys: BTreeMap::new(),
             invites: BTreeMap::new(),
+            profiles: BTreeMap::new(),
         }
+    }
+
+    /// `actor`'s signed name and color (decisions.md, entry 103), if it has
+    /// written one.
+    pub fn profile_of(&self, actor: ActorId) -> Option<&(String, String)> {
+        self.profiles.get(&actor).map(|r| r.value())
     }
 
     /// Every invite applied, by id, with whether it was used or cancelled.
@@ -497,6 +508,11 @@ impl State {
                     }
                 }
                 Op::Grant { .. } | Op::Revoke { .. } => {}
+                Op::Profile { name, color } => {
+                    if let Some(why) = super::profile::refusal(name, color) {
+                        return Err(bad(index, why.into()));
+                    }
+                }
                 Op::Invite { id, role, .. } => {
                     if self.invites.contains_key(id)
                         || change.ops[..index]
@@ -647,11 +663,20 @@ impl State {
                         e.sets.entry(*field).or_default().remove(member, seen);
                     }
                 }
-                Op::Grant { actor, role } => {
-                    self.write_grant(change, stamp, *actor, role.clone(), false);
+                Op::Grant { actor, role, key } => {
+                    self.write_grant(change, stamp, *actor, role.clone(), false, *key);
                 }
                 Op::Revoke { actor } => {
-                    self.write_grant(change, stamp, *actor, Role::ReadOnly, true);
+                    self.write_grant(change, stamp, *actor, Role::ReadOnly, true, None);
+                }
+                Op::Profile { name, color } => {
+                    let v = (name.clone(), color.clone());
+                    match self.profiles.get_mut(&change.actor) {
+                        Some(r) => r.write(stamp, v),
+                        None => {
+                            self.profiles.insert(change.actor, Register::new(stamp, v));
+                        }
+                    }
                 }
                 Op::Key { key } => {
                     self.keys.entry(change.actor).or_insert((*key, change.id()));
@@ -681,11 +706,23 @@ impl State {
                     // inviter, ranked as the inviter was where the claim was
                     // made.
                     if let Some(rec) = self.invites.get(invite).cloned() {
+                        // Tied to the claimant's key (decisions.md, entry 103):
+                        // the one the claim itself publishes (an app's does),
+                        // or one published in a change the claim's `deps`
+                        // name. Either way every computer has it when the
+                        // claim is applied, so they all tie the same key.
+                        let key = change.key().or_else(|| {
+                            self.keys
+                                .get(&change.actor)
+                                .filter(|(_, at)| change.deps.includes(*at))
+                                .map(|(k, _)| *k)
+                        });
                         let w = GrantWrite {
                             role: rec.role.clone(),
                             rank: access::rank(&access::role_at(self, rec.by, &change.deps)),
                             deps: change.deps.clone(),
                             removed: false,
+                            key,
                         };
                         match self.grants.get_mut(&change.actor) {
                             Some(r) => r.write(stamp, w),
@@ -723,12 +760,14 @@ impl State {
         actor: ActorId,
         role: Role,
         removed: bool,
+        key: Option<PublicKey>,
     ) {
         let w = GrantWrite {
             role,
             rank: access::rank(&access::role_at(self, change.actor, &change.deps)),
             deps: change.deps.clone(),
             removed,
+            key,
         };
         match self.grants.get_mut(&actor) {
             Some(r) => r.write(stamp, w),

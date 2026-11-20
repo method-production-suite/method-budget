@@ -26,6 +26,7 @@ pub mod hash;
 pub mod ids;
 pub mod invite;
 pub mod op;
+pub mod profile;
 pub mod project;
 pub mod review;
 pub mod schema;
@@ -1078,7 +1079,66 @@ impl Log {
         label: &str,
         time: &str,
     ) -> Result<ChangeId, LogError> {
-        self.record_ops(vec![Op::Grant { actor, role }], label, time)
+        self.grant_tied(actor, role, None, label, time)
+    }
+
+    /// [`Log::grant`], tied to `key` (decisions.md, entry 103): the role
+    /// holds only while that is the key published in `actor`'s name.
+    pub fn grant_tied(
+        &mut self,
+        actor: ActorId,
+        role: Role,
+        key: Option<PublicKey>,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::Grant { actor, role, key }], label, time)
+    }
+
+    /// Writes this actor's name and color as a signed change of its own
+    /// (decisions.md, entry 103), the name in [`profile::normal_name`]
+    /// form. `None` when the log already says so.
+    pub fn set_profile(
+        &mut self,
+        name: &str,
+        color: &str,
+        label: &str,
+        time: &str,
+    ) -> Result<Option<ChangeId>, LogError> {
+        let name = profile::normal_name(name);
+        let color = if profile::COLORS.contains(&color) {
+            color
+        } else {
+            "slate"
+        };
+        if self.state.profile_of(self.actor) == Some(&(name.clone(), color.to_string())) {
+            return Ok(None);
+        }
+        self.record_ops(
+            vec![Op::Profile {
+                name,
+                color: color.to_string(),
+            }],
+            label,
+            time,
+        )
+        .map(Some)
+    }
+
+    /// `actor`'s signed name and color, if it has written one.
+    pub fn profile_of(&self, actor: ActorId) -> Option<&(String, String)> {
+        self.state.profile_of(actor)
+    }
+
+    /// The key `actor`'s current role is tied to, if any (decisions.md,
+    /// entry 103): `None` for no role, or a role from before roles were
+    /// tied to keys.
+    pub fn role_key(&self, actor: ActorId) -> Option<PublicKey> {
+        self.state
+            .grants()
+            .get(&actor)
+            .and_then(|r| access::grant_write_at(r, &self.frontier))
+            .and_then(|w| w.key)
     }
 
     /// Removes `actor` (decisions.md, entry 89): a change by this actor

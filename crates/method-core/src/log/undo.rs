@@ -122,6 +122,7 @@ pub fn inverse(state: &State, change: &Change, describe: &dyn Fn(Uid) -> String)
             Op::Grant { .. }
             | Op::ActsFor { .. }
             | Op::Key { .. }
+            | Op::Profile { .. }
             | Op::Revoke { .. }
             | Op::Invite { .. }
             | Op::Claim { .. }
