@@ -233,6 +233,7 @@
     "allow-share-use-value",
     "allow-share-set-role",
     "allow-share-remove-person",
+    "allow-share-confirm-key",
     "allow-share-start-again",
     "allow-share-reopen",
     "allow-share-request-access",

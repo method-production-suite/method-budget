@@ -58,6 +58,10 @@ impl SharedDoc {
             }
             return default_name(actor);
         }
+        // Their own signed name first (decisions.md, entry 103).
+        if let Some((name, _)) = self.shared.log.profile_of(actor) {
+            return name.clone();
+        }
         match self.people.get(&actor) {
             Some(p) if !p.name.trim().is_empty() => {
                 p.name.trim().chars().take(NAME_MAX_CHARS).collect()
@@ -75,6 +79,11 @@ impl SharedDoc {
         }
         if actor == self.actor() {
             return self.me.color.clone();
+        }
+        if let Some((_, color)) = self.shared.log.profile_of(actor) {
+            if COLORS.contains(&color.as_str()) {
+                return color.clone();
+            }
         }
         match self.people.get(&actor) {
             Some(p) if COLORS.contains(&p.color.as_str()) => p.color.clone(),
@@ -138,6 +147,21 @@ impl SharedDoc {
                 .unwrap_or_default(),
             signs: self.shared.log.key_of(actor).is_some(),
             removed,
+            name_confirmed: me || self.shared.log.profile_of(actor).is_some(),
+            key_tied: self
+                .shared
+                .log
+                .role_key(actor)
+                .is_some_and(|k| self.shared.log.key_of(actor) == Some(k)),
+            // Mine: the key this computer holds, so a key in my name that
+            // isn't mine shows a different code from the one the owner sees.
+            key_code: if me {
+                self.shared.log.signer_key()
+            } else {
+                self.shared.log.key_of(actor)
+            }
+            .map(|k| key_code(&k))
+            .unwrap_or_default(),
         }
     }
 

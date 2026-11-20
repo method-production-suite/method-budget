@@ -896,10 +896,11 @@ fn changes_are_signed_from_the_first_role_and_the_lists_say_so() {
     // The first change, made before signing, isn't.
     let all = alex.shared().unwrap().activity(500);
     assert!(!all.last().unwrap().signed);
-    // The file says so: format 3.
+    // The file says so: format 5, since each person's signed name and the
+    // roles tied to keys come with signing (decisions.md, entry 103).
     let dir = alex.shared().unwrap().folder().to_path_buf();
     let info = std::fs::read_to_string(dir.join("budget.json")).unwrap();
-    assert!(info.contains("\"version\": 3"), "{info}");
+    assert!(info.contains("\"version\": 5"), "{info}");
 }
 
 #[test]
@@ -1497,6 +1498,81 @@ fn a_requests_code_comes_from_the_key() {
     assert!(!real.removed && !real.no_key);
 }
 
+fn person_seen(s: &Session, actor: ActorId) -> method_app::shared::PersonDto {
+    s.shared()
+        .unwrap()
+        .status(Instant::now())
+        .people
+        .into_iter()
+        .find(|p| p.actor == actor.hex())
+        .unwrap()
+}
+
+/// Each person's name is their own signed one once signing has started: a
+/// heartbeat written by someone else doesn't change it, and renaming
+/// yourself does, everywhere (decisions.md, entry 103).
+#[test]
+fn names_come_from_each_persons_signed_profile() {
+    let (path, mut alex, mut jordan) = signed_sessions();
+    exchange(&mut alex, &mut jordan);
+    let j = person_seen(&alex, JORDAN);
+    assert_eq!(j.name, "Jordan Lee");
+    assert!(j.name_confirmed);
+    // Someone rewrites Jordan's heartbeat with another name: the signed one stays.
+    let dir = method_format::log::LogDir::for_budget(&path);
+    let mut hb = dir.read_presence(JORDAN).unwrap();
+    hb.name = "Someone Else".into();
+    dir.write_presence(JORDAN, &hb).unwrap();
+    tick_at(&mut alex, 60);
+    assert_eq!(person_seen(&alex, JORDAN).name, "Jordan Lee");
+    // Jordan renames themselves: a signed change everyone takes.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_me(person("Jordan L.", "teal"));
+    exchange(&mut alex, &mut jordan);
+    let j = person_seen(&alex, JORDAN);
+    assert_eq!(j.name, "Jordan L.");
+    assert_eq!(j.color, "teal");
+}
+
+/// A role from before roles were tied to keys is tied by Confirm key, with
+/// the code of the key in the person's name; a wrong code changes nothing.
+/// Once signing has started, a role goes only to someone with a key here.
+#[test]
+fn confirm_key_ties_an_existing_role() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    exchange(&mut alex, &mut jordan);
+    // Jordan's editor role came before Jordan's key was in the budget.
+    let j = person_seen(&alex, JORDAN);
+    assert!(!j.key_tied);
+    assert_eq!(j.key_code, method_app::shared::key_code(&key(2).public()));
+    let sh = alex.shared_mut().unwrap();
+    assert!(sh
+        .confirm_key(&JORDAN.hex(), "0000 0000 0000 0000")
+        .is_err());
+    assert!(!person_seen(&alex, JORDAN).key_tied);
+    alex.shared_mut()
+        .unwrap()
+        .confirm_key(&JORDAN.hex(), &j.key_code)
+        .unwrap();
+    let j = person_seen(&alex, JORDAN);
+    assert!(j.key_tied);
+    assert_eq!(j.role, "editor");
+    // Jordan still edits, everywhere.
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(
+        jordan.shared().unwrap().role(),
+        method_core::log::Role::Editor
+    );
+
+    // Someone with no key in the budget gets no role beyond read only.
+    let stranger = ActorId([8; 32]);
+    let sh = alex.shared_mut().unwrap();
+    assert!(sh.set_role(&stranger.hex(), "editor", &[]).is_err());
+    sh.set_role(&stranger.hex(), "read_only", &[]).unwrap();
+}
+
 #[test]
 fn a_read_only_persons_request_is_declined_on_one_computer_and_allowed() {
     let (path, mut alex, mut jordan) = two_sessions();
@@ -1724,8 +1800,9 @@ fn an_invite_link_lets_someone_new_join_with_its_role_once() {
     assert!(text.contains(r#""op":"invite""#));
     assert!(!text.contains(&base64url(&link.secret)));
     assert!(!text.contains(&method_core::log::ids::hex(&link.secret)));
+    // Format 5: signed names and roles tied to keys (decisions.md, entry 103).
     let info = std::fs::read_to_string(folder.join("budget.json")).unwrap();
-    assert!(info.contains("\"version\": 4"), "{info}");
+    assert!(info.contains("\"version\": 5"), "{info}");
 
     // Riley opens the budget in their copy of the folder and joins from the
     // link: the role it gives, nothing more.

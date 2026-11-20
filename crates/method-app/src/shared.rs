@@ -326,6 +326,15 @@ pub struct PersonDto {
     /// Removed by the owner, a co-owner or an admin, and not given a role
     /// since: their later changes are left out.
     pub removed: bool,
+    /// Their name is their own signed one (decisions.md, entry 103), not
+    /// only what their heartbeat says.
+    pub name_confirmed: bool,
+    /// Their role is tied to the key in their name (decisions.md, entry
+    /// 103). False for a role from before roles were tied to keys.
+    pub key_tied: bool,
+    /// The code of the key in their name, to check with them before
+    /// Confirm key (empty with no key).
+    pub key_code: String,
 }
 
 /// The status item and its panel.

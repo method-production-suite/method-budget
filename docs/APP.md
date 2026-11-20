@@ -2121,6 +2121,18 @@ being typed in, and my cursor, selection and scroll don't move on their own. In 
 **Go there** takes me to that person's cell, and **Follow** keeps going where they go until I press
 a key, click or scroll ("Stopped following Jordan"), or the link ends.
 
+**Names and keys** (decision 103). Once signing has started, each person's app signs their
+name and color into the budget's history, and the People list, requests, Activity, cursors and
+Who Changed This show that signed name. A name known only from a heartbeat says so (the app
+hasn't signed it yet). A role set or allowed from this version on is tied to the key in the person's
+name, and a role goes beyond read only only to someone whose key is in the budget. For a role
+from before, the Share dialog offers **Confirm key…** for that person: read the code it shows
+to them, by phone or in person, and they read back the code their own app shows (in their Share
+dialog, under their own name, and under their request if they asked). If the codes match, **The codes match** ties their role to
+that key; if they don't, remove them and invite them again. A budget shared this way moves to
+history format 5, which Method Budget 0.9.0 and older can't read, so everyone sharing it
+updates together.
+
 **Inviting someone** (decision 97; design 9.1). In the Share dialog, whoever may give roles
 sees **Invite someone**: what the person can do (the same roles as the People list, with
 the category checklist for Edits some categories; admins and co-owners only for those who

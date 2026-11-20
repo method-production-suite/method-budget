@@ -217,7 +217,10 @@ impl SharedDoc {
         // whose key is in the budget.
         let key = self.shared.log.key_of(who);
         if key.is_none() && self.shared.log.signing_started() && role != Role::ReadOnly {
-            return Err(tr_with("shared.no_key_yet", &[("name", &self.name_of(who))]));
+            return Err(tr_with(
+                "shared.no_key_yet",
+                &[("name", &self.name_of(who))],
+            ));
         }
         let me = self.role();
         self.shared

@@ -5583,9 +5583,14 @@ answered "Yes, decision 103".
 - **A name is a signed change of the person's own.** A new op, `profile` (`Op::Profile
   { name, color }`), says the change's actor is called `name` and shown in `color`. Anyone may
   write their own, as with `key`: it is about the person, not the budget. The last one an actor
-  wrote counts. A name is up to 60 characters on one line, and a color is one of the app's
-  person colors (any other shows as slate). The app writes it with this computer's key when it
-  shares or joins a budget, and again when the person changes their name or color.
+  wrote counts. A name is one line of visible characters, up to 60: white space folded to
+  single spaces and trimmed, with no control characters, none that change the direction text
+  runs in and none that show nothing (`profile::normal_name`). A profile in any other form is
+  refused by every computer, so two signed names can't differ only by an invisible
+  character. A color is one of the app's person colors. The app writes the profile with this
+  computer's key once that key is in the log, so a budget shared without roles stays at the
+  format it has, and again when the person changes their name or color. Two people may still
+  sign the same name: the request panel's shared-name note stays.
 - **Names on screen come from the log.** The People list, requests, Activity, cursors and Who
   Changed This show the signed name. A name known only from a heartbeat, for a computer with no
   `profile` yet, is marked "not confirmed".
@@ -5594,10 +5599,14 @@ answered "Yes, decision 103".
   actor is read only otherwise, on every computer alike. A grant without a key, which is every
   grant made before this decision, works as before.
 - **New roles name the key.** Set, Allow and Allow-only write the key in the log for that
-  person. Once signing has started, the app gives no role to someone with no key there. An
-  invite claim (decision 97) gives a role tied to the key the claimant published.
-- **Existing roles are tied after a check.** For a person whose role has no key yet, the status
-  panel offers **Confirm key…**. It shows a code made from the key in the log under their name
+  person. Once signing has started, the app gives no role beyond read only to someone with no
+  key there. A grant without a key from another program is still read as before, because
+  nothing in a change says which format wrote it, and refusing those would also refuse the
+  grants that 0.8 and 0.9 made. An invite claim (decision 97) gives a role tied to the
+  claimant's key: the one the claim publishes, or one in a change its `deps` name. Every
+  computer has that key when it applies the claim, so they all tie the same one.
+- **Existing roles are tied after a check.** For each person whose role has no key yet, the
+  Share dialog offers **Confirm key…** (and says when their key isn't in the budget yet). It shows a code made from the key in the log under their name
   (the first 16 hex characters of the SHA-256 of the public key, in four groups), and the
   person's own app shows the code of the key their computer holds. The owner compares the two
   with the person, by phone or in person, then confirms, which gives the same role again with
@@ -5605,7 +5614,10 @@ answered "Yes, decision 103".
 - **History format 5.** `budget.json` and every segment holding a `profile`, or a grant with a
   key, say 5 (`LOG_FORMAT_KEYED`). An app that reads only 4 (Method Budget 0.9.0 and older)
   refuses the folder as newer than it reads, rather than reading roles it can't judge.
-  Everyone who shares a budget updates together, and the release notes say so plainly.
+  Someone on an older version still opens the budget's file, on its own: it says the shared
+  changes are newer than it reads, and nothing changed there is shared. So the owner updates
+  everyone who shares the budget before signing starts on this version, and the release notes
+  say so plainly.
 - **Unchanged:** removals and their cutoffs (decision 89), the owner's key pin (decision 95),
   and invites (decision 97), apart from the key their claims now carry.
 

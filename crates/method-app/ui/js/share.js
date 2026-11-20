@@ -1305,6 +1305,8 @@ function sharedDialog(title, setup) {
       const colors = colorPicker(me.color, (c) => { me.color = c; });
       const people = el('div', { class: 'share-people-list share-people-dialog' });
       if (s.me) people.append(personRow({ ...s.me, name: t('share.name_you', { name: s.me.name }) }, s));
+      // The code of this computer's key, for whoever confirms it (decisions.md, entry 103).
+      if (s.me && s.me.key_code) people.append(el('p', { class: 'share-muted', text: t('share.my_code', { code: s.me.key_code }) }));
       for (const p of s.people) {
         people.append(personRow(p, s));
         const picker = s.can_set_roles ? rolePicker(p, s, setup, error) : null;
@@ -1511,7 +1513,45 @@ function rolePicker(p, s, setup, error) {
       go.focus();
     });
   }
-  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: t('share.may_change'), attrs: { for: id } }), select, set, remove, cats, first, confirmRemove);
+  // Confirm key (decisions.md, entry 103): a role from before roles were
+  // tied to keys is tied once the owner has checked the key's code with the
+  // person; their own app shows the code of the key their computer holds.
+  const needsKey = !p.removed && !p.key_tied && p.role !== 'owner' && p.role !== 'read_only';
+  const confirmKey = needsKey && p.key_code ? el('button', { class: 'btn btn-quiet', text: t('share.confirm_key'), attrs: { type: 'button', 'aria-label': t('share.confirm_key_label', { name: p.name }) } }) : null;
+  const keyBox = el('div', { class: 'share-first-role', attrs: { role: 'group', 'aria-label': t('share.confirm_key_label', { name: p.name }) } });
+  keyBox.hidden = true;
+  const noKey = needsKey && !p.key_code ? el('p', { class: 'share-muted', text: t('share.no_key_note', { name: p.name }) }) : null;
+  if (confirmKey) {
+    confirmKey.addEventListener('click', () => {
+      error.hidden = true;
+      const go = el('button', { class: 'btn btn-primary', text: t('share.codes_match'), attrs: { type: 'button' } });
+      const keep = el('button', { class: 'btn', text: t('share.cancel'), attrs: { type: 'button' } });
+      keep.addEventListener('click', () => { keyBox.hidden = true; confirmKey.focus(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        try {
+          const status = await ctx.invoke('share_confirm_key', { doc: ctx.doc(), actor: p.actor, code: p.key_code });
+          if (status) statusArrived({ doc: ctx.doc(), status });
+          ctx.toast(t('share.key_confirmed', { name: p.name }));
+          Object.assign(s, status || {});
+          keyBox.hidden = true;
+        } catch (e) {
+          error.textContent = String(e);
+          error.hidden = false;
+        }
+        go.disabled = false;
+      });
+      keyBox.replaceChildren(
+        el('p', { class: 'modal-message', text: t('share.confirm_key_message', { name: p.name, code: p.key_code }) }),
+        el('div', { class: 'modal-actions' }, keep, go),
+      );
+      keyBox.hidden = false;
+      go.focus();
+    });
+  }
+  // A name known only from their heartbeat, not yet signed by them.
+  const unconfirmed = !p.me && !p.name_confirmed ? el('p', { class: 'share-muted', text: t('share.name_unconfirmed', { name: p.name }) }) : null;
+  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: t('share.may_change'), attrs: { for: id } }), select, set, remove, confirmKey, cats, first, confirmRemove, keyBox, noKey, unconfirmed);
 }
 
 // ---------------------------------------------------------------------------
