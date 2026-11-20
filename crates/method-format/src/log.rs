@@ -1145,13 +1145,35 @@ impl LogDir {
         self.segments(actor).iter().map(|s| s.to).max().unwrap_or(0)
     }
 
+    /// `actor`'s folder, made if need be, for this computer to write in.
+    /// The `actors` folder and the actor's own may not be links: they are
+    /// inside the shared folder, and a link put in by someone else would
+    /// send this computer's writes, and its roll's removals, somewhere
+    /// outside it. (The log folder itself may be a link the person made.)
+    fn writable_actor_dir(&self, actor: ActorId) -> Result<PathBuf, LogFileError> {
+        let dir = self.actor_dir(actor);
+        let not_a_link = |p: &Path| -> Result<(), LogFileError> {
+            match fs::symlink_metadata(p) {
+                Ok(m) if m.file_type().is_symlink() => Err(LogFileError(format!(
+                    "{}: a link, where the shared folder should have a folder",
+                    p.display()
+                ))),
+                _ => Ok(()),
+            }
+        };
+        not_a_link(&self.actors_dir())?;
+        not_a_link(&dir)?;
+        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        not_a_link(&dir)?;
+        Ok(dir)
+    }
+
     /// Writes one sealed segment of `changes` (one actor, in sequence)
     /// into that actor's folder and returns its path.
     pub fn write_segment(&self, changes: &[Change]) -> Result<PathBuf, LogFileError> {
         let bytes = segment_bytes(changes)?;
         let first = &changes[0];
-        let dir = self.actor_dir(first.actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(first.actor)?;
         let path = dir.join(format!(
             "{:06}-{:06}.{SEGMENT_EXTENSION}",
             first.seq,
@@ -1413,8 +1435,7 @@ struct Written {
 impl LogDir {
     /// Notes that `actor` wrote (or started from) a `.mthd` holding `bytes`.
     pub fn note_written(&self, actor: ActorId, bytes: &[u8]) -> Result<(), LogFileError> {
-        let dir = self.actor_dir(actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(actor)?;
         // One program writes each actor folder (the app as the person, every
         // other program as a tool actor it holds alone), so this read,
         // change and write never races another.
@@ -1509,8 +1530,7 @@ impl LogDir {
     /// Writes `actor`'s heartbeat (only that actor's own application
     /// does), through a temporary file and a rename like a segment.
     pub fn write_presence(&self, actor: ActorId, p: &Presence) -> Result<(), LogFileError> {
-        let dir = self.actor_dir(actor);
-        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let dir = self.writable_actor_dir(actor)?;
         let mut text = serde_json::to_string_pretty(p).expect("presence serializes");
         text.push('\n');
         write_sealed(&dir.join(PRESENCE_FILE), text.as_bytes())
@@ -2369,6 +2389,31 @@ mod tests {
         let mut a = [0u8; 32];
         a[0] = n;
         ActorId(a)
+    }
+
+    /// A link in place of an actor's folder is refused for writing, and
+    /// nothing is written where it points.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_in_place_of_an_actor_folder_is_refused() {
+        let base = std::env::temp_dir().join(format!("method-link-refused-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let log = LogDir::at(&base.join("Show.mthd-log"));
+        let elsewhere = base.join("elsewhere");
+        fs::create_dir_all(&elsewhere).unwrap();
+        fs::create_dir_all(log.actors_dir()).unwrap();
+        let who = actor(4);
+        std::os::unix::fs::symlink(&elsewhere, log.actor_dir(who)).unwrap();
+        let p = Presence {
+            name: "Field Station".into(),
+            ..Default::default()
+        };
+        assert!(log.write_presence(who, &p).is_err());
+        assert!(log.note_written(who, b"x").is_err());
+        assert_eq!(fs::read_dir(&elsewhere).unwrap().count(), 0);
+        // A real folder is written as before.
+        log.write_presence(actor(5), &p).unwrap();
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
