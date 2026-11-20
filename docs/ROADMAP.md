@@ -17,32 +17,25 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-11-19. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-11-20. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.9.0 waits on MReview's merge, then the rehearsal, then the owner's yes on that
-  commit.** The owner answered through MOrg (2026-11-18): "0.9.0, hide the row", and of the
-  headline, "Yes, use it". #141 bumps to 0.9.0, holds the Live changes row back
-  (`LIVE_CHANGES_SHOWN` in share.js), drops the live sections from the notes and moves
-  Live changes to the roadmap on the README and site. After MReview merges it, the release
-  workflow rehearses that merge commit and the run goes to MOrg; the tag waits for the
-  owner's yes on that exact commit. The dependency bumps landed first, as the owner asked:
-  #106 (tauri 2.12) and #139 (tokio, serde_json, getrandom) are on main at 9b160d1.
+- **0.9.0 is out** (published 2026-11-20, tagged on 7650d62; methodbudget.com follows it).
+  The owner said yes through MOrg: "Yes, tag 0.9.0". It carries the accessibility work, the
+  Linux AppImage fix, the Tools panel fix and signed checksums, with the Live changes row
+  held back. Rehearsal 44634827822 and release run 44656648162 passed on that commit, and
+  the draft's checks (checksums and their signature, the updater signature, notarization and
+  Gatekeeper) passed before it was published. The next release needs the owner's yes as usual.
 - **Live changes come back after the two-computer test below** (3.18; D98) and the owner's
   yes. To bring them back: set `LIVE_CHANGES_SHOWN` to true, set the feature's status in
   docs/features.toml to "have", and restore the offline wording in the README and the
   site's FAQ (the parent of #141's b94bac0 has it).
-- **The next release fixes the Linux AppImage** (docs/research/linux-appimage-egl.md): 0.8.1's
-  opens to an empty window on current Arch-based systems. Its new packaging tool also packages
-  the macOS and Windows builds, so the rehearsal has to pass first.
-- **0.8.1 is out** (published 2026-11-03, tagged on f110543; methodbudget.com follows it).
-  It carries the high contrast and empty-grid focus fixes and the site copy fixes, with no
-  crate-age exceptions. 0.8.0 (2026-10-30) brought signed changes, the owner's key and
-  invite links (3.18), so 0.7.0 and older refuse a shared budget at log format 3 or 4. The
-  next release needs the owner's yes as usual. Signing, Remove, Start Again, muted cells,
-  access requests and invite links still need a live check in the app.
+- **0.8.1** (published 2026-11-03, tagged on f110543) was the release before. 0.8.0
+  (2026-10-30) brought signed changes, the owner's key and invite links (3.18), so 0.7.0 and
+  older refuse a shared budget at log format 3 or 4. Signing, Remove, Start Again, muted
+  cells, access requests and invite links still need a live check in the app.
 
 ### Open decisions
 
