@@ -122,9 +122,23 @@ impl SharedDoc {
     pub(super) fn request_dto(&self, actor: ActorId, req: &AccessRequest) -> RequestDto {
         let (key, scope) = self.granted_for(actor, req, false);
         let given = Role::parse(&key, self.scope_uids(&scope)).unwrap_or(Role::ReadOnly);
+        let name = self.name_of(actor);
+        let same = |n: &str| n.trim().to_lowercase() == name.trim().to_lowercase();
+        let name_taken = self
+            .people
+            .keys()
+            .copied()
+            .chain(std::iter::once(self.actor()))
+            .chain(self.shared.log.owner())
+            .filter(|a| *a != actor)
+            .any(|a| same(&self.name_of(a)));
         RequestDto {
             actor: actor.hex(),
-            name: self.name_of(actor),
+            name_taken,
+            // Applied changes only: a refused one still moves the frontier.
+            new_here: !self.shared.log.changes().any(|c| c.actor == actor),
+            code: computer_code(actor),
+            name,
             color: self.color_of(actor),
             role: req.role.clone(),
             role_text: self.role_text(&given),

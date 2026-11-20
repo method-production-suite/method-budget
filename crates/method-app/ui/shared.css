@@ -857,6 +857,20 @@
   overflow-wrap: anywhere;
 }
 
+/* A request whose name may not be who it seems: the text in the normal
+   color (for contrast), marked by an amber bar beside it. */
+.share-request-warn {
+  margin: 2px 0;
+  padding-left: 6px;
+  border-left: 3px solid var(--share-warn-mark);
+}
+
+@media (forced-colors: active) {
+  .share-request-warn {
+    border-left-color: CanvasText;
+  }
+}
+
 .share-request-input {
   width: 100%;
   margin: 4px 0;
