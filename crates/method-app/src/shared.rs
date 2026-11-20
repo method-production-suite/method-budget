@@ -473,6 +473,22 @@ pub struct RequestDto {
     pub note: String,
     /// When they asked (ISO 8601 UTC); with `actor`, what names it.
     pub at: String,
+    /// The name is also another person's here. Names come from each
+    /// computer's heartbeat, which anyone with the folder can write, so a
+    /// shared name is shown as a warning, never trusted.
+    pub name_taken: bool,
+    /// No change of theirs is in the budget yet: a computer new to it.
+    pub new_here: bool,
+    /// A short code for the computer asking, from its id ("3fa9 c1d2"): the
+    /// asker sees the same code on their own request, so the two can compare.
+    pub code: String,
+}
+
+/// A computer's short code, as people compare it out loud: the first eight
+/// hex characters of its id, in two groups.
+pub fn computer_code(actor: ActorId) -> String {
+    let hex = actor.hex();
+    format!("{} {}", &hex[..4], &hex[4..8])
 }
 
 /// How long a note on an access request may be, in characters.
