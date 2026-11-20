@@ -16,14 +16,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout, MissedTickBehavior};
 
-use crate::{Cell, Frame, Link, Node, Relay, SyncError};
+use crate::{Cell, Frame, Link, Node, Relay, SyncError, MOST_SELECTED};
 
 /// How often a member with no link is tried again.
 pub const RETRY: Duration = Duration::from_secs(3);
@@ -36,6 +36,15 @@ const CLOSE_WAIT: Duration = Duration::from_secs(2);
 const SEND_QUEUE: usize = 256;
 /// Events waiting for the app's timer. Past this a link is closed, likewise.
 const EVENT_QUEUE: usize = 4096;
+/// The most the events waiting for the app may hold, roughly, in bytes.
+/// A peer whose frame would take it past this loses its link (it comes back
+/// and the two compare what they hold), so a fast sender can't fill memory
+/// between two looks by the app's timer.
+const QUEUED_BYTES_MAX: usize = 256 * 1024 * 1024;
+/// How often one link's peer may ask for what it lacks (`Have`). An app asks
+/// once when the link opens; asking again sooner is ignored, since each
+/// answer may be every change it lacks.
+const HAVE_EVERY: Duration = Duration::from_secs(10);
 
 /// What happened on the links since the last look.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,8 +80,46 @@ pub struct Mesh {
     node: Node,
     cmds: mpsc::UnboundedSender<Cmd>,
     events: std_mpsc::Receiver<Event>,
+    /// Bytes waiting in `events` (see [`QUEUED_BYTES_MAX`]).
+    queued: Arc<AtomicUsize>,
     connected: Arc<AtomicUsize>,
     runtime: Option<Runtime>,
+}
+
+impl Event {
+    /// About how many bytes this event holds while it waits.
+    fn weight(&self) -> usize {
+        match self {
+            Event::Changes { lines, .. } => lines.iter().map(|l| l.len() + 24).sum::<usize>() + 64,
+            Event::Cursor { selection, .. } => 128 + selection.len() * 128,
+            Event::Have { frontier, .. } => 64 + frontier.len() * 96,
+            Event::Up { .. } | Event::Down { .. } => 64,
+        }
+    }
+}
+
+/// Where a link's reader puts events for the app: the channel and how many
+/// bytes wait in it.
+#[derive(Clone)]
+struct Events {
+    tx: std_mpsc::SyncSender<Event>,
+    queued: Arc<AtomicUsize>,
+}
+
+impl Events {
+    /// Queues `event`; false when there's no room (by count or by bytes).
+    fn try_send(&self, event: Event) -> bool {
+        let w = event.weight();
+        if self.queued.load(Ordering::Relaxed) + w > QUEUED_BYTES_MAX {
+            return false;
+        }
+        self.queued.fetch_add(w, Ordering::Relaxed);
+        if self.tx.try_send(event).is_err() {
+            self.queued.fetch_sub(w, Ordering::Relaxed);
+            return false;
+        }
+        true
+    }
 }
 
 impl Mesh {
@@ -108,7 +155,12 @@ impl Mesh {
                 .map_err(|e| SyncError(format!("couldn't start the live link: {e}")))?;
             let node = runtime.block_on(start())?;
             let (cmds, cmd_rx) = mpsc::unbounded_channel();
-            let (event_tx, events) = std_mpsc::sync_channel(EVENT_QUEUE);
+            let (tx, events) = std_mpsc::sync_channel(EVENT_QUEUE);
+            let queued = Arc::new(AtomicUsize::new(0));
+            let event_tx = Events {
+                tx,
+                queued: queued.clone(),
+            };
             let connected = Arc::new(AtomicUsize::new(0));
             runtime.spawn(run(
                 node.clone(),
@@ -121,6 +173,7 @@ impl Mesh {
                 node,
                 cmds,
                 events,
+                queued,
                 connected,
                 runtime: Some(runtime),
             })
@@ -157,7 +210,10 @@ impl Mesh {
 
     /// What happened since the last call.
     pub fn events(&self) -> Vec<Event> {
-        self.events.try_iter().collect()
+        let out: Vec<Event> = self.events.try_iter().collect();
+        let w: usize = out.iter().map(Event::weight).sum();
+        self.queued.fetch_sub(w, Ordering::Relaxed);
+        out
     }
 
     /// How many links are open.
@@ -204,7 +260,7 @@ async fn run(
     node: Node,
     budget: String,
     mut cmds: mpsc::UnboundedReceiver<Cmd>,
-    events: std_mpsc::SyncSender<Event>,
+    events: Events,
     connected: Arc<AtomicUsize>,
 ) {
     let me = node.id();
@@ -235,7 +291,7 @@ async fn run(
                             if let Some(open) = links.remove(&id) {
                                 open.stop();
                                 connected.store(links.len(), Ordering::Relaxed);
-                                let _ = events.try_send(Event::Down { peer: id });
+                                events.try_send(Event::Down { peer: id });
                             }
                         }
                     }
@@ -264,7 +320,7 @@ async fn run(
                 serial += 1;
                 links.insert(peer.clone(), open_link(link, serial, events.clone(), ended_tx.clone()));
                 connected.store(links.len(), Ordering::Relaxed);
-                let _ = events.try_send(Event::Up { peer });
+                events.try_send(Event::Up { peer });
             }
             Some(peer) = dialed_rx.recv() => {
                 dialing.remove(&peer);
@@ -275,7 +331,7 @@ async fn run(
                         open.stop();
                     }
                     connected.store(links.len(), Ordering::Relaxed);
-                    let _ = events.try_send(Event::Down { peer });
+                    events.try_send(Event::Down { peer });
                 }
             }
             _ = retry.tick() => {
@@ -342,7 +398,7 @@ fn dial_missing(
 fn open_link(
     link: Link,
     serial: u64,
-    events: std_mpsc::SyncSender<Event>,
+    events: Events,
     ended: mpsc::UnboundedSender<(String, u64)>,
 ) -> Open {
     let peer = link.peer();
@@ -359,16 +415,26 @@ fn open_link(
         let _ = done.send((who, serial));
     });
     let reader = tokio::spawn(async move {
+        let mut last_have: Option<Instant> = None;
         loop {
             let event = match receiver.recv().await {
-                Ok(Frame::Have { frontier }) => Event::Have {
-                    peer: peer.clone(),
-                    frontier,
-                },
+                Ok(Frame::Have { frontier }) => {
+                    if last_have.is_some_and(|t| t.elapsed() < HAVE_EVERY) {
+                        continue;
+                    }
+                    last_have = Some(Instant::now());
+                    Event::Have {
+                        peer: peer.clone(),
+                        frontier,
+                    }
+                }
                 Ok(Frame::Changes { lines }) => Event::Changes {
                     peer: peer.clone(),
                     lines,
                 },
+                // An app never sends more cells than this; a peer that does
+                // loses its link.
+                Ok(Frame::Cursor { selection, .. }) if selection.len() > MOST_SELECTED => break,
                 Ok(Frame::Cursor { cell, selection }) => Event::Cursor {
                     peer: peer.clone(),
                     cell,
@@ -377,7 +443,7 @@ fn open_link(
                 Ok(Frame::Hello { .. }) => continue,
                 Err(_) => break,
             };
-            if events.try_send(event).is_err() {
+            if !events.try_send(event) {
                 break;
             }
         }
