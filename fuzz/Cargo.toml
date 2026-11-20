@@ -83,3 +83,24 @@ path = "fuzz_targets/delta.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "exchange_any"
+path = "fuzz_targets/exchange_any.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "schedule"
+path = "fuzz_targets/schedule.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mapping_file"
+path = "fuzz_targets/mapping_file.rs"
+test = false
+doc = false
+bench = false

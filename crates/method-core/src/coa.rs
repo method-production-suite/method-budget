@@ -339,6 +339,10 @@ fn pieces(code: &str) -> Vec<&str> {
     code.split(is_separator).filter(|p| !p.is_empty()).collect()
 }
 
+/// Widths count bytes, as numbers are ASCII digits; a number with other
+/// characters is cut only where a character starts (`str::get`), never
+/// inside one.
+///
 /// The smallest category width `w` for numbers that all have the same
 /// length and no separator (`1100`, `1101`, `1200`): the numbers that are
 /// all zeros after `w` characters are the categories, and every other number
@@ -347,7 +351,10 @@ fn pieces(code: &str) -> Vec<&str> {
 pub fn zero_suffix_width(codes: &[&str]) -> Option<usize> {
     let len = codes.iter().map(|c| c.len()).max()?;
     (1..len).find(|&w| {
-        let is_cat = |c: &str| c.len() > w && c[w..].bytes().all(|b| b == b'0');
+        let is_cat = |c: &str| {
+            c.get(w..)
+                .is_some_and(|r| !r.is_empty() && r.bytes().all(|b| b == b'0'))
+        };
         let cats: BTreeSet<&str> = codes
             .iter()
             .filter(|c| is_cat(c))
@@ -364,7 +371,7 @@ pub fn zero_suffix_width(codes: &[&str]) -> Option<usize> {
 fn covered(cats: &BTreeSet<&str>, accounts: &[&str], w: usize) -> bool {
     let n = accounts
         .iter()
-        .filter(|a| a.len() > w && cats.contains(&a[..w]))
+        .filter(|a| a.len() > w && a.get(..w).is_some_and(|p| cats.contains(p)))
         .count();
     n * 2 >= accounts.len()
 }
@@ -400,73 +407,76 @@ pub fn infer_coding(
     let has_sep = |c: &&str| c.chars().any(is_separator);
     let max_len = |it: &mut dyn Iterator<Item = usize>| it.max().unwrap_or(0);
 
-    let (cw, aw, sw) =
-        if separator.is_some() && (accounts.iter().any(has_sep) || subs.iter().any(has_sep)) {
-            let leaves: Vec<&str> = accounts.iter().chain(subs).copied().collect();
-            let cw = max_len(
-                &mut leaves
-                    .iter()
-                    .map(|c| pieces(c).first().map_or(0, |p| p.len())),
-            );
-            let aw = max_len(
-                &mut leaves
-                    .iter()
-                    .map(|c| pieces(c).get(1).map_or(0, |p| p.len())),
-            );
-            let sw = max_len(
-                &mut leaves
-                    .iter()
-                    .map(|c| pieces(c).get(2).map_or(0, |p| p.len())),
-            );
-            (cw, aw, sw)
-        } else if separator.is_some() && accounts.is_empty() && subs.is_empty() {
-            let cw = max_len(
-                &mut categories
-                    .iter()
-                    .map(|c| pieces(c).first().map_or(0, |p| p.len())),
-            );
-            (cw, 2, 0)
+    let (cw, aw, sw) = if separator.is_some()
+        && (accounts.iter().any(has_sep) || subs.iter().any(has_sep))
+    {
+        let leaves: Vec<&str> = accounts.iter().chain(subs).copied().collect();
+        let cw = max_len(
+            &mut leaves
+                .iter()
+                .map(|c| pieces(c).first().map_or(0, |p| p.len())),
+        );
+        let aw = max_len(
+            &mut leaves
+                .iter()
+                .map(|c| pieces(c).get(1).map_or(0, |p| p.len())),
+        );
+        let sw = max_len(
+            &mut leaves
+                .iter()
+                .map(|c| pieces(c).get(2).map_or(0, |p| p.len())),
+        );
+        (cw, aw, sw)
+    } else if separator.is_some() && accounts.is_empty() && subs.is_empty() {
+        let cw = max_len(
+            &mut categories
+                .iter()
+                .map(|c| pieces(c).first().map_or(0, |p| p.len())),
+        );
+        (cw, 2, 0)
+    } else {
+        let alen = max_len(&mut accounts.iter().map(|c| c.len()));
+        let cw = if categories.is_empty() {
+            match alen {
+                0 => 2,
+                1..=3 => 1,
+                _ => 2,
+            }
+        } else if accounts.is_empty() {
+            max_len(&mut categories.iter().map(|c| c.len()))
         } else {
-            let alen = max_len(&mut accounts.iter().map(|c| c.len()));
-            let cw = if categories.is_empty() {
-                match alen {
-                    0 => 2,
-                    1..=3 => 1,
-                    _ => 2,
-                }
-            } else if accounts.is_empty() {
-                max_len(&mut categories.iter().map(|c| c.len()))
-            } else {
-                let cmax = categories.iter().map(|c| c.len()).max().unwrap_or(0);
-                (1..=cmax.min(alen.saturating_sub(1)))
-                    .find(|&w| {
-                        let zeros = |c: &&str| c.len() >= w && c[w..].bytes().all(|b| b == b'0');
-                        let prefixes: BTreeSet<&str> =
-                            categories.iter().map(|c| &c[..w.min(c.len())]).collect();
-                        categories.iter().all(zeros) && covered(&prefixes, accounts, w)
-                    })
-                    .unwrap_or_else(|| {
-                        categories
-                            .iter()
-                            .map(|c| c.len())
-                            .min()
-                            .unwrap_or(2)
-                            .min(alen.saturating_sub(1).max(1))
-                    })
-            };
-            let aw = if accounts.is_empty() {
-                2
-            } else {
-                alen.saturating_sub(cw)
-            };
-            let slen = max_len(&mut subs.iter().map(|c| c.len()));
-            let sw = if subs.is_empty() {
-                0
-            } else {
-                slen.saturating_sub(cw + aw)
-            };
-            (cw, aw, sw)
+            let cmax = categories.iter().map(|c| c.len()).max().unwrap_or(0);
+            (1..=cmax.min(alen.saturating_sub(1)))
+                .find(|&w| {
+                    let zeros = |c: &&str| c.get(w..).is_some_and(|r| r.bytes().all(|b| b == b'0'));
+                    let prefixes: BTreeSet<&str> = categories
+                        .iter()
+                        .map(|c| c.get(..w.min(c.len())).unwrap_or(c))
+                        .collect();
+                    categories.iter().all(zeros) && covered(&prefixes, accounts, w)
+                })
+                .unwrap_or_else(|| {
+                    categories
+                        .iter()
+                        .map(|c| c.len())
+                        .min()
+                        .unwrap_or(2)
+                        .min(alen.saturating_sub(1).max(1))
+                })
         };
+        let aw = if accounts.is_empty() {
+            2
+        } else {
+            alen.saturating_sub(cw)
+        };
+        let slen = max_len(&mut subs.iter().map(|c| c.len()));
+        let sw = if subs.is_empty() {
+            0
+        } else {
+            slen.saturating_sub(cw + aw)
+        };
+        (cw, aw, sw)
+    };
     let fits = |w: usize| w <= usize::from(MAX_WIDTH);
     if cw == 0 {
         return Err("no category part could be found in the numbers".into());
@@ -932,6 +942,21 @@ mod tests {
         }
     }
 
+    /// Numbers with letters from any script are measured without cutting a
+    /// character in two, so nothing panics.
+    #[test]
+    fn numbers_with_other_characters_are_never_cut_inside_one() {
+        let cats = ["\u{e9}1", "\u{e9}2"];
+        let accts = ["\u{e9}101", "\u{e9}201", "1\u{e9}01"];
+        let _ = infer_coding(&cats, &accts, &[]);
+        let _ = infer_coding(&["\u{4e00}"], &["\u{4e00}1", "1\u{4e00}"], &[]);
+        let _ = zero_suffix_width(&["\u{e9}00", "\u{e9}01", "1\u{e9}0"]);
+        // ASCII numbers are read as before.
+        assert_eq!(
+            zero_suffix_width(&["1100", "1101", "1200", "1201"]),
+            Some(2)
+        );
+    }
     #[test]
     fn infers_patterns_from_numbers() {
         let c = |cats: &[&str], accts: &[&str], subs: &[&str]| {

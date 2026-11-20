@@ -5,6 +5,13 @@
 *.pem
 *.key
 id_rsa*
+# Signing material: certificates, Apple keys and profiles, minisign secret keys
+*.p12
+*.p8
+*.pfx
+*.cer
+*.mobileprovision
+*.sec
 
 # OS / editor
 .DS_Store

@@ -95,16 +95,18 @@ pub fn read_file(path: &Path, shown: &str) -> Result<Vec<u8>, ToolError> {
             .map_err(|e| ToolError::io(format!("{shown}: {}", e.0)))?;
         return Ok(method_format::to_string(&b).into_bytes());
     }
-    let len = std::fs::metadata(path)
-        .map_err(|e| ToolError::io(format!("{shown}: {e}")))?
-        .len();
-    if len > limits::MAX_FILE_BYTES {
-        return Err(ToolError::refused(format!(
-            "{shown}: {len} bytes is more than this server reads ({} MB)",
-            limits::MAX_FILE_BYTES / (1024 * 1024)
-        )));
-    }
-    std::fs::read(path).map_err(|e| ToolError::io(format!("{shown}: {e}")))
+    // One read with the cap, so a file that grows after a size check can't
+    // be read past it.
+    method_format::fsio::read_capped(path, limits::MAX_FILE_BYTES).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::InvalidData {
+            ToolError::refused(format!(
+                "{shown}: more than this server reads ({} MB)",
+                limits::MAX_FILE_BYTES / (1024 * 1024)
+            ))
+        } else {
+            ToolError::io(format!("{shown}: {e}"))
+        }
+    })
 }
 
 /// Parses a budget file's bytes.

@@ -1,5 +1,5 @@
-# Weekly: every crate in both locks against the 14-day cooldown and for yanks, even when
-# nothing was pushed (ci.yml's cooldown job does the same on every push to main; a pull
+# Weekly: every crate in both locks against the 14-day cooldown and for yanks, and against
+# the advisory database (cargo deny), even when nothing was pushed (ci.yml's cooldown job does the same on every push to main; a pull
 # request checks only what it adds). Least privilege; actions pinned to full commit SHAs
 # (pinact run).
 name: crate-ages
@@ -27,3 +27,19 @@ jobs:
           for lock in Cargo.lock fuzz/Cargo.lock; do
             python3 scripts/check-crate-ages.py --lock "$lock"
           done
+  advisories:
+    # A new advisory against a crate already in a lock shows up here within a week, even
+    # when nothing was pushed. ci.yml's deny job checks the same on every pull request.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: fuzz/Cargo.toml
+          command: check advisories
