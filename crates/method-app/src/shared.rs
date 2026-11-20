@@ -478,17 +478,22 @@ pub struct RequestDto {
     pub name_taken: bool,
     /// No change of theirs is in the budget yet: a computer new to it.
     pub new_here: bool,
-    /// A code for the computer asking ("3fa9 c1d2 07be 5e41"): the asker
-    /// sees the same code on their own request, so the two can compare.
+    /// They were removed from the budget: Allow brings them back.
+    pub removed: bool,
+    /// Signing has started and no key in their name is in the budget yet.
+    pub no_key: bool,
+    /// A code for the asking computer's key ("3fa9 c1d2 07be 5e41"): on the
+    /// owner's side from the key in the budget under that name, on the
+    /// asker's own request from the key that computer holds. They match
+    /// only when the key in the budget is really theirs. Empty when no key
+    /// in their name is in the budget yet (`no_key`).
     pub code: String,
 }
 
-/// A computer's code, as people compare it out loud: the first 16 hex
-/// characters of the SHA-256 of its whole id, in four groups. A hash, not
-/// the id's own first characters, so matching another computer's code takes
-/// about 2^64 tries, whatever id is chosen.
-pub fn computer_code(actor: ActorId) -> String {
-    let hex = method_core::log::hash::sha256_hex(&actor.0);
+/// A code people can compare out loud: the first 16 hex characters of the
+/// SHA-256 of `bytes`, in four groups. Matching it takes about 2^64 tries.
+fn short_code(bytes: &[u8]) -> String {
+    let hex = method_core::log::hash::sha256_hex(bytes);
     format!(
         "{} {} {} {}",
         &hex[..4],
@@ -496,6 +501,18 @@ pub fn computer_code(actor: ActorId) -> String {
         &hex[8..12],
         &hex[12..16]
     )
+}
+
+/// A computer's code, from its signing key: what the request panel shows
+/// and the two people compare.
+pub fn key_code(key: &method_core::log::PublicKey) -> String {
+    short_code(&key.0)
+}
+
+/// A computer's code from its id, for a budget whose signing hasn't started
+/// (no keys to go by).
+pub fn computer_code(actor: ActorId) -> String {
+    short_code(&actor.0)
 }
 
 /// How long a note on an access request may be, in characters (the same
