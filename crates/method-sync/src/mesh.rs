@@ -51,8 +51,12 @@ pub enum Event {
     },
     /// The peer sent changes.
     Changes { peer: String, lines: Vec<String> },
-    /// The peer moved to this cell.
-    Cursor { peer: String, cell: Option<Cell> },
+    /// The peer moved to this cell, with these other cells selected.
+    Cursor {
+        peer: String,
+        cell: Option<Cell>,
+        selection: Vec<Cell>,
+    },
 }
 
 enum Cmd {
@@ -365,9 +369,10 @@ fn open_link(
                     peer: peer.clone(),
                     lines,
                 },
-                Ok(Frame::Cursor { cell }) => Event::Cursor {
+                Ok(Frame::Cursor { cell, selection }) => Event::Cursor {
                     peer: peer.clone(),
                     cell,
+                    selection,
                 },
                 Ok(Frame::Hello { .. }) => continue,
                 Err(_) => break,

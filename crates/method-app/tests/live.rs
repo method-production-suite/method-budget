@@ -486,6 +486,55 @@ fn a_cursor_crosses_the_link_and_stops_with_it() {
     t.until("the link gone", |t| cell_seen(&t.jordan, ALEX).is_none());
 }
 
+fn selection_seen(s: &Session, actor: ActorId) -> Vec<method_sync::Cell> {
+    let status = s.shared().unwrap().status(Instant::now());
+    status
+        .people
+        .into_iter()
+        .find(|p| p.actor == actor.hex())
+        .map(|p| p.selection)
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_selection_crosses_the_link_and_stops_with_it() {
+    let mut t = apart();
+    let two = vec![cell("7"), cell("8")];
+    // Set before the link is up, so it goes with the cell when the link opens.
+    Two::doc(&mut t.alex).set_here(Some(cell("7")), two.clone());
+    t.linked();
+    t.until("the selection", |t| selection_seen(&t.jordan, ALEX) == two);
+    assert_eq!(cell_seen(&t.jordan, ALEX), Some(cell("7")));
+    // Moving the cursor alone keeps it.
+    Two::doc(&mut t.alex).set_cell(Some(cell("8")));
+    t.until("the move", |t| {
+        cell_seen(&t.jordan, ALEX) == Some(cell("8"))
+    });
+    assert_eq!(selection_seen(&t.jordan, ALEX), two);
+    // It isn't in the heartbeat or the log.
+    let heartbeat = std::fs::read_to_string(presence(&t.alex_log, ALEX)).unwrap();
+    assert!(!heartbeat.contains("selection"), "{heartbeat}");
+    Two::doc(&mut t.alex).set_selection(Vec::new());
+    t.until("the selection cleared", |t| {
+        selection_seen(&t.jordan, ALEX).is_empty()
+    });
+    assert_eq!(cell_seen(&t.jordan, ALEX), Some(cell("8")));
+    // Past the most a frame carries, none goes.
+    let many: Vec<_> = (0..=method_sync::MOST_SELECTED)
+        .map(|i| cell(&i.to_string()))
+        .collect();
+    Two::doc(&mut t.alex).set_selection(many);
+    assert!(Two::doc(&mut t.alex).selection().is_empty());
+    Two::doc(&mut t.alex).set_selection(two.clone());
+    t.until("the selection back", |t| {
+        selection_seen(&t.jordan, ALEX) == two
+    });
+    Two::doc(&mut t.alex).live_stop();
+    t.until("the link gone", |t| {
+        selection_seen(&t.jordan, ALEX).is_empty()
+    });
+}
+
 fn linked_seen(s: &Session, actor: ActorId) -> bool {
     let status = s.shared().unwrap().status(Instant::now());
     status

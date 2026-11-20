@@ -73,6 +73,8 @@ const st = {
 const FLASH_MS = 1600;
 // How long the cursor rests on a cell before the others are told.
 const CELL_WAIT_MS = 120;
+// The most selected cells sent (method_sync::MOST_SELECTED): more go as none.
+export const MOST_SELECTED = 500;
 // What stops Follow: anything this person does.
 const FOLLOW_STOPS = ['keydown', 'mousedown', 'wheel', 'touchstart'];
 
@@ -116,8 +118,8 @@ function statusArrived(p) {
     renderBar(ctx.view());
     decorateShare(ctx.view());
     followOn(p.status);
-    // Someone moving their cursor doesn't redraw the panel under this person.
-    const panelText = JSON.stringify({ ...p.status, people: p.status.people.map((q) => ({ ...q, cell: !!q.cell })), me: null });
+    // Someone moving their cursor or selection doesn't redraw the panel under this person.
+    const panelText = JSON.stringify({ ...p.status, people: p.status.people.map((q) => ({ ...q, cell: !!q.cell, selection: null })), me: null });
     if (st.panel && panelText !== st.panelText) drawPanel();
     st.panelText = panelText;
   }
@@ -814,17 +816,22 @@ export function reportPlace(view) {
   }, 300);
 }
 
-/** The cell this person is on, kept here and sent on only over a live link. */
-export function reportCell(place) {
+/**
+ * The cell this person is on and the other cells they have selected (places,
+ * as placeOfCell gives them), kept here and sent on only over a live link.
+ */
+export function reportCell(place, selected = []) {
   if (!ctx || !ctx.view() || !ctx.view().shared) return;
-  const cell = place ? { kind: place.kind, key: String(place.key), parent: place.parent || null, field: place.field || null } : null;
+  const bare = (p) => ({ kind: p.kind, key: String(p.key), parent: p.parent || null, field: p.field || null });
+  const cell = place ? bare(place) : null;
+  const selection = selected.length <= MOST_SELECTED ? selected.map(bare) : [];
   const doc = ctx.doc();
-  const text = JSON.stringify([doc, cell]);
+  const text = JSON.stringify([doc, cell, selection]);
   if (text === st.cellSent) return;
   st.cellSent = text;
   clearTimeout(st.cellTimer);
   st.cellTimer = setTimeout(() => {
-    ctx.invoke('share_cell', { doc, cell }).catch(() => {});
+    ctx.invoke('share_cell', { doc, cell, selection }).catch(() => {});
   }, CELL_WAIT_MS);
 }
 
@@ -881,8 +888,9 @@ export function decorateShare(view) {
   const s = current();
   const grid = ctx.grid();
   if (!s || !grid) return;
-  for (const n of grid.table.querySelectorAll('.share-here, .share-conflict-badge, .share-cell')) n.remove();
+  for (const n of grid.table.querySelectorAll('.share-here, .share-conflict-badge, .share-cell, .share-sel')) n.remove();
   for (const td of grid.table.querySelectorAll('.share-cell-at')) td.classList.remove('share-cell-at');
+  for (const td of grid.table.querySelectorAll('.share-sel-at')) td.classList.remove('share-sel-at');
   for (const td of grid.table.querySelectorAll('.share-conflict')) td.classList.remove('share-conflict');
   // People in categories and accounts (folder mode: account level only).
   const level = ctx.level();
@@ -895,6 +903,18 @@ export function decorateShare(view) {
     const td = grid.cellFor(at.key, 'name');
     if (!td || td.classList.contains('editing')) continue;
     td.append(el('span', { class: `share-here ${colorClass(p.color)}`, text: p.initials, title: personTitle(p), attrs: { 'aria-label': personTitle(p) } }));
+  }
+  // The cells each person on a live link has selected: a light tint in their
+  // color under their cursor's outline. The first person's tint wins a cell.
+  for (const p of s.people) {
+    for (const place of Array.isArray(p.selection) ? p.selection : []) {
+      const at = ctx.rowKeyFor(place);
+      if (!at || !at.col) continue;
+      const td = grid.cellFor(at.key, at.col);
+      if (!td || td.classList.contains('editing') || td.classList.contains('share-sel-at')) continue;
+      td.classList.add('share-sel-at');
+      td.append(el('span', { class: `share-sel ${colorClass(p.color)}`, attrs: { 'aria-hidden': 'true' } }));
+    }
   }
   // The cell each person on a live link is on. Not in a cell being typed in:
   // nothing of theirs ever goes inside what I'm typing.

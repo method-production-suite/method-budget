@@ -46,7 +46,7 @@ use method_core::{Budget, RowId};
 use method_format::log::{self as flog, AccessRequest, LoadReport, Presence, Scan, Shared};
 use method_session::messages::{msg, word};
 use method_sync::mesh::{Event as LiveEvent, Mesh};
-use method_sync::{Cell, Frame, Relay};
+use method_sync::{Cell, Frame, Relay, MOST_SELECTED};
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_with};
@@ -299,6 +299,9 @@ pub struct PersonDto {
     pub changes: u64,
     /// The cell they are on, over a live link (never for this person).
     pub cell: Option<Cell>,
+    /// The other cells they have selected, over a live link (never for this
+    /// person): empty for none.
+    pub selection: Vec<Cell>,
     /// A live link to their computer is open now (never for this person).
     pub linked: bool,
     /// What they may change: "owner", "co_owner", "admin", "editor", "department",
@@ -576,6 +579,8 @@ pub struct SharedDoc {
     place_changed: bool,
     /// The cell this person is on, for those on a live link.
     cell: Option<Cell>,
+    /// The cells this person has selected, for those on a live link.
+    selection: Vec<Cell>,
     people: BTreeMap<ActorId, Presence>,
     recent: Vec<RemoteChange>,
     /// Changes waiting for ones that haven't arrived, from the last read.
@@ -620,6 +625,8 @@ struct Live {
     linked: HashSet<String>,
     /// The cell each linked person last said they are on.
     cells: HashMap<String, Cell>,
+    /// The cells each linked person last said they have selected.
+    selections: HashMap<String, Vec<Cell>>,
 }
 
 /// How old a heartbeat may be and still be dialed. Far longer than the time
@@ -790,6 +797,7 @@ impl SharedDoc {
             place: (None, None),
             place_changed: false,
             cell: None,
+            selection: Vec::new(),
             people: BTreeMap::new(),
             recent: Vec::new(),
             waiting: 0,
@@ -884,16 +892,43 @@ impl SharedDoc {
         self.cell.as_ref()
     }
 
+    /// The cells this person has selected, as checked.
+    pub fn selection(&self) -> &[Cell] {
+        &self.selection
+    }
+
     /// The cell this person moved to. It goes only to those on a live link,
     /// and only while live mode is on.
     pub fn set_cell(&mut self, cell: Option<Cell>) {
+        self.set_here(cell, self.selection.clone());
+    }
+
+    /// The cells this person has selected besides the cursor's (empty for
+    /// none). Like the cell, they go only over a live link; more than
+    /// [`MOST_SELECTED`] go as none.
+    pub fn set_selection(&mut self, selection: Vec<Cell>) {
+        self.set_here(self.cell.clone(), selection);
+    }
+
+    /// The cell and the selection together: one frame when either changed.
+    pub fn set_here(&mut self, cell: Option<Cell>, selection: Vec<Cell>) {
         let cell = cell.and_then(checked_cell);
-        if cell == self.cell {
+        let selection = checked_selection(selection);
+        if cell == self.cell && selection == self.selection {
             return;
         }
-        self.cell = cell.clone();
+        self.cell = cell;
+        self.selection = selection;
+        self.send_cursor();
+    }
+
+    /// Tells everyone on a live link where this person is now.
+    fn send_cursor(&self) {
         if let Some(live) = &self.live {
-            live.mesh.broadcast(Frame::Cursor { cell });
+            live.mesh.broadcast(Frame::Cursor {
+                cell: self.cell.clone(),
+                selection: self.selection.clone(),
+            });
         }
     }
 
@@ -1238,6 +1273,7 @@ impl SharedDoc {
             peers: BTreeMap::new(),
             linked: HashSet::new(),
             cells: HashMap::new(),
+            selections: HashMap::new(),
         });
         self.heartbeat(Instant::now(), true);
     }
@@ -1269,6 +1305,21 @@ impl SharedDoc {
         }
         let id = live_id(self.people.get(&actor)?.live.as_deref()?)?;
         live.cells.get(&id).cloned()
+    }
+
+    /// The cells a person has selected, as [`Self::live_cell`] finds theirs.
+    fn live_selection(&self, actor: ActorId) -> Vec<Cell> {
+        let Some(live) = self.live.as_ref() else {
+            return Vec::new();
+        };
+        if self.shared.log.removed(actor) {
+            return Vec::new();
+        }
+        self.people
+            .get(&actor)
+            .and_then(|p| live_id(p.live.as_deref()?))
+            .and_then(|id| live.selections.get(&id).cloned())
+            .unwrap_or_default()
     }
 
     /// A live link to this person's computer is open. Someone removed has none.
@@ -1330,22 +1381,30 @@ impl SharedDoc {
                         &peer,
                         Frame::Cursor {
                             cell: self.cell.clone(),
+                            selection: self.selection.clone(),
                         },
                     );
                 }
                 LiveEvent::Have { peer, frontier } => asked.push((peer, frontier)),
                 LiveEvent::Changes { lines: more, .. } => lines.extend(more),
-                LiveEvent::Cursor { peer, cell } => match cell.and_then(checked_cell) {
-                    Some(cell) => {
-                        live.cells.insert(peer, cell);
-                    }
-                    None => {
-                        live.cells.remove(&peer);
-                    }
-                },
+                LiveEvent::Cursor {
+                    peer,
+                    cell,
+                    selection,
+                } => {
+                    match checked_selection(selection) {
+                        selection if selection.is_empty() => live.selections.remove(&peer),
+                        selection => live.selections.insert(peer.clone(), selection),
+                    };
+                    match cell.and_then(checked_cell) {
+                        Some(cell) => live.cells.insert(peer, cell),
+                        None => live.cells.remove(&peer),
+                    };
+                }
                 LiveEvent::Down { peer } => {
                     live.linked.remove(&peer);
                     live.cells.remove(&peer);
+                    live.selections.remove(&peer);
                 }
             }
         }
@@ -1737,6 +1796,11 @@ impl SharedDoc {
             },
             changes: self.shared.log.frontier().get(&actor),
             cell: if me { None } else { self.live_cell(actor) },
+            selection: if me {
+                Vec::new()
+            } else {
+                self.live_selection(actor)
+            },
             linked: !me && self.live_linked(actor),
             role: role.key().to_string(),
             role_text: if removed {
@@ -3258,6 +3322,15 @@ fn checked_cell(cell: Cell) -> Option<Cell> {
     .then_some(cell)
 }
 
+/// A selection as the page may read it: each cell checked like the cursor's
+/// (one that fails is left out), and none at all past [`MOST_SELECTED`].
+fn checked_selection(selection: Vec<Cell>) -> Vec<Cell> {
+    if selection.len() > MOST_SELECTED {
+        return Vec::new();
+    }
+    selection.into_iter().filter_map(checked_cell).collect()
+}
+
 /// Changes as frames' worth of the log's own lines. One too large for any
 /// frame is left to the folder, which carries it as always.
 fn live_frames<'a>(
@@ -3299,6 +3372,24 @@ mod tests {
 
     /// What a link brings is refused unless it is one of the grid's kinds with
     /// short names, whichever computer sent it.
+    /// A selection from a link keeps the cells that pass, and none at all
+    /// once it is longer than a frame may carry.
+    #[test]
+    fn a_selection_from_a_link_is_checked() {
+        let good: Vec<Cell> = (0..3).map(|i| a_cell("row", &i.to_string())).collect();
+        assert_eq!(checked_selection(good.clone()), good);
+        let mut mixed = good.clone();
+        mixed.insert(1, a_cell("script", "9"));
+        assert_eq!(checked_selection(mixed), good);
+        let most: Vec<Cell> = (0..MOST_SELECTED)
+            .map(|i| a_cell("row", &i.to_string()))
+            .collect();
+        assert_eq!(checked_selection(most.clone()).len(), MOST_SELECTED);
+        let mut over = most;
+        over.push(a_cell("row", "x"));
+        assert!(checked_selection(over).is_empty());
+    }
+
     #[test]
     fn a_cell_from_a_link_is_checked() {
         for kind in ["row", "account", "category", "production_total"] {
