@@ -142,16 +142,18 @@ pub fn share_status(
     Ok(s.shared().map(|sh| sh.status(Instant::now())))
 }
 
-/// The cursor moved to this cell (or to none).
+/// The cursor moved to this cell (or to none), with these other cells
+/// selected (none when left out).
 #[tauri::command]
 pub fn share_cell(
     state: State<'_, AppState>,
     doc: Option<DocId>,
     cell: Option<method_sync::Cell>,
+    selection: Option<Vec<method_sync::Cell>>,
 ) -> Result<(), String> {
     let mut s = state.lock_doc(doc)?;
     if let Some(sh) = s.shared_mut() {
-        sh.set_cell(cell);
+        sh.set_here(cell, selection.unwrap_or_default());
     }
     Ok(())
 }

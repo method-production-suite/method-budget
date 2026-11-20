@@ -118,9 +118,20 @@ pub enum Frame {
     Have { frontier: BTreeMap<String, u64> },
     /// Changes the other side lacks, as the log's own signed lines.
     Changes { lines: Vec<String> },
-    /// The cell this person is on now, if any. Never a value.
-    Cursor { cell: Option<Cell> },
+    /// The cell this person is on now, if any, and the other cells they have
+    /// selected (empty for none, or for more than [`MOST_SELECTED`]). Never a
+    /// value. A computer that doesn't know `selection` reads the frame
+    /// without it, so it came in under the same [`ALPN`].
+    Cursor {
+        cell: Option<Cell>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        selection: Vec<Cell>,
+    },
 }
+
+/// The most selected cells a cursor frame carries: a larger selection is
+/// sent as none, so a long one never fills the link.
+pub const MOST_SELECTED: usize = 500;
 
 /// A cell of the budget, in the names the change log uses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -493,6 +504,40 @@ mod tests {
     }
 
     /// A relay named in someone's heartbeat is never contacted.
+    fn a_cell(key: &str) -> Cell {
+        Cell {
+            kind: "row".into(),
+            key: key.into(),
+            parent: Some("50-01".into()),
+            field: Some("rate".into()),
+        }
+    }
+
+    /// A cursor with nothing selected is written as it was before selections,
+    /// and a frame from a computer that doesn't send them reads as none.
+    #[test]
+    fn a_cursor_frame_without_a_selection_is_unchanged() {
+        let before =
+            r#"{"frame":"cursor","cell":{"kind":"row","key":"7","parent":"50-01","field":"rate"}}"#;
+        let frame = Frame::Cursor {
+            cell: Some(a_cell("7")),
+            selection: Vec::new(),
+        };
+        assert_eq!(serde_json::to_string(&frame).unwrap(), before);
+        assert_eq!(serde_json::from_str::<Frame>(before).unwrap(), frame);
+    }
+
+    #[test]
+    fn a_cursor_frame_carries_its_selection() {
+        let frame = Frame::Cursor {
+            cell: Some(a_cell("7")),
+            selection: vec![a_cell("7"), a_cell("8")],
+        };
+        let text = serde_json::to_string(&frame).unwrap();
+        assert!(text.contains(r#""selection":["#), "{text}");
+        assert_eq!(serde_json::from_str::<Frame>(&text).unwrap(), frame);
+    }
+
     #[test]
     fn a_relay_that_isnt_ours_is_dropped_from_an_address() {
         let theirs = address_with("https://their-relay.example.org");

@@ -83,7 +83,7 @@ import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy, subBudgetFromRow, subBudgetRow } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
 import { announce } from './announce.js';
-import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, reportCell, openShareDialog, openJoinDialog, whoChangedThis, lookedAt, shareShown, shareLocks, showLocked } from './share.js';
+import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, reportCell, MOST_SELECTED, openShareDialog, openJoinDialog, whoChangedThis, lookedAt, shareShown, shareLocks, showLocked } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
@@ -172,7 +172,7 @@ function makeGrid(pane) {
       if (pane !== target) return;
       showFormula(at);
       cursorMoved();
-      reportCell(at ? placeOfCell(at.row, at.col.key) : null);
+      reportHere(pane.grid, at);
     }),
     enterMovesDown: false,
   });
@@ -566,6 +566,28 @@ function placeOfCell(row, colKey) {
     return { kind: 'production_total', key: row.cells.name.text, field: 'name', text: t('main.production_total', { name: row.cells.name.text }) };
   }
   return null;
+}
+
+/**
+ * Where this person is, for those on a live link (share.js): the cursor's
+ * cell and, when more than it is selected, the selected cells people type
+ * in. A selection over MOST_SELECTED cells goes as none.
+ */
+function reportHere(g, at) {
+  const cell = at ? placeOfCell(at.row, at.col.key) : null;
+  const selected = [];
+  if (g && g.hasRange()) {
+    const { rows, cols } = g.cellRange();
+    if (rows.length * cols.length <= MOST_SELECTED) {
+      for (const r of rows) {
+        for (const c of cols) {
+          const place = placeOfCell(r, c.key);
+          if (place) selected.push(place);
+        }
+      }
+    }
+  }
+  reportCell(cell, selected);
 }
 
 /** Right-click > Who Changed This…, or its menu item, on the cursor cell. */
@@ -1114,6 +1136,7 @@ function selectionChanged(keys) {
   if (cur === target) {
     document.dispatchEvent(new CustomEvent('method:selection')); // the tools panel (apply.js, notes.js)
     broadcastSelection();
+    reportHere(cur.grid, cur.grid.cursorCell());
   }
   if (state.level !== 'details') return;
   requestSelectionTotals(keys, { speak: true });

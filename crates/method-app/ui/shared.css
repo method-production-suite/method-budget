@@ -636,9 +636,27 @@
   line-height: 12px;
 }
 
+/* Cells someone else has selected on a live link: a light tint in their
+   color, under the text's own contrast. It takes no clicks. */
+.grid td.share-sel-at {
+  position: relative;
+}
+
+.share-sel {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--pc, var(--pc-slate)) 16%, transparent);
+  pointer-events: none;
+}
+
 @media (forced-colors: active) {
   .share-cell {
     border-color: CanvasText;
+  }
+
+  .share-sel {
+    background: none;
+    border: 1px dashed CanvasText;
   }
 
   .share-cell-tag {

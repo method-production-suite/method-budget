@@ -5535,10 +5535,19 @@ Design 9.3 has an outline with initials in the other person's cell, in live mode
   new frame. Live changes haven't been released, so nobody is left behind.
 - **Follow (added the same day).** Go there and Follow in the status panel move my view only
   because I asked. Any key, click or scroll of mine stops Follow, and so does the link ending.
-- **Not built.** Tinted selections. A cell shows when the app's share timer next runs,
-  so it is as quick as that timer, not instant.
+- **Tinted selections (added 2026-11-20).** The same frame carries the other cells the person
+  has selected, each named like the cursor's and checked the same way on arrival. Only cells
+  people type in are named, and a selection over 500 cells (`MOST_SELECTED`) goes as none, so a
+  frame stays small. They show as a light tint in the person's color (a dashed border under
+  `forced-colors`), and the first person's tint wins a cell two have selected. The field is
+  left out of a frame with nothing selected, and a computer that doesn't know it reads the frame
+  without it, so the protocol keeps its name.
+- **Timing.** A cell shows when the app's share timer next runs, so it is as quick as that
+  timer, not instant.
 
-Tests: `a_cursor_crosses_the_link_and_stops_with_it`, `a_bad_cursor_from_a_link_is_dropped`,
+Tests: `a_cursor_crosses_the_link_and_stops_with_it`, `a_selection_crosses_the_link_and_stops_with_it`,
+`a_selection_from_a_link_is_checked`, `a_cursor_frame_without_a_selection_is_unchanged`,
+`a_cursor_frame_carries_its_selection`, `a_bad_cursor_from_a_link_is_dropped`,
 `with_live_mode_off_a_cell_goes_nowhere`, `a_removed_person_shows_no_cursor`, and
 `a_cell_from_a_link_is_checked` on the check itself. Seen working in real windows on 2026-11-06: two copies of a
 Linux build in one container, each on its own X display, sharing a folder, with no relay: the outline, Follow across
