@@ -473,9 +473,8 @@ pub struct RequestDto {
     pub note: String,
     /// When they asked (ISO 8601 UTC); with `actor`, what names it.
     pub at: String,
-    /// The name is also another person's here. Names come from each
-    /// computer's heartbeat, which anyone with the folder can write, so a
-    /// shared name is shown as a warning, never trusted.
+    /// The name is also another person's here (names come from each
+    /// computer's own heartbeat), shown as something to check.
     pub name_taken: bool,
     /// No change of theirs is in the budget yet: a computer new to it.
     pub new_here: bool,

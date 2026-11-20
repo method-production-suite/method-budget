@@ -633,8 +633,8 @@ function requestRows(s) {
         el('div', {}, el('span', { class: `share-avatar ${colorClass(r.color)}`, text: initialsOf(r.name), attrs: { 'aria-hidden': 'true' } }), el('span', { class: 'share-person-name', text: what })),
         el('div', { class: 'share-muted', text: t('share.requests.gives', { role: r.role_text, time: localTime(r.at) }) }),
         el('div', { class: 'share-muted', text: t('share.requests.code', { code: r.code }) }),
-        // Names come from each computer's heartbeat, which anyone with the
-        // folder can write: say so when this one could be someone else.
+        // Names come from each computer's own heartbeat: something to check
+        // when the name is also another person's, or the computer is new.
         r.name_taken ? el('div', { class: 'share-request-warn', text: t('share.requests.name_taken', { name: r.name }) }) : null,
         r.new_here ? el('div', { class: 'share-request-warn', text: t('share.requests.new_here') }) : null,
         r.note ? el('div', { class: 'share-request-note', text: r.note }) : null,
