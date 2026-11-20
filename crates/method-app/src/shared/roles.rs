@@ -456,7 +456,10 @@ impl SharedDoc {
     pub(super) fn sign_profile(&mut self) -> Result<bool, String> {
         let log = &self.shared.log;
         let mine = log.signer_key();
-        if mine.is_none() || log.key_of(self.actor()) != mine || self.me.name.trim().is_empty() {
+        if mine.is_none()
+            || log.key_of(self.actor()) != mine
+            || method_core::log::profile::normal_name(&self.me.name).is_empty()
+        {
             return Ok(false);
         }
         let label = msg("engine.undo.profile", &[("name", &self.me.name)]);

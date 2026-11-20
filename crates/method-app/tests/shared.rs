@@ -1534,6 +1534,15 @@ fn names_come_from_each_persons_signed_profile() {
     let j = person_seen(&alex, JORDAN);
     assert_eq!(j.name, "Jordan L.");
     assert_eq!(j.color, "teal");
+    // A name of only hidden characters is never signed: the last one stays.
+    let before = jordan.shared().unwrap().log().len();
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_me(person("\u{200B}\u{2800}", "blue"));
+    assert_eq!(jordan.shared().unwrap().log().len(), before);
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(person_seen(&alex, JORDAN).name, "Jordan L.");
 }
 
 /// A role from before roles were tied to keys is tied by Confirm key, with
