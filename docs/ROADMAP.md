@@ -22,6 +22,12 @@ this page goes ahead without waiting.
 
 ### Release go-aheads
 
+- **The next release carries decision 103 and the hardened updater, and waits on two
+  things.** (1) The owner's re-run of the administrator update hand test on Launcher, which
+  MOrg is arranging (method-update fa7d430, #160): no tag before it passes. (2) The owner's
+  yes, as for every release. Its notes must say plainly that everyone who shares a budget
+  updates first: decision 103 moves a shared folder to history format 5, which 0.9.0 and
+  older refuse (#158). The release environment holds the signing secrets from now on (#159).
 - **0.9.0 is out** (published 2026-11-20, tagged on 7650d62; methodbudget.com follows it).
   The owner said yes through MOrg: "Yes, tag 0.9.0". It carries the accessibility work, the
   Linux AppImage fix, the Tools panel fix and signed checksums, with the Live changes row
