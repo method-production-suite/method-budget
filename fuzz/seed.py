@@ -78,6 +78,35 @@ def main():
     for f in files(FIX / "exchange", "*.json"):
         put("exchange_json", f.read_bytes())
 
+    # The exchange_any target's first byte picks the format: 0 XML basic,
+    # 1 XML advanced, 2 Excel, 3 tab-delimited.
+    for f in files(FIX / "exchange", "*-xmlbasic.xml"):
+        put("exchange_any", b"\x00" + f.read_bytes())
+    for f in files(FIX / "exchange", "*-xmladv.xml"):
+        put("exchange_any", b"\x01" + f.read_bytes())
+    for f in files(FIX / "exchange", "*.xlsx"):
+        put("exchange_any", b"\x02" + f.read_bytes())
+    for f in files(FIX / "exchange", "*.txt"):
+        put("exchange_any", b"\x03" + f.read_bytes())
+
+    for f in files(FIX / "schedule", "*.json"):
+        put("schedule", f.read_bytes())
+
+    for mapping in [
+        {
+            "sheet": "Detail",
+            "header_row": 1,
+            "columns": {"account_code": "A", "description": "B", "amount": 3, "rate": "E"},
+            "create_accounts": False,
+            "create_setup": False,
+            "default_account": "",
+        },
+        {"sheet": 2, "header_row": "none", "columns": {"amount": "AA"}},
+        {"header_row": "detect"},
+        {},
+    ]:
+        put("mapping_file", json.dumps(mapping).encode())
+
     golden = ROOT / "crates" / "method-format" / "tests" / "golden" / "small.json"
     put("mthd", golden.read_bytes())
     for f in files(CHARTS, "*.mthd"):

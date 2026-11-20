@@ -632,6 +632,11 @@ function requestRows(s) {
         { class: 'share-request', attrs: { role: 'group', 'aria-label': what } },
         el('div', {}, el('span', { class: `share-avatar ${colorClass(r.color)}`, text: initialsOf(r.name), attrs: { 'aria-hidden': 'true' } }), el('span', { class: 'share-person-name', text: what })),
         el('div', { class: 'share-muted', text: t('share.requests.gives', { role: r.role_text, time: localTime(r.at) }) }),
+        el('div', { class: 'share-muted', text: t('share.requests.code', { code: r.code }) }),
+        // Names come from each computer's own heartbeat: something to check
+        // when the name is also another person's, or the computer is new.
+        r.name_taken ? el('div', { class: 'share-request-warn', text: t('share.requests.name_taken', { name: r.name }) }) : null,
+        r.new_here ? el('div', { class: 'share-request-warn', text: t('share.requests.new_here') }) : null,
         r.note ? el('div', { class: 'share-request-note', text: r.note }) : null,
         el('div', { class: 'share-panel-actions' }, allow, only, decline),
       ));
@@ -644,6 +649,7 @@ function requestRows(s) {
     out.push(
       el('h4', { class: 'share-panel-sub', text: t('share.requests.yours') }),
       el('p', { class: 'share-muted', text: r.codes_text ? t('share.requests.yours_text_about', { name: s.ask_name, time: localTime(r.at), codes: r.codes_text }) : t('share.requests.yours_text', { name: s.ask_name, time: localTime(r.at) }) }),
+      el('p', { class: 'share-muted', text: t('share.requests.your_code', { code: r.code, name: s.ask_name }) }),
       el('div', { class: 'share-panel-actions' }, withdraw),
     );
   } else if (s.can_ask) {

@@ -100,6 +100,10 @@ jobs:
   build:
     name: build (${{ matrix.name }})
     needs: check
+    # The signing secrets live in the "release" environment, which deploys only
+    # from main and v* tags (a rehearsal runs from main; the check job refuses
+    # any other ref first).
+    environment: release
     strategy:
       fail-fast: false
       matrix:
@@ -497,6 +501,7 @@ jobs:
     # A rehearsal stops before it: no release is created, edited or uploaded to.
     needs: [check, build]
     if: github.event_name == 'push'
+    environment: release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

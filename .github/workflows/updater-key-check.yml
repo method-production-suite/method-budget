@@ -16,6 +16,8 @@ jobs:
     # Only main's code ever runs with the key: a run started from another branch would
     # compile that branch's xtask and hand it the secret, so it does nothing there.
     if: github.ref == 'refs/heads/main'
+    # The key secret lives in the "release" environment (main and v* tags only).
+    environment: release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

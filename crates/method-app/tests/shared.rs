@@ -1328,6 +1328,88 @@ fn a_department_editors_request_reaches_who_can_allow_it() {
     assert_eq!(rate_of(&alex, line), "55");
 }
 
+/// A heartbeat anyone with the folder could write, under a member's name,
+/// asking for access: the request is shown with that name, but flagged as
+/// a name someone else here has, from a computer new to the budget, with
+/// the computer's code to check (the 2026-11-20 security review).
+#[test]
+fn a_request_under_a_members_name_is_flagged() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let dir = method_format::log::LogDir::for_budget(&path);
+    let stranger = ActorId([8; 32]);
+    let mut planted = dir.read_presence(JORDAN).unwrap();
+    planted.request = Some(method_format::log::AccessRequest {
+        role: "editor".into(),
+        codes: Vec::new(),
+        note: String::new(),
+        at: planted.at.clone(),
+    });
+    dir.write_presence(stranger, &planted).unwrap();
+    // A refused change under the new id moves its frontier, but it is still
+    // a computer new to the budget: only applied changes count.
+    let refused = method_core::log::Change {
+        actor: stranger,
+        seq: 1,
+        deps: Default::default(),
+        lamport: 1,
+        time: "2026-11-20T00:00:00Z".into(),
+        label: "planted".into(),
+        ops: vec![],
+        sig: None,
+    };
+    dir.write_segment(&[refused]).unwrap();
+    tick_at(&mut alex, 60);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let r = st
+        .requests
+        .iter()
+        .find(|r| r.actor == stranger.hex())
+        .expect("the request is listed");
+    assert_eq!(r.name, "Jordan Lee");
+    assert!(r.name_taken, "another person here is Jordan Lee");
+    assert_eq!(
+        alex.shared().unwrap().log().frontier().get(&stranger),
+        1,
+        "the refused change took its number"
+    );
+    assert!(r.new_here, "no change of theirs is in the budget");
+    assert_eq!(r.code, method_app::shared::computer_code(stranger));
+    assert_eq!(r.code.len(), 19, "16 hex characters in four groups");
+    assert_ne!(r.code, method_app::shared::computer_code(JORDAN));
+
+    // Jordan's own request: the name is theirs alone, and they see the
+    // same code the owner does.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "")
+        .unwrap();
+    let mine = jordan
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .my_request
+        .unwrap();
+    assert_eq!(mine.code, method_app::shared::computer_code(JORDAN));
+    tick_at(&mut alex, 120);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let real = st
+        .requests
+        .iter()
+        .find(|r| r.actor == JORDAN.hex())
+        .unwrap();
+    assert_eq!(real.code, mine.code);
+    assert!(
+        real.name_taken,
+        "the stranger's heartbeat uses the name too"
+    );
+}
+
 #[test]
 fn a_read_only_persons_request_is_declined_on_one_computer_and_allowed() {
     let (path, mut alex, mut jordan) = two_sessions();
