@@ -5587,7 +5587,11 @@ answered "Yes, decision 103".
   single spaces and trimmed, with no control characters, none that change the direction text
   runs in and none that show nothing (`profile::normal_name`). A profile in any other form is
   refused by every computer, so two signed names can't differ only by an invisible
-  character. A color is one of the app's person colors. The app writes the profile with this
+  character. The set of characters left out is fixed for history format 5: the zero-width,
+  joiner and direction marks, embeddings, overrides and isolates, invisible operators, the
+  byte order mark, soft hyphen, combining grapheme joiner, Arabic letter mark, Mongolian vowel
+  separator, the Hangul fillers, the blank Braille pattern, the variation selectors and the
+  tag characters. Every computer checks the same set, so a change to it needs a new format. A color is one of the app's person colors. The app writes the profile with this
   computer's key once that key is in the log, so a budget shared without roles stays at the
   format it has, and again when the person changes their name or color. Two people may still
   sign the same name: the request panel's shared-name note stays.

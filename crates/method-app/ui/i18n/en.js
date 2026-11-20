@@ -3915,6 +3915,7 @@ export default {
   "shared.cant_write_file": "Couldn't write the budget file: {why}",
   "shared.cant_write_folder": "Couldn't write to the shared folder: {why}",
   "shared.changed_since": "it has been changed since.",
+  "shared.confirm_key_first": "Confirm {name}’s key first: their role is from before roles were tied to keys. Then set it.",
   "shared.couldnt_redo": "Couldn't redo this step: {why}",
   "shared.couldnt_undo": "Couldn't undo this step: {why}",
   "shared.department_only": "You can change lines and notes in {scope} only. {owner} sets who may change what.",

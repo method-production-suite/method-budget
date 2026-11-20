@@ -1547,6 +1547,16 @@ fn confirm_key_ties_an_existing_role() {
     let j = person_seen(&alex, JORDAN);
     assert!(!j.key_tied);
     assert_eq!(j.key_code, method_app::shared::key_code(&key(2).public()));
+    // Jordan's own app shows the same code, from the key it holds.
+    let mine = jordan.shared().unwrap().status(Instant::now()).me;
+    assert_eq!(mine.key_code, j.key_code);
+    // Setting a role over it asks for Confirm key first.
+    let refused = alex
+        .shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "admin", &[])
+        .unwrap_err();
+    assert!(refused.contains("Confirm"), "{refused}");
     let sh = alex.shared_mut().unwrap();
     assert!(sh
         .confirm_key(&JORDAN.hex(), "0000 0000 0000 0000")

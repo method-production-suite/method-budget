@@ -222,6 +222,19 @@ impl SharedDoc {
                 &[("name", &self.name_of(who))],
             ));
         }
+        // A role from before roles were tied to keys is tied by Confirm key,
+        // after the code check, never by setting a role over it.
+        let current = self.shared.log.role_of(who);
+        if role != Role::ReadOnly
+            && current != Role::ReadOnly
+            && key.is_some()
+            && self.shared.log.role_key(who) != key
+        {
+            return Err(tr_with(
+                "shared.confirm_key_first",
+                &[("name", &self.name_of(who))],
+            ));
+        }
         let me = self.role();
         self.shared
             .log

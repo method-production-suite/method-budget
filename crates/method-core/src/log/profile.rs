@@ -13,19 +13,35 @@ pub const COLORS: [&str; 8] = [
 ];
 
 /// Characters a name may not hold, besides control characters: the ones
-/// that change the direction text runs in, or that show nothing.
+/// that change the direction text runs in, or that show nothing. Fixed for
+/// history format 5 (decisions.md, entry 103): every computer checks the
+/// same set, so changing it would split builds.
 fn hidden(c: char) -> bool {
     matches!(
         c,
+        // Zero width, joiners and direction marks; embeddings and overrides;
+        // invisible operators; isolates.
         '\u{200B}'..='\u{200F}'
             | '\u{202A}'..='\u{202E}'
             | '\u{2060}'..='\u{2064}'
             | '\u{2066}'..='\u{2069}'
+            // Byte order mark, soft hyphen, combining grapheme joiner,
+            // Arabic letter mark, Mongolian vowel separator.
             | '\u{FEFF}'
             | '\u{00AD}'
             | '\u{034F}'
             | '\u{061C}'
             | '\u{180E}'
+            // Hangul fillers and the blank Braille pattern.
+            | '\u{115F}'
+            | '\u{1160}'
+            | '\u{3164}'
+            | '\u{FFA0}'
+            | '\u{2800}'
+            // Variation selectors and tag characters.
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{E0100}'..='\u{E01EF}'
+            | '\u{E0000}'..='\u{E007F}'
     )
 }
 
@@ -43,7 +59,9 @@ pub fn normal_name(name: &str) -> String {
         .filter(|w| !w.is_empty())
         .collect::<Vec<_>>()
         .join(" ");
-    folded.chars().take(NAME_MAX_CHARS).collect()
+    // Cut, then trimmed again: the cut can end on a space.
+    let cut: String = folded.chars().take(NAME_MAX_CHARS).collect();
+    cut.trim_end().to_string()
 }
 
 /// Why a profile isn't one every computer takes, or `None` when it is.
@@ -70,6 +88,27 @@ mod tests {
         assert_eq!(normal_name("Jor\u{200B}dan\u{202E} Lee"), "Jordan Lee");
         assert_eq!(normal_name(&"x".repeat(80)).chars().count(), NAME_MAX_CHARS);
         assert_eq!(normal_name("Zoë Ångström"), "Zoë Ångström");
+        for odd in [
+            '\u{3164}',
+            '\u{115F}',
+            '\u{FFA0}',
+            '\u{2800}',
+            '\u{FE0F}',
+            '\u{E0041}',
+            '\u{E0100}',
+        ] {
+            assert_eq!(normal_name(&format!("Jor{odd}dan")), "Jordan", "{odd:?}");
+        }
+    }
+
+    /// A cut that lands on a space still gives a name every computer takes.
+    #[test]
+    fn a_name_cut_on_a_space_is_trimmed() {
+        let long = format!("{} {}", "a".repeat(NAME_MAX_CHARS - 1), "b".repeat(10));
+        let name = normal_name(&long);
+        assert_eq!(name, "a".repeat(NAME_MAX_CHARS - 1));
+        assert_eq!(refusal(&name, "blue"), None);
+        assert_eq!(normal_name(&name), name);
     }
 
     #[test]
