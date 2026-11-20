@@ -622,9 +622,22 @@ function requestRows(s) {
     for (const r of list) {
       const what = r.codes_text ? t('share.requests.asks_about', { name: r.name, codes: r.codes_text }) : t('share.requests.asks', { name: r.name });
       const allow = el('button', { class: 'btn btn-primary', text: t('share.requests.allow'), title: t('share.requests.allow_tip', { name: r.name, role: r.role_text }), attrs: { type: 'button' } });
-      allow.addEventListener('click', () => run(allow, 'share_allow_request', { actor: r.actor, at: r.at, only: false }, t('share.role_saved', { name: r.name })));
+      // A request with something to check asks once more before it gives anything.
+      const toCheck = r.name_taken || r.new_here || r.removed || r.no_key;
+      const allowAfterCheck = async (button, only) => {
+        if (toCheck) {
+          const yes = await confirmDialog({
+            title: t('share.requests.check_title', { name: r.name }),
+            message: t('share.requests.check_message', { name: r.name, code: r.code }),
+            confirmText: t('share.requests.allow'),
+          });
+          if (!yes) return;
+        }
+        run(button, 'share_allow_request', { actor: r.actor, at: r.at, only }, t('share.role_saved', { name: r.name }));
+      };
+      allow.addEventListener('click', () => allowAfterCheck(allow, false));
       const only = r.only ? el('button', { class: 'btn', text: t('share.requests.allow_only', { codes: r.codes_text }), attrs: { type: 'button' } }) : null;
-      if (only) only.addEventListener('click', () => run(only, 'share_allow_request', { actor: r.actor, at: r.at, only: true }, t('share.role_saved', { name: r.name })));
+      if (only) only.addEventListener('click', () => allowAfterCheck(only, true));
       const decline = el('button', { class: 'btn', text: t('share.requests.decline'), title: t('share.requests.decline_tip'), attrs: { type: 'button' } });
       decline.addEventListener('click', () => run(decline, 'share_decline_request', { actor: r.actor, at: r.at }, null));
       out.push(el(
@@ -632,11 +645,13 @@ function requestRows(s) {
         { class: 'share-request', attrs: { role: 'group', 'aria-label': what } },
         el('div', {}, el('span', { class: `share-avatar ${colorClass(r.color)}`, text: initialsOf(r.name), attrs: { 'aria-hidden': 'true' } }), el('span', { class: 'share-person-name', text: what })),
         el('div', { class: 'share-muted', text: t('share.requests.gives', { role: r.role_text, time: localTime(r.at) }) }),
-        el('div', { class: 'share-muted', text: t('share.requests.code', { code: r.code }) }),
+        r.code ? el('div', { class: 'share-muted', text: t('share.requests.code', { code: r.code }) }) : null,
         // Names come from each computer's own heartbeat: something to check
         // when the name is also another person's, or the computer is new.
         r.name_taken ? el('div', { class: 'share-request-warn', text: t('share.requests.name_taken', { name: r.name }) }) : null,
         r.new_here ? el('div', { class: 'share-request-warn', text: t('share.requests.new_here') }) : null,
+        r.removed ? el('div', { class: 'share-request-warn', text: t('share.requests.removed', { name: r.name }) }) : null,
+        r.no_key ? el('div', { class: 'share-request-warn', text: t('share.requests.no_key') }) : null,
         r.note ? el('div', { class: 'share-request-note', text: r.note }) : null,
         el('div', { class: 'share-panel-actions' }, allow, only, decline),
       ));

@@ -118,6 +118,22 @@ impl SharedDoc {
             .collect()
     }
 
+    /// The code shown with `actor`'s request: from the key this computer
+    /// holds when it is the asker's own, else from the key in the budget in
+    /// that name (none yet: empty). Before signing starts, from the id.
+    fn request_code(&self, actor: ActorId) -> String {
+        let log = &self.shared.log;
+        if !log.signing_started() {
+            return computer_code(actor);
+        }
+        let key = if actor == self.actor() {
+            log.signer_key()
+        } else {
+            log.key_of(actor)
+        };
+        key.map(|k| key_code(&k)).unwrap_or_default()
+    }
+
     /// A request as the panel shows it.
     pub(super) fn request_dto(&self, actor: ActorId, req: &AccessRequest) -> RequestDto {
         let (key, scope) = self.granted_for(actor, req, false);
@@ -137,7 +153,9 @@ impl SharedDoc {
             name_taken,
             // Applied changes only: a refused one still moves the frontier.
             new_here: !self.shared.log.changes().any(|c| c.actor == actor),
-            code: computer_code(actor),
+            removed: self.shared.log.removed(actor),
+            no_key: self.shared.log.signing_started() && self.shared.log.key_of(actor).is_none(),
+            code: self.request_code(actor),
             name,
             color: self.color_of(actor),
             role: req.role.clone(),

@@ -1410,6 +1410,80 @@ fn a_request_under_a_members_name_is_flagged() {
     );
 }
 
+/// Once signing has started, a request's code comes from the key: the
+/// owner's side from the key in the budget in that name, the asker's side
+/// from the key their computer holds. A key someone else put in under that
+/// name gives a different code, so comparing them catches it.
+#[test]
+fn a_requests_code_comes_from_the_key() {
+    use method_core::log::Signer;
+    let (path, mut alex, mut jordan) = signed_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let dir = method_format::log::LogDir::for_budget(&path);
+    let stranger = ActorId([8; 32]);
+    let mut asks = dir.read_presence(JORDAN).unwrap();
+    asks.request = Some(method_format::log::AccessRequest {
+        role: "editor".into(),
+        codes: Vec::new(),
+        note: String::new(),
+        at: asks.at.clone(),
+    });
+    dir.write_presence(stranger, &asks).unwrap();
+    tick_at(&mut alex, 60);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let r = st.requests.iter().find(|r| r.actor == stranger.hex()).unwrap();
+    assert!(r.no_key, "no key in that name yet");
+    assert!(r.code.is_empty(), "nothing to compare yet");
+
+    // A key put in under that name: the request now shows that key's code.
+    let theirs = method_format::log::sign::KeyPair::from_seed([88; 32]);
+    let log = alex.shared().unwrap().log();
+    let mut planted = method_core::log::Change {
+        actor: stranger,
+        seq: 1,
+        deps: log.frontier().clone(),
+        lamport: log.lamport() + 1,
+        time: "2026-11-20T00:00:00Z".into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    planted.sig = Some(theirs.sign(&planted));
+    dir.write_segment(&[planted]).unwrap();
+    tick_at(&mut alex, 120);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let r = st.requests.iter().find(|r| r.actor == stranger.hex()).unwrap();
+    assert!(!r.no_key);
+    assert_eq!(r.code, method_app::shared::key_code(&theirs.public()));
+
+    // Jordan's own request: both sides show the code of Jordan's key, and
+    // it isn't the stranger's.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .request_access("editor", &[], "")
+        .unwrap();
+    let mine = jordan
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .my_request
+        .unwrap();
+    assert_eq!(mine.code, method_app::shared::key_code(&key(2).public()));
+    tick_at(&mut alex, 180);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let real = st.requests.iter().find(|r| r.actor == JORDAN.hex()).unwrap();
+    assert_eq!(real.code, mine.code);
+    assert_ne!(real.code, method_app::shared::key_code(&theirs.public()));
+    assert!(!real.removed && !real.no_key);
+}
+
 #[test]
 fn a_read_only_persons_request_is_declined_on_one_computer_and_allowed() {
     let (path, mut alex, mut jordan) = two_sessions();
