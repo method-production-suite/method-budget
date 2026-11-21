@@ -16,6 +16,7 @@ and its CI never build it. Only fuzzing uses a nightly compiler.
 | `exchange_any`  | Budget exchange XML (basic and advanced), Excel and tab-delimited exports; the first byte picks the format, then build and reconcile (`import/exchange`) |
 | `schedule`      | Schedule days files (`import/schedule.rs`) |
 | `mapping_file`  | Saved column mapping files, UTF-8 only (`import/mapping_file.rs`) |
+| `log`           | Shared-folder files from another computer: segments taken into a log, change lines, heartbeats, `budget.json` (`log.rs`) |
 | `mthd`          | Native budgets (`from_str`); what reads must write and read back the same |
 | `delta`         | `[doc, other]`: `other` as a version-delta patch on `doc`, and the differ's patch from `doc` to `other` must rebuild `other` (`delta.rs`) |
 

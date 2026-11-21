@@ -104,3 +104,10 @@ path = "fuzz_targets/mapping_file.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "log"
+path = "fuzz_targets/log.rs"
+test = false
+doc = false
+bench = false

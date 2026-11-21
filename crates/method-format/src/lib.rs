@@ -138,6 +138,7 @@ pub fn from_str(s: &str) -> Result<Budget, FormatError> {
 #[doc(hidden)]
 pub mod fuzzing {
     pub use crate::delta::fuzzing::{apply_patch, diff_then_apply};
+    pub use crate::log::fuzzing::read_shared_folder_file;
 }
 
 /// Why a file could not be read.

@@ -3010,3 +3010,54 @@ mod tests {
         assert!(segment_bytes(&[changes[0].clone(), changes[2].clone()]).is_err());
     }
 }
+
+/// The fuzz target's way in (fuzz/fuzz_targets/log.rs), behind the
+/// `fuzzing` feature: every reader of what another computer writes into the
+/// shared folder, and the log taking in what a segment holds.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub mod fuzzing {
+    use super::*;
+    use method_core::log::Ids;
+
+    /// The first byte picks the reader; the rest is the file. Never panics,
+    /// whatever the bytes (that is what the target checks).
+    pub fn read_shared_folder_file(data: &[u8]) {
+        let Some((&pick, rest)) = data.split_first() else {
+            return;
+        };
+        match pick % 4 {
+            0 => {
+                if let Ok(changes) = read_segment(rest) {
+                    take(changes);
+                }
+            }
+            1 => {
+                let Ok(text) = std::str::from_utf8(rest) else {
+                    return;
+                };
+                take(
+                    text.lines()
+                        .filter_map(|l| change_from_json(l).ok())
+                        .collect(),
+                );
+            }
+            2 => {
+                let _ = serde_json::from_slice::<Presence>(rest);
+            }
+            _ => {
+                let _ = serde_json::from_slice::<FileBudgetInfo>(rest);
+            }
+        }
+    }
+
+    /// A fresh log taking in `changes` in order, then its view of the budget.
+    fn take(changes: Vec<Change>) {
+        let mut log = Log::new(ActorId([1; 32]), Ids::seeded(1));
+        for c in changes {
+            let _ = log.apply(c);
+        }
+        let _ = log.lamport();
+        let _ = log.project();
+    }
+}
