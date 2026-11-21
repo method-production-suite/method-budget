@@ -138,7 +138,7 @@ this section.
 - **Copy rows with everything on them.** Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change.
 - **Notes.** Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.
 - **Signed and notarized Mac app.** The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.
-- **Work on a budget together.** Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.
+- **Work on a budget together.** Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, each person's name is signed by them and each role is tied to their key, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days.
 
 ### Versions, compare, diff and merge
 

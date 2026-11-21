@@ -261,9 +261,9 @@ ref = "1.21"
 [[feature]]
 group = "editor"
 title = "Work on a budget together"
-text = "Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days."
+text = "Share a budget through a folder you already sync, and everyone who opens it edits the same budget; give each person a role, from everything to some categories, actuals and notes, notes only or read only; every change is signed by the computer that made it, each person's name is signed by them and each role is tied to their key, Who Changed This answers for any cell, undo takes back only your own edits, and an invite link works once and expires in 1, 7 or 30 days."
 status = "have"
-ref = ["D64", "D78", "D89", "D97"]
+ref = ["D64", "D78", "D89", "D97", "D103"]
 
 [[feature]]
 group = "editor"
